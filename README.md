@@ -3,7 +3,7 @@
 
 ## Installation
 
-Installation : follow the step in [Installation]
+Installation : follow the step in [Installation](https://github.com/KU-SSM/KU-Smart-Skill-Mapping/blob/main/Installation.md)
 
 ## Running the Application
 
