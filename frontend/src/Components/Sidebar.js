@@ -5,7 +5,7 @@ function SideBar () {
     return <div className="Sidebar">
             <ul className="List">
                 {SideBarData.map((val, key) => {
-                  return <li key={key} className="row">
+                  return <li key={key} onClick={() => {window.location.pathname = val.link}} className="row">
                      <div id="icon"> 
                         {val.icon} 
                     </div> 
