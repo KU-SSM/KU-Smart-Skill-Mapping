@@ -1,4 +1,4 @@
-import React from 'react'
+import { IconType } from 'react-icons'
 import * as AiIcons from 'react-icons/ai'
 import { TbCertificate } from 'react-icons/tb'
 import { VscGraph, VscBook } from 'react-icons/vsc'
@@ -6,40 +6,47 @@ import { BsPersonLinesFill } from 'react-icons/bs'
 import { LuChartLine } from 'react-icons/lu'
 import { MdHome } from 'react-icons/md'
 
-export const SideBarData = [
+export interface SidebarItem {
+    title: string;
+    link: string;
+    icon: IconType;
+}
+
+export const SideBarData: SidebarItem[] = [
     {
         title: "Courses & Skills",
         link:"/courses_and_skills",
-        icon: <TbCertificate />
+        icon: TbCertificate
     },
     {
         title: "Jobs & Skills",
         link:"/jobs_and_skills",
-        icon: <VscGraph />
+        icon: VscGraph
     },
     {
         title: "Recommend Course",
         link:"/recommend_course",
-        icon: <VscBook />
+        icon: VscBook
     },
     {
         title: "Export Chart",
         link:"/export_chart",
-        icon: <LuChartLine />
+        icon: LuChartLine
     },
     {
         title: "Your Profile",
         link:"/profile",
-        icon: <BsPersonLinesFill />
+        icon: BsPersonLinesFill
     },
     {
         title: "Skill Map",
         link:"/skill_map",
-        icon: <AiIcons.AiOutlineRadarChart />
+        icon: AiIcons.AiOutlineRadarChart
     },
     {
         title: "Home",
         link:"/",
-        icon: <MdHome />
+        icon: MdHome
     }
 ];
+
