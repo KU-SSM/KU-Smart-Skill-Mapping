@@ -1,5 +1,6 @@
 import React from "react";
 import { SideBarData } from "./SidebarData";
+import "./Sidebar.css";
 
 const SideBar: React.FC = () => {
     return <div className="Sidebar">
