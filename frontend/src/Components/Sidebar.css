@@ -1,11 +1,11 @@
 .Sidebar {
-  flex: 1;
   width: 250px;
   background-color: rgba(178, 187, 30, 0.6);
   margin: 0;
   padding: 0;
   overflow-y: auto;
   color: black;
+  flex-shrink: 0;
 }
 
 .List .row {
