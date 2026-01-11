@@ -24,7 +24,7 @@ const Certificates: React.FC = () => {
             className="certificates-search"
           />
         </div>
-        <h2 className="certificates-subheader">Lorem Ipsum</h2>
+        <h2 className="certificates-subheader">All of your achievements is here!</h2>
         <div className="certificates-grid">
           {certificates.map((certificate) => (
             <Link 
