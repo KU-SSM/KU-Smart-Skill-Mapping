@@ -1,0 +1,49 @@
+# Virtual environments
+env/
+venv/
+.venv/
+
+# Python caches / bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Local env files & secrets
+.env
+.env.* 
+
+# Packaging / build
+dist/
+build/
+*.egg-info/
+
+# Testing
+.pytest_cache/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# testing
+/coverage
+
+# production
+/build
+
+# misc
+.DS_Store
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
