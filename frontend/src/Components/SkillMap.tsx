@@ -38,7 +38,7 @@ const SkillMap: React.FC = () => {
                   tickCount={6}
                 />
                 <Radar
-                  name="User's Skills"
+                  name="User's #1 Skills"
                   dataKey="user"
                   stroke="#3b82f6"
                   fill="#3b82f6"
