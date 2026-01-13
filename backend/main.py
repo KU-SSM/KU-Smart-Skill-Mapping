@@ -75,8 +75,8 @@ async def read_maps(db: db_dependency, skip: int=0, limit: int=100):
 
 
 # PDF Text Extraction Endpoint
-@app.post("/pdf/extract")
-async def extract_pdf_text(file: UploadFile = File(...)):
+@app.post("/portfolio/import")
+async def extract_document(file: UploadFile = File(...)):
     try:
         # Validate file type
         if not file.filename or not file.filename.lower().endswith('.pdf'):
@@ -89,8 +89,8 @@ async def extract_pdf_text(file: UploadFile = File(...)):
         openai_service = get_openai_service()
         
         # Extract text from PDF
-        # result = await openai_service.extract_text_from_pdf(file)
-        result = {"text": "test", "metadata": "test data"}
+        result = await openai_service.extract_text_from_pdf(file)
+        # result = {"text": "test", "metadata": "test data"}
         
         return JSONResponse(
             status_code=200,
