@@ -6,6 +6,7 @@ import Home from './Components/Home';
 import Certificates from './Components/Certificates';
 import CertificateDetail from './Components/CertificateDetail';
 import SkillMap from './Components/SkillMap';
+import Portfolio from './Components/Portfolio';
 
 const App: React.FC = () => {
   return (
@@ -19,6 +20,7 @@ const App: React.FC = () => {
               <Route path="/certificates" element={<Certificates />} />
               <Route path="/certificates/:id" element={<CertificateDetail />} />
               <Route path="/skill_map" element={<SkillMap />} />
+              <Route path="/portfolio" element={<Portfolio />} />
             </Routes>
           </main>
         </div>
