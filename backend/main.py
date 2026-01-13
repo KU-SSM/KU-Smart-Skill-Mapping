@@ -1,11 +1,16 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
+from fastapi.responses import JSONResponse
 from typing import Annotated, List
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from database import SessionLocal, engine
 import models
 from fastapi.middleware.cors import CORSMiddleware
-from database import engine
+from services.openai_service import get_openai_service
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 app = FastAPI()
@@ -67,3 +72,42 @@ async def create_map(map: SkillMapBase, db: db_dependency):
 async def read_maps(db: db_dependency, skip: int=0, limit: int=100):
     maps = db.query(models.SkillMap).offset(skip).limit(limit).all()
     return maps
+
+
+# PDF Text Extraction Endpoint
+@app.post("/pdf/extract")
+async def extract_pdf_text(file: UploadFile = File(...)):
+    try:
+        # Validate file type
+        if not file.filename or not file.filename.lower().endswith('.pdf'):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid file type. Please upload a PDF file (.pdf)"
+            )
+        
+        # Get OpenAI service instance
+        openai_service = get_openai_service()
+        
+        # Extract text from PDF
+        # result = await openai_service.extract_text_from_pdf(file)
+        result = {"text": "test", "metadata": "test data"}
+        
+        return JSONResponse(
+            status_code=200,
+            content={
+                "success": True,
+                "text": result["text"],
+                "metadata": result["metadata"]
+            }
+        )
+        
+    except ValueError as e:
+        logger.error(f"Validation error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    
+    except Exception as e:
+        logger.error(f"Error extracting PDF text: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to extract text from PDF: {str(e)}"
+        )

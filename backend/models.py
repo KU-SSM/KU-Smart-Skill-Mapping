@@ -7,7 +7,7 @@ class SkillMap(Base):
     __tablename__ = 'transactions'
 
     id = Column(Integer, primary_key=True, index=True)
-    skills = Column(ARRAY)
+    # skills = Column(ARRAY)
     category = Column(String)
     description = Column(String)
     date = Column(String)
