@@ -96,8 +96,6 @@ async def extract_document(file: UploadFile = File(...)):
             status_code=200,
             content={
                 "success": True,
-                "text": result["text"],
-                "metadata": result["metadata"]
             }
         )
         

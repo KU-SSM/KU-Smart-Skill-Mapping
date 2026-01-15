@@ -1,6 +1,0 @@
-fastapi
-uvicorn
-sqlalchemy
-openai>=1.0.0
-python-multipart
-python-dotenv
