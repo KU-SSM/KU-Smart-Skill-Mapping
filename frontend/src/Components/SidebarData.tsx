@@ -45,8 +45,8 @@ export const SideBarData: SidebarItem[] = [
         icon: AiIcons.AiOutlineRadarChart
     },
     {
-        title: "Certificates",
-        link:"/certificates",
+        title: "Certificate",
+        link:"/certificate",
         icon: FaCertificate
     },
     {
