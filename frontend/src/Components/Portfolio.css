@@ -96,6 +96,41 @@
   box-shadow: none;
 }
 
+.selected-files {
+  width: 100%;
+  margin-top: 20px;
+  padding: 15px;
+  background-color: #f0f0f0;
+  border-radius: 6px;
+  box-sizing: border-box;
+}
+
+.files-count {
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  margin: 0 0 10px 0;
+}
+
+.files-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.file-item {
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  color: #666;
+  padding: 8px 0;
+  border-bottom: 1px solid #ddd;
+}
+
+.file-item:last-child {
+  border-bottom: none;
+}
+
 @media (max-width: 640px) {
   .portfolio-container {
     padding: 20px;
