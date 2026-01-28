@@ -1,0 +1,106 @@
+.home-wrapper {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  box-sizing: border-box;
+  padding: 20px;
+}
+
+.home-container {
+  width: 100%;
+  max-width: 1400px;
+  display: flex;
+  align-items: center;
+  gap: 40px;
+  box-sizing: border-box;
+}
+
+.home-image-section {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.home-image {
+  width: 100%;
+  max-width: 400px;
+  height: auto;
+  animation: fadeUp 0.8s ease-out forwards;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+@keyframes fadeUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.home-greeting-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.greeting-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 42px;
+  font-weight: 700;
+  color: #333;
+  margin: 0 0 24px 0;
+  line-height: 1.2;
+  text-align: left;
+  animation: fadeUp 0.8s ease-out 0.4s forwards;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.greeting-message {
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px;
+  line-height: 1.8;
+  color: #666;
+  margin: 0 0 20px 0;
+  text-align: left;
+  animation: fadeUp 0.8s ease-out 0.6s forwards;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.greeting-message:last-child {
+  margin-bottom: 0;
+}
+
+@media (max-width: 1024px) {
+  .home-container {
+    flex-direction: column;
+    gap: 30px;
+  }
+
+  .home-image-section {
+    width: 100%;
+  }
+
+  .home-greeting-section {
+    width: 100%;
+    text-align: center;
+  }
+
+  .greeting-title {
+    font-size: 32px;
+  }
+
+  .greeting-message {
+    font-size: 16px;
+  }
+}

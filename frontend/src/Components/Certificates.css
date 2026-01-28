@@ -1,0 +1,146 @@
+.certificates-wrapper {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.certificates-container {
+  background-color: #ffffff;
+  padding: 20px 30px 30px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 1200px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+}
+
+.certificates-header {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  gap: 20px;
+}
+
+.certificates-container h1 {
+  font-family: 'Roboto', sans-serif;
+  font-size: 40px;
+  margin-bottom: 0;
+  margin-top: 0;
+  color: #333;
+  text-align: left;
+  flex-shrink: 0;
+}
+
+.certificates-search {
+  padding: 10px 16px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  min-width: 250px;
+  max-width: 400px;
+  flex: 1;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.certificates-search:focus {
+  outline: none;
+  border-color: rgba(178, 187, 30, 0.8);
+  box-shadow: 0 0 0 3px rgba(178, 187, 30, 0.1);
+}
+
+.certificates-search::placeholder {
+  color: #999;
+}
+
+.certificates-subheader {
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  margin-bottom: 30px;
+  margin-top: 0;
+  color: #888;
+  width: 100%;
+  text-align: left;
+  font-weight: 400;
+}
+
+.certificates-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  row-gap: 40px;
+  column-gap: 40px;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.certificate-item-link {
+  text-decoration: none;
+  color: inherit;
+  width: 100%;
+  display: block;
+  cursor: pointer;
+}
+
+.certificate-item {
+  background-color: #ffffff; 
+  border: 1px solid #e0e0d0;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.certificate-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.certificate-image {
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  border: 1px solid #000000;
+}
+
+.certificate-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+  text-align: center;
+  width: 100%;
+  padding: 0 8px;
+}
+
+@media (max-width: 968px) {
+  .certificates-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .certificates-grid {
+    grid-template-columns: 1fr;
+  }
+}

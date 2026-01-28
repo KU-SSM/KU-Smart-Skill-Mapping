@@ -1,0 +1,171 @@
+.certificate-detail-wrapper {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 30px;
+  box-sizing: border-box;
+}
+
+.certificate-section {
+  background-color: #ffffff;
+  padding: 30px;
+  width: 100%;
+  max-width: 1200px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.message-section {
+  background-color: #ffffff;
+  padding: 20px;
+  width: 100%;
+  max-width: 1200px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+
+.certificate-detail-buttons {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.export-button {
+  background-color: rgba(178, 187, 30, 1);
+  border: 1px solid rgba(178, 187, 30, 1);
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  color: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.export-button:hover {
+  background-color: rgba(178, 187, 30, 0.9);
+  border-color: rgba(178, 187, 30, 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(178, 187, 30, 0.3);
+}
+
+.back-button {
+  background-color: transparent;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px 20px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  cursor: pointer;
+  color: #333;
+  transition: all 0.2s ease;
+}
+
+.back-button:hover {
+  background-color: #f5f5f5;
+  border-color: rgba(178, 187, 30, 0.8);
+  color: rgba(178, 187, 30, 1);
+}
+
+.certificate-detail-img {
+  width: 100%;
+  max-width: 800px;
+  height: auto;
+  aspect-ratio: 210 / 297;
+  object-fit: contain;
+  border: 1px solid #000000;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.certificate-detail-info {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.certificate-detail-info h1 {
+  font-family: 'Roboto', sans-serif;
+  font-size: 28px;
+  margin: 0;
+  color: #333;
+}
+
+.certificate-description {
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #666;
+  margin: 0;
+}
+
+.certificate-details {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+}
+
+.certificate-detail-image {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.detail-item {
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #333;
+  display: flex;
+  gap: 10px;
+}
+
+.detail-item strong {
+  min-width: 150px;
+  color: #555;
+}
+
+@media (min-width: 768px) {
+  .certificate-detail-wrapper {
+    flex-direction: row;
+    align-items: flex-start;
+    position: relative;
+  }
+
+  .certificate-section {
+    flex: 1.5;
+    max-width: none;
+  }
+
+  .certificate-detail-img {
+    max-width: 1000px;
+  }
+
+  .message-section {
+    width: 350px;
+    flex: 0 0 350px;
+    max-width: 350px;
+    position: sticky;
+    top: 0;
+    align-self: flex-start;
+    max-height: 100vh;
+    overflow-y: auto;
+  }
+}

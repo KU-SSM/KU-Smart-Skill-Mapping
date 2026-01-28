@@ -5,6 +5,8 @@ import { VscGraph, VscBook } from 'react-icons/vsc'
 import { BsPersonLinesFill } from 'react-icons/bs'
 import { LuChartLine } from 'react-icons/lu'
 import { MdHome } from 'react-icons/md'
+import { FaCertificate, FaBriefcase } from 'react-icons/fa'
+import { AiOutlineCheckSquare } from 'react-icons/ai'
 
 export interface SidebarItem {
     title: string;
@@ -42,6 +44,21 @@ export const SideBarData: SidebarItem[] = [
         title: "Skill Map",
         link:"/skill_map",
         icon: AiIcons.AiOutlineRadarChart
+    },
+    {
+        title: "Certificate",
+        link:"/certificate",
+        icon: FaCertificate
+    },
+    {
+        title: "Portfolio",
+        link:"/portfolio",
+        icon: FaBriefcase
+    },
+    {
+        title: "Rubric Score",
+        link:"/rubric_score",
+        icon: AiOutlineCheckSquare
     },
     {
         title: "Home",

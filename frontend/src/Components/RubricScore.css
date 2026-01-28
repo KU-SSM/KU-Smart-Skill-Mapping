@@ -1,0 +1,320 @@
+.rubric-score-wrapper {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.rubric-score-container {
+  background-color: #ffffff;
+  padding: 20px 30px 30px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 1200px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.rubric-score-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 40px;
+  margin-bottom: 30px;
+  margin-top: 0;
+  color: #333;
+  text-align: left;
+  flex-shrink: 0;
+}
+
+.table-container {
+  width: 100%;
+  overflow: hidden;
+  border-radius: 8px;
+  padding: 0;
+  background-color: transparent;
+}
+
+.table-wrapper {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.rubric-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 12px;
+  min-width: 800px;
+  background-color: transparent;
+}
+
+.rubric-table thead {
+  background-color: transparent;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.rubric-table thead tr {
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.rubric-table thead tr th.add-column-cell {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.rubric-table th {
+  padding: 20px;
+  text-align: left;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  white-space: normal;
+  word-wrap: break-word;
+  background-color: transparent;
+  border: none;
+  min-width: 120px;
+  vertical-align: top;
+}
+
+.rubric-table th:first-child {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.rubric-table th:last-child:not(.add-column-cell) {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.rubric-table th.add-column-cell {
+  padding: 8px !important;
+  text-align: center;
+  vertical-align: middle;
+  min-width: 60px;
+  width: 60px;
+  border-left: 1px solid #e0e0e0;
+}
+
+.rubric-table th.fixed-column {
+  position: sticky;
+  left: 0;
+  z-index: 20;
+  background-color: #ffffff;
+  border-right: 1px solid #e0e0e0;
+  min-width: 200px;
+  max-width: 200px;
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.rubric-table tbody tr {
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+  margin-bottom: 12px;
+}
+
+.rubric-table tbody tr:hover {
+  background-color: #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transform: translateY(-1px);
+}
+
+.rubric-table td {
+  padding: 20px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #666;
+  white-space: normal;
+  word-wrap: break-word;
+  min-width: 120px;
+  background-color: transparent;
+  border: none;
+  vertical-align: top;
+}
+
+.rubric-table td:first-child {
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.rubric-table td:last-child:not(.add-column-cell) {
+  border-top-right-radius: 6px;
+  border-bottom-right-radius: 6px;
+}
+
+.rubric-table td.add-column-cell {
+  border-left: 1px solid #e0e0e0;
+}
+
+.rubric-table td.fixed-column {
+  position: sticky;
+  left: 0;
+  z-index: 15;
+  background-color: #ffffff;
+  border-right: 1px solid #e0e0e0;
+  font-weight: 500;
+  color: #333;
+  min-width: 200px;
+  max-width: 200px;
+  border-top-left-radius: 6px;
+  border-bottom-left-radius: 6px;
+}
+
+.rubric-table tbody tr:hover td.fixed-column {
+  background-color: #ffffff;
+}
+
+.editable-cell,
+.editable-header {
+  width: 100%;
+  border: none;
+  background: transparent;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #666;
+  padding: 0;
+  outline: none;
+  box-sizing: border-box;
+  resize: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  min-height: 20px;
+  line-height: 1.5;
+  overflow: hidden;
+  display: block;
+  height: auto;
+}
+
+.editable-header {
+  font-weight: 600;
+  color: #333;
+}
+
+.editable-cell:focus,
+.editable-header:focus {
+  color: #333;
+  background-color: #f0f7ff;
+  border-radius: 4px;
+  padding: 4px 8px;
+}
+
+.editable-cell::placeholder,
+.editable-header::placeholder {
+  color: #bbb;
+}
+
+.add-column-cell,
+.add-row-cell {
+  padding: 8px !important;
+  text-align: center;
+  vertical-align: middle;
+  min-width: 60px;
+  width: 60px;
+}
+
+.add-button {
+  width: 32px;
+  height: 32px;
+  border: 2px dashed #b2bb1e;
+  border-radius: 6px;
+  background-color: transparent;
+  color: #b2bb1e;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  transition: all 0.2s ease;
+  padding: 0;
+  margin: 0 auto;
+}
+
+.add-button:hover {
+  background-color: #b2bb1e;
+  color: #ffffff;
+  border-style: solid;
+  transform: scale(1.1);
+}
+
+.add-row-row {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  height: auto;
+}
+
+.add-row-row:hover {
+  transform: none !important;
+  box-shadow: none !important;
+  background-color: transparent !important;
+}
+
+.add-row-row td {
+  background-color: transparent !important;
+  border: none !important;
+  padding: 8px !important;
+}
+
+.add-row-row .add-button {
+  border-color: #ccc;
+  color: #999;
+}
+
+.add-row-row .add-button:hover {
+  background-color: #b2bb1e;
+  color: #ffffff;
+  border-color: #b2bb1e;
+}
+
+.table-wrapper::-webkit-scrollbar {
+  height: 8px;
+}
+
+.table-wrapper::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb {
+  background: #b2bb1e;
+  border-radius: 4px;
+}
+
+.table-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #9aa017;
+}
+
+@media (max-width: 768px) {
+  .rubric-score-container {
+    padding: 15px;
+  }
+
+  .rubric-score-title {
+    font-size: 24px;
+  }
+
+  .rubric-table th,
+  .rubric-table td {
+    padding: 12px 15px;
+    font-size: 13px;
+  }
+}
