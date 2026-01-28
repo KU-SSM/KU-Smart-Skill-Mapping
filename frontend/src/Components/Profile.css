@@ -1,0 +1,335 @@
+.profile-wrapper {
+  width: 100%;
+  max-width: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  box-sizing: border-box;
+  padding: 0;
+}
+
+.profile-container {
+  background-color: #ffffff;
+  padding: 20px 30px 30px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 1200px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+}
+
+.profile-header {
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.profile-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 40px;
+  margin: 0;
+  color: #333;
+  text-align: left;
+  flex-shrink: 0;
+}
+
+.skills-tabs-box {
+  width: 100%;
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding: 8px;
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-sizing: border-box;
+}
+
+.skill-tab-button {
+  flex: 1;
+  padding: 12px 24px;
+  border: none;
+  border-radius: 6px;
+  background-color: transparent;
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.skill-tab-button:hover {
+  background-color: #f5f5f5;
+  color: #333;
+}
+
+.skill-tab-button.active {
+  background-color: rgba(178, 187, 30, 1);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.skills-panels-container {
+  width: 100%;
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+.skills-panel {
+  flex: 1;
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  height: 600px;
+  max-height: 600px;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.panel-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 16px 0;
+}
+
+.search-container {
+  position: relative;
+  width: 100%;
+  margin-bottom: 16px;
+}
+
+.search-input {
+  width: 100%;
+  padding: 10px 40px 10px 16px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: rgba(178, 187, 30, 1);
+}
+
+.clear-search {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  font-size: 18px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+}
+
+.clear-search:hover {
+  color: #333;
+}
+
+.skills-list {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  scrollbar-gutter: stable;
+  padding-right: 15px;
+}
+
+.skills-list::-webkit-scrollbar {
+  width: 8px;
+}
+
+.skills-list::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.skills-list::-webkit-scrollbar-thumb {
+  background: #b2bb1e;
+  border-radius: 4px;
+}
+
+.skills-list::-webkit-scrollbar-thumb:hover {
+  background: #9aa017;
+}
+
+.skill-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  background-color: #fafafa;
+  transition: all 0.2s ease;
+}
+
+.skill-item:hover {
+  background-color: #f0f0f0;
+}
+
+.skill-name {
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #333;
+  flex: 1;
+}
+
+.add-skill-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.level-label {
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #666;
+  margin: 0;
+}
+
+.level-input {
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  background-color: #ffffff;
+  width: 60px;
+  text-align: center;
+}
+
+.level-input:focus {
+  outline: none;
+  border-color: rgba(178, 187, 30, 1);
+}
+
+.level-input::placeholder {
+  color: #999;
+}
+
+.add-skill-button {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  background-color: rgba(178, 187, 30, 1);
+  color: #ffffff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.add-skill-button:hover {
+  background-color: rgba(178, 187, 30, 0.9);
+  transform: translateY(-1px);
+}
+
+.skill-item.selected {
+  background-color: #ffffff;
+}
+
+.remove-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 4px;
+  background-color: #ff4444;
+  color: #ffffff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.remove-button:hover {
+  background-color: #cc0000;
+}
+
+.add-skill-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0;
+  align-self: center;
+  height: 600px;
+  width: auto;
+  min-width: fit-content;
+}
+
+.add-arrow {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(178, 187, 30, 1);
+  border-radius: 50%;
+  color: #ffffff;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.add-text {
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #666;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+  width: 100%;
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+
+@media (max-width: 1024px) {
+  .skills-panels-container {
+    flex-direction: column;
+  }
+
+  .add-skill-section {
+    transform: rotate(90deg);
+    padding: 10px 0;
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-container {
+    padding: 15px;
+  }
+
+  .profile-title {
+    font-size: 28px;
+  }
+
+  .skills-panel {
+    min-height: 400px;
+  }
+}
