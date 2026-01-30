@@ -2,10 +2,12 @@
   width: 100%;
   max-width: 100%;
   display: flex;
+  flex-direction: column;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
   box-sizing: border-box;
   padding: 0;
+  gap: 30px;
 }
 
 .profile-container {
@@ -320,6 +322,261 @@
   }
 }
 
+.portfolio-container {
+  background-color: #ffffff;
+  padding: 20px 30px 30px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 1200px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+}
+
+.portfolio-section {
+  width: 100%;
+}
+
+.portfolio-section-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 32px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 30px 0;
+  text-align: left;
+}
+
+.portfolio-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 24px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.portfolio-box {
+  background-color: #fafafa;
+  border: 2px dashed #ddd;
+  border-radius: 8px;
+  padding: 30px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  position: relative;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.portfolio-box:hover {
+  border-color: rgba(178, 187, 30, 0.8);
+  background-color: #f5f5f5;
+}
+
+.portfolio-box-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: transparent;
+  color: rgba(178, 187, 30, 1);
+  font-size: 48px;
+}
+
+.portfolio-box-name {
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  text-align: center;
+}
+
+.portfolio-upload-button {
+  padding: 12px 24px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background-color: #ffffff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portfolio-upload-button:hover {
+  background-color: #f5f5f5;
+  border-color: rgba(178, 187, 30, 0.8);
+  color: rgba(178, 187, 30, 1);
+}
+
+.portfolio-delete-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background-color: #ff4444;
+  color: #ffffff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+}
+
+.portfolio-delete-button:hover {
+  background-color: #cc0000;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 968px) {
+  .portfolio-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .portfolio-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.evaluation-container {
+  background-color: #ffffff;
+  padding: 20px 30px 30px 30px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  width: 100%;
+  max-width: 1200px;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+}
+
+.evaluation-section {
+  width: 100%;
+}
+
+.evaluation-section-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 32px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 24px 0;
+  text-align: left;
+}
+
+.evaluation-box {
+  width: 100%;
+  background-color: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 40px;
+  box-sizing: border-box;
+  min-height: 200px;
+}
+
+.evaluation-content {
+  text-align: center;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 120px;
+}
+
+.evaluation-message {
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: #666;
+  margin: 0 0 12px 0;
+}
+
+.evaluation-submessage {
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #999;
+  margin: 0;
+}
+
+.evaluation-table-container {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: visible;
+  box-sizing: border-box;
+  display: block;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  padding-bottom: 15px;
+}
+
+.evaluation-table {
+  width: auto;
+  min-width: 100%;
+  border-collapse: collapse;
+  background-color: #ffffff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: table;
+  table-layout: auto;
+  white-space: nowrap;
+}
+
+.evaluation-table-header {
+  background-color: rgba(178, 187, 30, 1);
+  color: #ffffff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 16px;
+  text-align: center;
+  border: 1px solid rgba(178, 187, 30, 0.8);
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+.evaluation-table-row-header {
+  background-color: #f5f5f5;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  padding: 16px;
+  text-align: left;
+  border: 1px solid #e0e0e0;
+  white-space: nowrap;
+}
+
+.evaluation-table-cell {
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #333;
+  padding: 16px;
+  text-align: center;
+  border: 1px solid #e0e0e0;
+  background-color: #ffffff;
+  white-space: nowrap;
+  min-width: 120px;
+}
+
+.evaluation-table tbody tr:hover .evaluation-table-cell {
+  background-color: #f9f9f9;
+}
+
 @media (max-width: 768px) {
   .profile-container {
     padding: 15px;
@@ -331,5 +588,13 @@
 
   .skills-panel {
     min-height: 400px;
+  }
+
+  .evaluation-container {
+    padding: 15px;
+  }
+
+  .evaluation-box {
+    padding: 30px 20px;
   }
 }

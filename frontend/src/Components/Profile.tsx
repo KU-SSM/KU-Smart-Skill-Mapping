@@ -1,14 +1,21 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import './Profile.css';
 import { AiOutlineArrowRight, AiOutlineClose } from 'react-icons/ai';
+import { FaBriefcase } from 'react-icons/fa';
 
 const ArrowIcon = AiOutlineArrowRight as React.ComponentType;
 const CloseIcon = AiOutlineClose as React.ComponentType;
+const BriefcaseIcon = FaBriefcase as React.ComponentType;
 
 interface Skill {
   id: string;
   name: string;
   level?: number;
+}
+
+interface Portfolio {
+  id: string;
+  name: string;
 }
 
 const Profile: React.FC = () => {
@@ -42,6 +49,45 @@ const Profile: React.FC = () => {
   ]);
   
   const [softSkillsSelected, setSoftSkillsSelected] = useState<Skill[]>([]);
+
+  const [portfolios, setPortfolios] = useState<Portfolio[]>([
+    { id: '1', name: 'Portfolio 1' },
+    { id: '2', name: 'Portfolio 2' },
+    { id: '3', name: 'Portfolio 3' },
+    { id: '4', name: 'Portfolio 4' },
+    { id: '5', name: 'Portfolio 5' },
+    { id: '6', name: 'Portfolio 6' },
+  ]);
+
+  const [portfolioFiles, setPortfolioFiles] = useState<{ [key: string]: File[] }>({});
+
+  const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+
+  const handleClearFiles = (id: string) => {
+    const updatedFiles = { ...portfolioFiles };
+    delete updatedFiles[id];
+    setPortfolioFiles(updatedFiles);
+    const fileInput = fileInputRefs.current[id];
+    if (fileInput) {
+      fileInput.value = '';
+    }
+  };
+
+  const handleUploadClick = (portfolioId: string) => {
+    fileInputRefs.current[portfolioId]?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, portfolioId: string) => {
+    const files = event.target.files;
+    if (files) {
+      const fileArray = Array.from(files);
+      setPortfolioFiles({
+        ...portfolioFiles,
+        [portfolioId]: fileArray
+      });
+      console.log(`Selected files for ${portfolioId}:`, fileArray);
+    }
+  };
 
   const getAvailableSkills = () => {
     return activeTab === 'hard' ? hardSkillsAvailable : softSkillsAvailable;
@@ -97,6 +143,20 @@ const Profile: React.FC = () => {
   const filteredSelected = getSelectedSkills().filter(skill =>
     skill.name.toLowerCase().includes(searchRight.toLowerCase())
   );
+
+  const activeSelectedSkills = useMemo(() => {
+    return activeTab === 'hard' ? hardSkillsSelected : softSkillsSelected;
+  }, [activeTab, hardSkillsSelected, softSkillsSelected]);
+
+  const evaluationData = useMemo(() => {
+    const generateRandomLevel = () => Math.floor(Math.random() * 5) + 1; 
+    
+    return [
+      { evaluator: 'Teacher', levels: activeSelectedSkills.map(() => generateRandomLevel()) },
+      { evaluator: 'AI', levels: activeSelectedSkills.map(() => generateRandomLevel()) },
+      { evaluator: 'Student (You)', levels: activeSelectedSkills.map(() => generateRandomLevel()) },
+    ];
+  }, [activeSelectedSkills]);
 
   return (
     <div className="profile-wrapper">
@@ -226,6 +286,90 @@ const Profile: React.FC = () => {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="portfolio-container">
+        <div className="portfolio-section">
+          <h2 className="portfolio-section-title">Portfolios</h2>
+          <div className="portfolio-grid">
+            {portfolios.map((portfolio) => (
+              <div key={portfolio.id} className="portfolio-box">
+                <div className="portfolio-box-icon">
+                  {React.createElement(BriefcaseIcon)}
+                </div>
+                <div className="portfolio-box-name">{portfolio.name}</div>
+                <input
+                  ref={(el) => (fileInputRefs.current[portfolio.id] = el)}
+                  type="file"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={(e) => handleFileChange(e, portfolio.id)}
+                  accept=".jpg,.jpeg"
+                />
+                <button
+                  className="portfolio-upload-button"
+                  onClick={() => handleUploadClick(portfolio.id)}
+                >
+                  {portfolioFiles[portfolio.id] && portfolioFiles[portfolio.id].length > 0
+                    ? portfolioFiles[portfolio.id].length === 1
+                      ? portfolioFiles[portfolio.id][0].name
+                      : `${portfolioFiles[portfolio.id].length} files selected`
+                    : 'Upload Portfolio'}
+                </button>
+                {portfolioFiles[portfolio.id] && portfolioFiles[portfolio.id].length > 0 && (
+                  <button
+                    className="portfolio-delete-button"
+                    onClick={() => handleClearFiles(portfolio.id)}
+                  >
+                    {React.createElement(CloseIcon)}
+                    <span>Delete</span>
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="evaluation-container">
+        <div className="evaluation-section">
+          <h2 className="evaluation-section-title">Evaluation Results</h2>
+          <div className="evaluation-box">
+            {activeSelectedSkills.length > 0 ? (
+              <div className="evaluation-table-container">
+                <table className="evaluation-table">
+                  <thead>
+                    <tr>
+                      <th className="evaluation-table-header">Evaluator</th>
+                      {activeSelectedSkills.map((skill) => (
+                        <th key={skill.id} className="evaluation-table-header">
+                          {skill.name}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {evaluationData.map((row, rowIndex) => (
+                      <tr key={rowIndex}>
+                        <td className="evaluation-table-row-header">{row.evaluator}</td>
+                        {row.levels.map((level, colIndex) => (
+                          <td key={colIndex} className="evaluation-table-cell">
+                            {level}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="evaluation-content">
+                <p className="evaluation-message">No evaluation results available yet.</p>
+                <p className="evaluation-submessage">Select {activeTab === 'hard' ? 'hard' : 'soft'} skills to see evaluation results.</p>
+              </div>
+            )}
           </div>
         </div>
       </div>

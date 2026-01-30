@@ -50,11 +50,11 @@ export const SideBarData: SidebarItem[] = [
         link:"/certificate",
         icon: FaCertificate
     },
-    {
-        title: "Portfolio",
-        link:"/portfolio",
-        icon: FaBriefcase
-    },
+    // {
+    //     title: "Portfolio",
+    //     link:"/portfolio",
+    //     icon: FaBriefcase
+    // },
     {
         title: "Rubric Score",
         link:"/rubric_score",
