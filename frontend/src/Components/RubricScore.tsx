@@ -10,12 +10,8 @@ interface TableData {
 }
 
 const RubricScore: React.FC = () => {
-  const [headers, setHeaders] = useState<string[]>(['Level 1', 'Level 2', 'Level 3']);
-  const [rows, setRows] = useState<TableData[]>([
-    { skillArea: 'Communication', values: ['Good', 'Great', 'Awesome'] },
-    { skillArea: 'Technical Skills', values: ['Zero', 'Hero', 'Superhero'] },
-    { skillArea: 'Problem Solving', values: ['Amateur', 'Sophisticated', 'Pro'] },
-  ]);
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [rows, setRows] = useState<TableData[]>([]);
 
   const handleHeaderChange = (index: number, value: string) => {
     const newHeaders = [...headers];

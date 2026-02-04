@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import './Profile.css';
 import { AiOutlineArrowRight, AiOutlineClose } from 'react-icons/ai';
 import { FaBriefcase } from 'react-icons/fa';
@@ -23,6 +23,8 @@ const Profile: React.FC = () => {
   const [searchLeft, setSearchLeft] = useState('');
   const [searchRight, setSearchRight] = useState('');
   const [skillLevels, setSkillLevels] = useState<{ [key: string]: string }>({});
+  const [newSkillName, setNewSkillName] = useState('');
+  const [skillIdCounter, setSkillIdCounter] = useState(100);
   
   const [hardSkillsAvailable, setHardSkillsAvailable] = useState<Skill[]>([
     { id: '1', name: 'JavaScript' },
@@ -62,6 +64,21 @@ const Profile: React.FC = () => {
   const [portfolioFiles, setPortfolioFiles] = useState<{ [key: string]: File[] }>({});
 
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
+  
+  const [studentEvaluations, setStudentEvaluations] = useState<{ [tab: string]: { [skillId: string]: string } }>({
+    hard: {},
+    soft: {}
+  });
+
+  const [teacherEvaluations, setTeacherEvaluations] = useState<{ [tab: string]: { [skillId: string]: number } }>({
+    hard: {},
+    soft: {}
+  });
+
+  const [aiEvaluations, setAiEvaluations] = useState<{ [tab: string]: { [skillId: string]: number } }>({
+    hard: {},
+    soft: {}
+  });
 
   const handleClearFiles = (id: string) => {
     const updatedFiles = { ...portfolioFiles };
@@ -86,6 +103,16 @@ const Profile: React.FC = () => {
         [portfolioId]: fileArray
       });
       console.log(`Selected files for ${portfolioId}:`, fileArray);
+      
+      const tabKey = activeTab;
+      const generateRandomLevel = () => Math.floor(Math.random() * 5) + 1;
+      setAiEvaluations(prev => {
+        const newAiValues: { [skillId: string]: number } = {};
+        activeSelectedSkills.forEach(skill => {
+          newAiValues[skill.id] = generateRandomLevel();
+        });
+        return { ...prev, [tabKey]: newAiValues };
+      });
     }
   };
 
@@ -136,6 +163,27 @@ const Profile: React.FC = () => {
     setSelectedSkills(updatedSelected);
   };
 
+  const handleAddNewSkill = () => {
+    const trimmedName = newSkillName.trim();
+    if (!trimmedName) return;
+    
+    const available = getAvailableSkills();
+    const existingSkill = available.find(s => s.name.toLowerCase() === trimmedName.toLowerCase());
+    if (existingSkill) {
+      alert('This skill already exists in the list.');
+      return;
+    }
+    
+    const newSkill: Skill = {
+      id: `new-${skillIdCounter}`,
+      name: trimmedName
+    };
+    
+    setAvailableSkills([...available, newSkill]);
+    setNewSkillName('');
+    setSkillIdCounter(prev => prev + 1);
+  };
+
   const filteredAvailable = getAvailableSkills().filter(skill =>
     skill.name.toLowerCase().includes(searchLeft.toLowerCase())
   );
@@ -148,15 +196,71 @@ const Profile: React.FC = () => {
     return activeTab === 'hard' ? hardSkillsSelected : softSkillsSelected;
   }, [activeTab, hardSkillsSelected, softSkillsSelected]);
 
+  useEffect(() => {
+    const tabKey = activeTab;
+    const generateRandomLevel = () => Math.floor(Math.random() * 5) + 1;
+    
+    setTeacherEvaluations(prev => {
+      const currentValues = prev[tabKey] || {};
+      const newTeacherValues: { [skillId: string]: number } = { ...currentValues };
+      let hasChanges = false;
+      
+      activeSelectedSkills.forEach(skill => {
+        if (!newTeacherValues[skill.id]) {
+          newTeacherValues[skill.id] = generateRandomLevel();
+          hasChanges = true;
+        }
+      });
+      
+      return hasChanges ? { ...prev, [tabKey]: newTeacherValues } : prev;
+    });
+    
+    setAiEvaluations(prev => {
+      const currentValues = prev[tabKey] || {};
+      const newAiValues: { [skillId: string]: number } = { ...currentValues };
+      let hasChanges = false;
+      
+      activeSelectedSkills.forEach(skill => {
+        if (!newAiValues[skill.id]) {
+          newAiValues[skill.id] = generateRandomLevel();
+          hasChanges = true;
+        }
+      });
+      
+      return hasChanges ? { ...prev, [tabKey]: newAiValues } : prev;
+    });
+  }, [activeSelectedSkills, activeTab]);
+
+  const hasPortfolioFiles = useMemo(() => {
+    return Object.values(portfolioFiles).some(files => files && files.length > 0);
+  }, [portfolioFiles]);
+
   const evaluationData = useMemo(() => {
-    const generateRandomLevel = () => Math.floor(Math.random() * 5) + 1; 
+    const tabKey = activeTab;
+    const generateRandomLevel = () => Math.floor(Math.random() * 5) + 1;
+    
+    const teacherLevels = activeSelectedSkills.map(skill => {
+      return teacherEvaluations[tabKey]?.[skill.id] || generateRandomLevel();
+    });
+    
+    const aiLevels = activeSelectedSkills.map(skill => {
+      if (!hasPortfolioFiles) {
+        return '-';
+      }
+      return aiEvaluations[tabKey]?.[skill.id] || generateRandomLevel();
+    });
+    
+    const studentLevels = activeSelectedSkills.map(skill => {
+      const storedValue = studentEvaluations[tabKey]?.[skill.id];
+      return storedValue !== undefined ? storedValue : '-';
+    });
     
     return [
-      { evaluator: 'Teacher', levels: activeSelectedSkills.map(() => generateRandomLevel()) },
-      { evaluator: 'AI', levels: activeSelectedSkills.map(() => generateRandomLevel()) },
-      { evaluator: 'Student (You)', levels: activeSelectedSkills.map(() => generateRandomLevel()) },
+      { evaluator: 'Teacher', levels: teacherLevels },
+      { evaluator: 'AI', levels: aiLevels },
+      { evaluator: 'Student (You)', levels: studentLevels },
     ];
-  }, [activeSelectedSkills]);
+  }, [activeSelectedSkills, activeTab, studentEvaluations, teacherEvaluations, aiEvaluations, hasPortfolioFiles]);
 
   return (
     <div className="profile-wrapper">
@@ -201,6 +305,27 @@ const Profile: React.FC = () => {
                   {React.createElement(CloseIcon)}
                 </button>
               )}
+            </div>
+            <div className="add-new-skill-container">
+              <input
+                type="text"
+                className="add-new-skill-input"
+                placeholder="Add new skill..."
+                value={newSkillName}
+                onChange={(e) => setNewSkillName(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleAddNewSkill();
+                  }
+                }}
+              />
+              <button
+                className="add-new-skill-button"
+                onClick={handleAddNewSkill}
+                disabled={!newSkillName.trim()}
+              >
+                Add Skill
+              </button>
             </div>
             <div className="skills-list">
               {filteredAvailable.map((skill) => (
@@ -270,6 +395,7 @@ const Profile: React.FC = () => {
                 </button>
               )}
             </div>
+            <div className="add-new-skill-spacer"></div>
             <div className="skills-list">
               {filteredSelected.map((skill) => (
                 <div key={skill.id} className="skill-item selected">
@@ -354,11 +480,84 @@ const Profile: React.FC = () => {
                     {evaluationData.map((row, rowIndex) => (
                       <tr key={rowIndex}>
                         <td className="evaluation-table-row-header">{row.evaluator}</td>
-                        {row.levels.map((level, colIndex) => (
-                          <td key={colIndex} className="evaluation-table-cell">
-                            {level}
-                          </td>
-                        ))}
+                        {row.levels.map((level, colIndex) => {
+                          const skill = activeSelectedSkills[colIndex];
+                          const isStudentRow = row.evaluator === 'Student (You)';
+                          const tabKey = activeTab;
+                          const currentValue = isStudentRow 
+                            ? (studentEvaluations[tabKey]?.[skill.id] !== undefined ? studentEvaluations[tabKey][skill.id] : level)
+                            : level;
+                          
+                          return (
+                            <td key={colIndex} className="evaluation-table-cell">
+                              {isStudentRow ? (
+                                <input
+                                  type="text"
+                                  value={currentValue}
+                                  onKeyDown={(e) => {
+                                    // If value is dash and user presses a number key, prevent default and set the number directly
+                                    if (currentValue === '-' && /^[1-9]$/.test(e.key)) {
+                                      e.preventDefault();
+                                      setStudentEvaluations(prev => ({
+                                        ...prev,
+                                        [activeTab]: {
+                                          ...prev[activeTab],
+                                          [skill.id]: e.key
+                                        }
+                                      }));
+                                    }
+                                  }}
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    // If current value is dash and user is typing, replace dash with the new value
+                                    if (currentValue === '-' && value.length > 0 && /^[1-9]\d*$/.test(value)) {
+                                      setStudentEvaluations(prev => ({
+                                        ...prev,
+                                        [activeTab]: {
+                                          ...prev[activeTab],
+                                          [skill.id]: value
+                                        }
+                                      }));
+                                    }
+                                    // Allow empty, dash, or positive integers only (no decimals, no 0)
+                                    else if (value === '' || value === '-' || /^[1-9]\d*$/.test(value)) {
+                                      setStudentEvaluations(prev => ({
+                                        ...prev,
+                                        [activeTab]: {
+                                          ...prev[activeTab],
+                                          [skill.id]: value
+                                        }
+                                      }));
+                                    }
+                                  }}
+                                  onFocus={(e) => {
+                                    // When focused, if value is dash, select all text so typing replaces it
+                                    if (currentValue === '-') {
+                                      e.target.select();
+                                    }
+                                  }}
+                                  onBlur={(e) => {
+                                    const value = e.target.value;
+                                    const numValue = parseInt(value, 10);
+                                    // If empty or invalid (including 0 or decimals), reset to dash
+                                    if (value === '' || isNaN(numValue) || numValue < 1) {
+                                      setStudentEvaluations(prev => ({
+                                        ...prev,
+                                        [activeTab]: {
+                                          ...prev[activeTab],
+                                          [skill.id]: '-'
+                                        }
+                                      }));
+                                    }
+                                  }}
+                                  className="evaluation-input"
+                                />
+                              ) : (
+                                level
+                              )}
+                            </td>
+                          );
+                        })}
                       </tr>
                     ))}
                   </tbody>
