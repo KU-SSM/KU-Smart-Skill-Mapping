@@ -80,6 +80,11 @@ const Profile: React.FC = () => {
     soft: {}
   });
 
+  const [editingSkill, setEditingSkill] = useState<Skill | null>(null);
+  const [editingAvailableSkill, setEditingAvailableSkill] = useState<Skill | null>(null);
+  const [modalLevel, setModalLevel] = useState<string>('');
+  const [modalSkillName, setModalSkillName] = useState<string>('');
+
   const handleClearFiles = (id: string) => {
     const updatedFiles = { ...portfolioFiles };
     delete updatedFiles[id];
@@ -144,8 +149,12 @@ const Profile: React.FC = () => {
     const available = getAvailableSkills();
     const selected = getSelectedSkills();
     
+    const levelToUse = skillLevels[skill.id] ? parseInt(skillLevels[skill.id]) || level : level;
+    
     const updatedAvailable = available.filter(s => s.id !== skill.id);
-    const updatedSelected = [...selected, { ...skill, level }];
+    const updatedSelected = [...selected, { ...skill, level: levelToUse }];
+    
+    setSkillLevels({ ...skillLevels, [skill.id]: levelToUse.toString() });
     
     setAvailableSkills(updatedAvailable);
     setSelectedSkills(updatedSelected);
@@ -159,8 +168,77 @@ const Profile: React.FC = () => {
     const { level, ...skillWithoutLevel } = skill;
     const updatedAvailable = [...available, skillWithoutLevel];
     
+    if (level !== undefined) {
+      setSkillLevels({ ...skillLevels, [skill.id]: level.toString() });
+    }
+    
     setAvailableSkills(updatedAvailable);
     setSelectedSkills(updatedSelected);
+  };
+
+  const handleEditSkill = (skill: Skill) => {
+    setEditingSkill(skill);
+    setEditingAvailableSkill(null);
+    setModalLevel(skill.level?.toString() || '1');
+    setModalSkillName(skill.name);
+  };
+
+  const handleEditAvailableSkill = (skill: Skill) => {
+    setEditingAvailableSkill(skill);
+    setEditingSkill(null);
+    setModalLevel(skillLevels[skill.id] === undefined ? '1' : skillLevels[skill.id]);
+    setModalSkillName(skill.name);
+  };
+
+  const handleCloseModal = () => {
+    setEditingSkill(null);
+    setEditingAvailableSkill(null);
+    setModalLevel('');
+    setModalSkillName('');
+  };
+
+  const handleApplyEdit = () => {
+    if (editingSkill) {
+      const selected = getSelectedSkills();
+      const levelValue = parseInt(modalLevel) || 1;
+      
+      const updatedSelected = selected.map(s => 
+        s.id === editingSkill.id 
+          ? { ...s, name: modalSkillName.trim(), level: levelValue }
+          : s
+      );
+      
+      setSkillLevels({ ...skillLevels, [editingSkill.id]: levelValue.toString() });
+      
+      setSelectedSkills(updatedSelected);
+    } else if (editingAvailableSkill) {
+      const available = getAvailableSkills();
+      const levelValue = modalLevel === '' ? '1' : modalLevel;
+      
+      const updatedAvailable = available.map(s => 
+        s.id === editingAvailableSkill.id 
+          ? { ...s, name: modalSkillName.trim() }
+          : s
+      );
+      
+      setAvailableSkills(updatedAvailable);
+      setSkillLevels({ ...skillLevels, [editingAvailableSkill.id]: levelValue });
+    }
+    handleCloseModal();
+  };
+
+  const handleDeleteSkill = () => {
+    if (editingSkill) {
+      handleRemoveSkill(editingSkill);
+    } else if (editingAvailableSkill) {
+      const available = getAvailableSkills();
+      const updatedAvailable = available.filter(s => s.id !== editingAvailableSkill.id);
+      setAvailableSkills(updatedAvailable);
+      const updatedSkillLevels = { ...skillLevels };
+      delete updatedSkillLevels[editingAvailableSkill.id];
+      setSkillLevels(updatedSkillLevels);
+    }
+    handleCloseModal();
   };
 
   const handleAddNewSkill = () => {
@@ -328,42 +406,33 @@ const Profile: React.FC = () => {
               </button>
             </div>
             <div className="skills-list">
-              {filteredAvailable.map((skill) => (
-                <div key={skill.id} className="skill-item">
-                  <span className="skill-name">{skill.name}</span>
-                  <div className="add-skill-controls">
-                    <label className="level-label">Level:</label>
-                    <input
-                      type="text"
-                      className="level-input"
-                      value={skillLevels[skill.id] === undefined ? '1' : skillLevels[skill.id]}
-                      onChange={(e) => {
-                        const value = e.target.value;
-                        if (value === '' || /^\d+$/.test(value)) {
-                          setSkillLevels({ ...skillLevels, [skill.id]: value });
-                        }
-                      }}
-                      onBlur={(e) => {
-                        const value = e.target.value;
-                        if (value === '' || parseInt(value) < 1 || isNaN(parseInt(value))) {
-                          setSkillLevels({ ...skillLevels, [skill.id]: '1' });
-                        }
-                      }}
-                      placeholder="1"
-                    />
-                    <button
-                      className="add-skill-button"
-                      onClick={() => {
-                        const levelValue = skillLevels[skill.id] || '1';
-                        const level = parseInt(levelValue) || 1;
-                        handleAddSkill(skill, level);
-                      }}
-                    >
-                      Add
-                    </button>
+              {filteredAvailable.map((skill) => {
+                const levelValue = skillLevels[skill.id] || '1';
+                return (
+                  <div key={skill.id} className="skill-item">
+                    <span className="skill-name">
+                      {skill.name} (Lv.{levelValue})
+                    </span>
+                    <div className="add-skill-controls">
+                      <button
+                        className="edit-skill-button"
+                        onClick={() => handleEditAvailableSkill(skill)}
+                      >
+                        Edit
+                      </button>
+                      <button
+                        className="add-skill-button"
+                        onClick={() => {
+                          const level = parseInt(levelValue) || 1;
+                          handleAddSkill(skill, level);
+                        }}
+                      >
+                        Add
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -402,13 +471,21 @@ const Profile: React.FC = () => {
                   <span className="skill-name">
                     {skill.name} (Lv.{skill.level})
                   </span>
-                  <button
-                    className="remove-button"
-                    onClick={() => handleRemoveSkill(skill)}
-                  >
-                    {React.createElement(CloseIcon)}
-                    <span>Remove</span>
-                  </button>
+                  <div className="skill-item-buttons">
+                    <button
+                      className="edit-skill-button"
+                      onClick={() => handleEditSkill(skill)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="remove-button"
+                      onClick={() => handleRemoveSkill(skill)}
+                    >
+                      {React.createElement(CloseIcon)}
+                      <span>Remove</span>
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -495,7 +572,6 @@ const Profile: React.FC = () => {
                                   type="text"
                                   value={currentValue}
                                   onKeyDown={(e) => {
-                                    // If value is dash and user presses a number key, prevent default and set the number directly
                                     if (currentValue === '-' && /^[1-9]$/.test(e.key)) {
                                       e.preventDefault();
                                       setStudentEvaluations(prev => ({
@@ -509,7 +585,6 @@ const Profile: React.FC = () => {
                                   }}
                                   onChange={(e) => {
                                     const value = e.target.value;
-                                    // If current value is dash and user is typing, replace dash with the new value
                                     if (currentValue === '-' && value.length > 0 && /^[1-9]\d*$/.test(value)) {
                                       setStudentEvaluations(prev => ({
                                         ...prev,
@@ -519,7 +594,6 @@ const Profile: React.FC = () => {
                                         }
                                       }));
                                     }
-                                    // Allow empty, dash, or positive integers only (no decimals, no 0)
                                     else if (value === '' || value === '-' || /^[1-9]\d*$/.test(value)) {
                                       setStudentEvaluations(prev => ({
                                         ...prev,
@@ -531,7 +605,6 @@ const Profile: React.FC = () => {
                                     }
                                   }}
                                   onFocus={(e) => {
-                                    // When focused, if value is dash, select all text so typing replaces it
                                     if (currentValue === '-') {
                                       e.target.select();
                                     }
@@ -539,7 +612,6 @@ const Profile: React.FC = () => {
                                   onBlur={(e) => {
                                     const value = e.target.value;
                                     const numValue = parseInt(value, 10);
-                                    // If empty or invalid (including 0 or decimals), reset to dash
                                     if (value === '' || isNaN(numValue) || numValue < 1) {
                                       setStudentEvaluations(prev => ({
                                         ...prev,
@@ -572,6 +644,67 @@ const Profile: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {(editingSkill || editingAvailableSkill) && (
+        <div className="modal-overlay" onClick={handleCloseModal}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h3 className="modal-title">Edit Skill</h3>
+            <div className="modal-form">
+              <div className="modal-field">
+                <label className="modal-label">Rename Skill:</label>
+                <input
+                  type="text"
+                  className="modal-input"
+                  value={modalSkillName}
+                  onChange={(e) => setModalSkillName(e.target.value)}
+                  placeholder="Skill name"
+                />
+              </div>
+              <div className="modal-field">
+                <label className="modal-label">Level:</label>
+                <input
+                  type="text"
+                  className="modal-input"
+                  value={modalLevel}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d+$/.test(value)) {
+                      setModalLevel(value);
+                    }
+                  }}
+                  onBlur={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || parseInt(value) < 1 || isNaN(parseInt(value))) {
+                      setModalLevel('1');
+                    }
+                  }}
+                  placeholder="1"
+                />
+              </div>
+            </div>
+            <div className="modal-buttons">
+              <button
+                className="modal-button modal-button-cancel"
+                onClick={handleCloseModal}
+              >
+                Cancel
+              </button>
+              <button
+                className="modal-button modal-button-delete"
+                onClick={handleDeleteSkill}
+              >
+                {editingSkill ? 'Remove' : 'Delete'}
+              </button>
+              <button
+                className="modal-button modal-button-apply"
+                onClick={handleApplyEdit}
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
