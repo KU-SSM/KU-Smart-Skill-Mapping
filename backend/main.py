@@ -89,15 +89,20 @@ async def extract_document(file: UploadFile = File(...)):
         openai_service = get_openai_service()
         
         # Extract text from PDF
-        result = await openai_service.extract_text_from_pdf(file)
+        extracted = await openai_service.extract_text_from_pdf(file)
         # result = {"text": "test", "metadata": "test data"}
         
-        return JSONResponse(
-            status_code=200,
-            content={
+        text = extracted["text"]
+        logger.info(f"Extracted text: {text[:100]}...")  # Log first 100 characters
+        metadata = extracted["metadata"]
+        # classify
+        classified_text = await openai_service.classify_text(text)
+        
+        return JSONResponse(status_code=200, content={
                 "success": True,
-            }
-        )
+                "metadata": metadata,
+                "classification": classified_text
+            })
         
     except ValueError as e:
         logger.error(f"Validation error: {str(e)}")
