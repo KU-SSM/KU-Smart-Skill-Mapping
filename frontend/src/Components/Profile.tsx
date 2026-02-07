@@ -384,27 +384,6 @@ const Profile: React.FC = () => {
                 </button>
               )}
             </div>
-            <div className="add-new-skill-container">
-              <input
-                type="text"
-                className="add-new-skill-input"
-                placeholder="Add new skill..."
-                value={newSkillName}
-                onChange={(e) => setNewSkillName(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleAddNewSkill();
-                  }
-                }}
-              />
-              <button
-                className="add-new-skill-button"
-                onClick={handleAddNewSkill}
-                disabled={!newSkillName.trim()}
-              >
-                Add Skill
-              </button>
-            </div>
             <div className="skills-list">
               {filteredAvailable.map((skill) => {
                 const levelValue = skillLevels[skill.id] || '1';
@@ -464,7 +443,6 @@ const Profile: React.FC = () => {
                 </button>
               )}
             </div>
-            <div className="add-new-skill-spacer"></div>
             <div className="skills-list">
               {filteredSelected.map((skill) => (
                 <div key={skill.id} className="skill-item selected">
