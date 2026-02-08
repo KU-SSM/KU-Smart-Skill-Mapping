@@ -51,11 +51,6 @@ export const SideBarData: SidebarItem[] = [
         icon: FaCertificate
     },
     {
-        title: "Portfolio",
-        link:"/portfolio",
-        icon: FaBriefcase
-    },
-    {
         title: "Rubric Score",
         link:"/rubric_score",
         icon: AiOutlineCheckSquare

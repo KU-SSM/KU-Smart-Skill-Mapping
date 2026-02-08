@@ -9,6 +9,7 @@ import Portfolio from './Components/Portfolio';
 import RubricScore from './Components/RubricScore';
 import Login from './Components/Login';
 import SignUp from './Components/SignUp';
+import Profile from './Components/Profile';
 
 const App: React.FC = () => {
   const location = useLocation();
@@ -25,8 +26,8 @@ const App: React.FC = () => {
               <Route path="/" element={<Home />} />
               <Route path="/certificate" element={<CertificateDetail />} />
               <Route path="/skill_map" element={<SkillMap />} />
-              <Route path="/portfolio" element={<Portfolio />} />
               <Route path="/rubric_score" element={<RubricScore />} />
+              <Route path="/profile" element={<Profile />} />
             </Routes>
           </main>
         </div>
