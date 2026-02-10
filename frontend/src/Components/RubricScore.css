@@ -22,14 +22,80 @@
   overflow: hidden;
 }
 
+.rubric-score-title-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 24px;
+  gap: 16px;
+}
+
 .rubric-score-title {
   font-family: 'Roboto', sans-serif;
   font-size: 40px;
-  margin-bottom: 30px;
-  margin-top: 0;
+  margin: 0 0 24px 0;
   color: #333;
   text-align: left;
+  flex: 1;
+}
+
+.rubric-score-title-container .rubric-score-title {
+  margin-bottom: 0;
+}
+
+.rubric-score-title-input {
+  font-family: 'Roboto', sans-serif;
+  font-size: 40px;
+  color: #333;
+  text-align: left;
+  flex: 1;
+  border: none;
+  border-radius: 4px;
+  padding: 0;
+  background-color: transparent;
+  outline: none;
+  box-sizing: border-box;
+  line-height: 1.2;
+  margin: 0;
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  font-weight: inherit;
+}
+
+.rubric-score-title-input:focus {
+  outline: 2px solid #b2bb1e;
+  outline-offset: 2px;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(178, 187, 30, 0.1);
+}
+
+.delete-rubric-button {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 6px;
+  background-color: #ff4444;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  transition: all 0.2s ease;
+  padding: 0;
   flex-shrink: 0;
+}
+
+.delete-rubric-button:hover {
+  background-color: #cc0000;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(255, 68, 68, 0.3);
 }
 
 .table-container {
@@ -70,6 +136,7 @@
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
+
 
 .rubric-table thead tr th.add-column-cell {
   border-top-right-radius: 6px;
@@ -314,6 +381,11 @@
   width: 100%;
 }
 
+.header-content:hover .delete-button {
+  opacity: 1;
+  visibility: visible;
+}
+
 .header-content .editable-header {
   flex: 1;
 }
@@ -333,6 +405,8 @@
   transition: all 0.2s ease;
   padding: 0;
   flex-shrink: 0;
+  opacity: 0;
+  visibility: hidden;
 }
 
 .delete-button:hover {
@@ -351,6 +425,11 @@
   width: 100%;
 }
 
+.skill-area-with-delete:hover .delete-button {
+  opacity: 1;
+  visibility: visible;
+}
+
 .skill-area-with-delete .editable-cell {
   flex: 1;
 }
@@ -361,11 +440,12 @@
 
 .save-button-container {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   width: 100%;
   margin-top: 20px;
   padding-top: 20px;
+  gap: 12px;
 }
 
 .save-changes-button {
@@ -387,18 +467,311 @@
   box-shadow: 0 4px 8px rgba(178, 187, 30, 0.3);
 }
 
+.rubric-score-search-container {
+  position: relative;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.rubric-score-search-input {
+  width: 100%;
+  padding: 12px 40px 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+
+.rubric-score-search-input:focus {
+  outline: none;
+  border-color: rgba(178, 187, 30, 1);
+}
+
+.rubric-score-clear-search {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  font-size: 18px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s ease;
+}
+
+.rubric-score-clear-search:hover {
+  color: #333;
+}
+
+.rubric-score-bars-container {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.rubric-score-list-button-container {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  width: 100%;
+  margin-top: 20px;
+  padding-top: 20px;
+  gap: 12px;
+}
+
+.add-rubric-score-button {
+  padding: 8px;
+  background-color: #b2bb1e;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  line-height: 1;
+  min-width: auto;
+}
+
+.add-rubric-score-button:hover {
+  background-color: #9aa017;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(178, 187, 30, 0.3);
+}
+
+.save-rubric-score-button {
+  padding: 8px 20px;
+  background-color: #4CAF50;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.save-rubric-score-button:hover {
+  background-color: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+}
+
+.edit-rubric-score-button {
+  padding: 8px 20px;
+  background-color: #b2bb1e;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.edit-rubric-score-button:hover {
+  background-color: #9aa017;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(178, 187, 30, 0.3);
+}
+
+.rubric-score-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 24px;
+  background-color: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  text-align: center;
+  position: relative;
+}
+
+.rubric-score-bar:hover {
+  background-color: #f5f5f5;
+  border-color: rgba(178, 187, 30, 0.5);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.rubric-score-bar-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: #333;
+  width: 100%;
+  text-align: center;
+  cursor: pointer;
+  display: block;
+  line-height: 1.5;
+}
+
+.rubric-score-bar-title-input {
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  color: #333;
+  width: 100%;
+  text-align: center;
+  border: none;
+  border-radius: 4px;
+  padding: 0;
+  background-color: transparent;
+  outline: none;
+  box-sizing: border-box;
+  line-height: 1.5;
+  margin: 0;
+  display: block;
+  height: auto;
+  min-height: 0;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  resize: none;
+  overflow: visible;
+}
+
+.rubric-score-bar-title-input:focus {
+  outline: 2px solid #b2bb1e;
+  outline-offset: 2px;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(178, 187, 30, 0.1);
+}
+
+.rubric-score-bar-delete-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background-color: #ff4444;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  padding: 0;
+  transition: all 0.2s ease;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.rubric-score-bar-delete-button:hover {
+  background-color: #cc0000;
+  transform: scale(1.1);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.rubric-score-bar-delete-button:active {
+  transform: scale(0.95);
+}
+
+.rubric-score-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  margin-bottom: 30px;
+}
+
+.back-button {
+  padding: 8px 20px;
+  background-color: #f5f5f5;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.back-button:hover {
+  background-color: #e0e0e0;
+  border-color: rgba(178, 187, 30, 0.5);
+  color: rgba(178, 187, 30, 1);
+}
+
+.rubric-score-detail-header .rubric-score-title {
+  margin-bottom: 0;
+  flex: 1;
+}
+
 @media (max-width: 768px) {
   .rubric-score-container {
     padding: 15px;
+  }
+
+  .rubric-score-title-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
   }
 
   .rubric-score-title {
     font-size: 24px;
   }
 
+  .rubric-score-title-input {
+    font-size: 24px;
+  }
+
+  .delete-rubric-button {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
   .rubric-table th,
   .rubric-table td {
     padding: 12px 15px;
     font-size: 13px;
+  }
+
+  .rubric-score-bars-container {
+    grid-template-columns: 1fr;
+  }
+
+  .rubric-score-bar {
+    padding: 16px 20px;
+  }
+
+  .rubric-score-bar-title {
+    font-size: 16px;
+  }
+
+  .save-button-container {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .back-button {
+    width: 100%;
+  }
+
+  .save-changes-button {
+    width: 100%;
   }
 }
