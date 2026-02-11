@@ -155,10 +155,12 @@ const RubricScoreTable: React.FC<RubricScoreTableProps> = ({
     };
   }, []);
 
+  const isTableEmpty = headers.length === 0 && rows.length === 0;
+
   return (
     <div className="table-container">
       <div className="table-wrapper" ref={tableWrapperRef}>
-        <table className="rubric-table">
+        <table className={`rubric-table ${isTableEmpty ? 'table-empty' : ''}`}>
           <thead>
             <tr>
               <th className="fixed-column">Skill Area</th>

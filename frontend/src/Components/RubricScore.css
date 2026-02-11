@@ -189,6 +189,11 @@
   border-bottom-left-radius: 6px;
 }
 
+.rubric-table.table-empty th.fixed-column {
+  min-width: 120px;
+  max-width: 120px;
+}
+
 .rubric-table tbody tr {
   background-color: #ffffff;
   border: 1px solid #e0e0e0;
@@ -243,6 +248,11 @@
   max-width: 200px;
   border-top-left-radius: 6px;
   border-bottom-left-radius: 6px;
+}
+
+.rubric-table.table-empty td.fixed-column {
+  min-width: 120px;
+  max-width: 120px;
 }
 
 .rubric-table tbody tr:hover td.fixed-column {
@@ -405,6 +415,9 @@
   transition: all 0.2s ease;
   padding: 0;
   flex-shrink: 0;
+  min-width: 24px;
+  min-height: 24px;
+  box-sizing: border-box;
   opacity: 0;
   visibility: hidden;
 }
@@ -459,6 +472,13 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-changes-button svg {
+  font-size: 16px;
 }
 
 .save-changes-button:hover {
@@ -514,6 +534,7 @@
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 16px;
+  align-items: stretch;
 }
 
 .rubric-score-list-button-container {
@@ -553,7 +574,7 @@
 
 .save-rubric-score-button {
   padding: 8px 20px;
-  background-color: #4CAF50;
+  background-color: rgba(178, 187, 30, 0.6);
   color: #ffffff;
   border: none;
   border-radius: 6px;
@@ -562,17 +583,24 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-rubric-score-button svg {
+  font-size: 16px;
 }
 
 .save-rubric-score-button:hover {
-  background-color: #45a049;
+  background-color: rgba(178, 187, 30, 0.8);
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+  box-shadow: 0 4px 8px rgba(178, 187, 30, 0.3);
 }
 
 .edit-rubric-score-button {
   padding: 8px 20px;
-  background-color: #b2bb1e;
+  background-color: rgba(178, 187, 30);
   color: #ffffff;
   border: none;
   border-radius: 6px;
@@ -581,10 +609,17 @@
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-rubric-score-button svg {
+  font-size: 16px;
 }
 
 .edit-rubric-score-button:hover {
-  background-color: #9aa017;
+  background-color: rgba(178, 187, 30, 0.8);
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(178, 187, 30, 0.3);
 }
@@ -602,6 +637,9 @@
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   text-align: center;
   position: relative;
+  box-sizing: border-box;
+  min-height: 0;
+  height: 100%;
 }
 
 .rubric-score-bar:hover {
@@ -609,6 +647,94 @@
   border-color: rgba(178, 187, 30, 0.5);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   transform: translateY(-2px);
+}
+
+.rubric-score-add-box {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 24px;
+  background-color: #ffffff;
+  border: 1px solid #b2bb1e;
+  border-style: dashed;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  text-align: center;
+  position: relative;
+  box-sizing: border-box;
+  min-height: 0;
+  height: 100%;
+  width: 100%;
+}
+
+.rubric-score-add-box-spacer {
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.5;
+  width: 100%;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  flex: 1;
+}
+
+.rubric-score-add-box-spacer::before {
+  content: 'Data Science Rubric';
+}
+
+.rubric-score-add-box-placeholder {
+  position: absolute;
+  opacity: 0;
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.5;
+  width: 100%;
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.rubric-score-add-box:hover {
+  background-color: #fafafa;
+  border-color: #9aa017;
+  border-style: solid;
+  transform: translateY(-2px);
+}
+
+.rubric-score-add-box-button {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #b2bb1e;
+  border-radius: 50%;
+  background-color: #ffffff;
+  color: #b2bb1e;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  transition: all 0.2s ease;
+  padding: 0;
+  margin: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.rubric-score-add-box-button:hover {
+  background-color: #b2bb1e;
+  color: #ffffff;
+  transform: scale(1.1);
 }
 
 .rubric-score-bar-title {
@@ -706,6 +832,13 @@
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.back-button svg {
+  font-size: 16px;
 }
 
 .back-button:hover {
@@ -755,6 +888,10 @@
   }
 
   .rubric-score-bar {
+    padding: 16px 20px;
+  }
+
+  .rubric-score-add-box {
     padding: 16px 20px;
   }
 

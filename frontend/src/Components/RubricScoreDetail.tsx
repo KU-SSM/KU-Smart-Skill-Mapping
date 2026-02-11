@@ -1,10 +1,13 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AiOutlineDelete } from 'react-icons/ai';
+import { AiOutlineDelete, AiOutlineArrowLeft } from 'react-icons/ai';
+import { FiSave } from 'react-icons/fi';
 import RubricScoreTable from './RubricScoreTable';
 import './RubricScore.css';
 
 const DeleteIcon = AiOutlineDelete as React.ComponentType;
+const BackIcon = AiOutlineArrowLeft as React.ComponentType;
+const SaveIcon = FiSave as React.ComponentType;
 
 interface TableData {
   skillArea: string;
@@ -166,10 +169,12 @@ const RubricScoreDetail: React.FC = () => {
         />
         <div className="save-button-container">
           <button className="back-button" onClick={handleBack}>
-            ← Back
+            {React.createElement(BackIcon)}
+            <span>Back</span>
           </button>
           <button className="save-changes-button" onClick={handleSaveChanges}>
-            Save Changes
+            {React.createElement(SaveIcon)}
+            <span>Save Changes</span>
           </button>
         </div>
       </div>

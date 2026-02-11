@@ -1,10 +1,14 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AiOutlineClose, AiOutlinePlus } from 'react-icons/ai';
+import { AiOutlineClose, AiOutlinePlus, AiOutlineEdit, AiOutlineCheck } from 'react-icons/ai';
+import { FiSave } from 'react-icons/fi';
 import './RubricScore.css';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const PlusIcon = AiOutlinePlus as React.ComponentType;
+const EditIcon = AiOutlineEdit as React.ComponentType;
+const CheckIcon = AiOutlineCheck as React.ComponentType;
+const SaveIcon = FiSave as React.ComponentType;
 
 interface RubricScore {
   id: string;
@@ -180,30 +184,50 @@ const RubricScoreList: React.FC = () => {
               )}
             </div>
           ))}
-        </div>
-        <div className="rubric-score-list-button-container">
-          {isEditMode && (
-            <>
+          {isEditMode && !searchQuery.trim() && (
+            <div 
+              className="rubric-score-add-box"
+              onClick={handleAddNew}
+            >
+              <span className="rubric-score-add-box-spacer"></span>
               <button 
-                className="add-rubric-score-button"
-                onClick={handleAddNew}
+                className="rubric-score-add-box-button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleAddNew();
+                }}
                 title="Add New Rubric Score"
               >
                 {React.createElement(PlusIcon)}
               </button>
-              <button 
-                className="save-rubric-score-button"
-                onClick={handleSave}
-              >
-                Save
-              </button>
-            </>
+            </div>
+          )}
+        </div>
+        <div className="rubric-score-list-button-container">
+          {isEditMode && (
+            <button 
+              className="save-rubric-score-button"
+              onClick={handleSave}
+            >
+              {React.createElement(SaveIcon)}
+              <span>Save</span>
+            </button>
           )}
           <button 
             className="edit-rubric-score-button"
             onClick={handleEditMode}
           >
-            {isEditMode ? 'Done Editing' : 'Edit Rubric Score'}
+            {isEditMode ? (
+              <>
+                {React.createElement(CheckIcon)}
+                <span>Done Editing</span>
+              </>
+            ) : (
+              <>
+                {React.createElement(EditIcon)}
+                <span>Edit Rubric Score</span>
+              </>
+            )}
           </button>
         </div>
       </div>
