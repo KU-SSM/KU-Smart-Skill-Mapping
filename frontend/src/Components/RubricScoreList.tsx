@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AiOutlineClose, AiOutlinePlus, AiOutlineEdit, AiOutlineCheck } from 'react-icons/ai';
-import { FiSave } from 'react-icons/fi';
+import { FiSave, FiX } from 'react-icons/fi';
 import './RubricScore.css';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
@@ -9,6 +9,7 @@ const PlusIcon = AiOutlinePlus as React.ComponentType;
 const EditIcon = AiOutlineEdit as React.ComponentType;
 const CheckIcon = AiOutlineCheck as React.ComponentType;
 const SaveIcon = FiSave as React.ComponentType;
+const CancelIcon = FiX as React.ComponentType;
 
 interface RubricScore {
   id: string;
@@ -77,6 +78,13 @@ const RubricScoreList: React.FC = () => {
     // Save functionality - can be implemented based on requirements
     console.log('Saving rubric scores...', rubricScores);
     // Add your save logic here (e.g., API call)
+  };
+
+  const handleCancel = () => {
+    // Cancel edit mode without saving
+    setEditingId(null);
+    setEditingTitle('');
+    setIsEditMode(false);
   };
 
   const handleAddNew = () => {
@@ -205,13 +213,22 @@ const RubricScoreList: React.FC = () => {
         </div>
         <div className="rubric-score-list-button-container">
           {isEditMode && (
-            <button 
-              className="save-rubric-score-button"
-              onClick={handleSave}
-            >
-              {React.createElement(SaveIcon)}
-              <span>Save</span>
-            </button>
+            <>
+              <button 
+                className="save-rubric-score-button"
+                onClick={handleSave}
+              >
+                {React.createElement(SaveIcon)}
+                <span>Save</span>
+              </button>
+              <button 
+                className="cancel-rubric-score-button"
+                onClick={handleCancel}
+              >
+                {React.createElement(CancelIcon)}
+                <span>Cancel</span>
+              </button>
+            </>
           )}
           <button 
             className="edit-rubric-score-button"

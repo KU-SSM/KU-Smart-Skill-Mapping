@@ -1,13 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AiOutlineDelete, AiOutlineArrowLeft } from 'react-icons/ai';
-import { FiSave } from 'react-icons/fi';
+import { FiSave, FiX } from 'react-icons/fi';
 import RubricScoreTable from './RubricScoreTable';
 import './RubricScore.css';
 
 const DeleteIcon = AiOutlineDelete as React.ComponentType;
 const BackIcon = AiOutlineArrowLeft as React.ComponentType;
 const SaveIcon = FiSave as React.ComponentType;
+const CancelIcon = FiX as React.ComponentType;
 
 interface TableData {
   skillArea: string;
@@ -85,6 +86,11 @@ const RubricScoreDetail: React.FC = () => {
   };
 
   const handleBack = () => {
+    navigate('/rubric_score');
+  };
+
+  const handleCancel = () => {
+    // Cancel changes and go back
     navigate('/rubric_score');
   };
 
@@ -172,10 +178,16 @@ const RubricScoreDetail: React.FC = () => {
             {React.createElement(BackIcon)}
             <span>Back</span>
           </button>
-          <button className="save-changes-button" onClick={handleSaveChanges}>
-            {React.createElement(SaveIcon)}
-            <span>Save Changes</span>
-          </button>
+          <div className="save-cancel-buttons-group">
+            <button className="cancel-changes-button" onClick={handleCancel}>
+              {React.createElement(CancelIcon)}
+              <span>Cancel</span>
+            </button>
+            <button className="save-changes-button" onClick={handleSaveChanges}>
+              {React.createElement(SaveIcon)}
+              <span>Save Changes</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>
