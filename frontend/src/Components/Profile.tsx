@@ -2,6 +2,7 @@ import React, { useState, useRef, useMemo, useEffect } from 'react';
 import './Profile.css';
 import { AiOutlineArrowRight, AiOutlineClose } from 'react-icons/ai';
 import { FaBriefcase } from 'react-icons/fa';
+import { importPortfolio } from '../services/portfolioApi';
 
 const ArrowIcon = AiOutlineArrowRight as React.ComponentType;
 const CloseIcon = AiOutlineClose as React.ComponentType;
@@ -99,7 +100,7 @@ const Profile: React.FC = () => {
     fileInputRefs.current[portfolioId]?.click();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>, portfolioId: string) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>, portfolioId: string) => {
     const files = event.target.files;
     if (files) {
       const fileArray = Array.from(files);
@@ -108,6 +109,26 @@ const Profile: React.FC = () => {
         [portfolioId]: fileArray
       });
       console.log(`Selected files for ${portfolioId}:`, fileArray);
+      
+      const portfolio = portfolios.find(p => p.id === portfolioId);
+      
+      const pdfFiles = fileArray.filter(file => file.name.toLowerCase().endsWith('.pdf'));
+      
+      if (pdfFiles.length === 0 && fileArray.length > 0) {
+        console.warn('Please upload PDF files only. The backend only accepts PDF format.');
+        return;
+      }
+
+      try {
+        const result = await importPortfolio(
+          portfolioId,
+          portfolio?.name || 'Unknown Portfolio',
+          pdfFiles.length > 0 ? pdfFiles : fileArray
+        );
+        console.log('Portfolio import successful:', result);
+      } catch (error: any) {
+        console.error('Error importing portfolio:', error);
+      }
       
       const tabKey = activeTab;
       const generateRandomLevel = () => Math.floor(Math.random() * 5) + 1;
@@ -248,7 +269,7 @@ const Profile: React.FC = () => {
     const available = getAvailableSkills();
     const existingSkill = available.find(s => s.name.toLowerCase() === trimmedName.toLowerCase());
     if (existingSkill) {
-      alert('This skill already exists in the list.');
+      console.warn('This skill already exists in the list.');
       return;
     }
     
@@ -487,7 +508,7 @@ const Profile: React.FC = () => {
                   multiple
                   style={{ display: 'none' }}
                   onChange={(e) => handleFileChange(e, portfolio.id)}
-                  accept=".jpg,.jpeg"
+                  accept=".pdf"
                 />
                 <button
                   className="portfolio-upload-button"
