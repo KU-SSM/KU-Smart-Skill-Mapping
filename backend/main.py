@@ -8,7 +8,7 @@ import models
 from fastapi.middleware.cors import CORSMiddleware
 from services.openai_service import get_openai_service
 import logging
-
+from datetime import datetime
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,35 @@ class SkillMapModel(SkillMapBase):
     # class Config:
     #     orm_mode = True
     
+class RubricScoreBase(BaseModel):
+    name: str
+    created_at: datetime
+    updated_at: datetime
+    
+class RubricScoreModel(RubricScoreBase):
+    id: int
+    
+class SkillBase(BaseModel):
+    rubric_id: int
+    display_order: int
+
+class SkillModel(SkillBase):
+    id: int
+    
+class LevelBase(BaseModel):
+    rubric_id: int
+    rank: int
+
+class LevelModel(LevelBase):
+    id: int
+
+class CriteriaBase(BaseModel):
+    skill_id: int
+    level_id: int
+    description: str
+
+class CriteriaModel(CriteriaBase):
+    id: int
 
 def get_db():
     db = SessionLocal()
@@ -73,6 +102,42 @@ async def read_maps(db: db_dependency, skip: int=0, limit: int=100):
     maps = db.query(models.SkillMap).offset(skip).limit(limit).all()
     return maps
 
+@app.post("/rubric/", response_model=RubricScoreModel)
+async def create_rubric(rubric: RubricScoreBase, db: db_dependency):
+    db_rubric = models.RubricScore(**rubric.model_dump())
+    db.add(db_rubric)
+    db.commit()
+    db.refresh(db_rubric)
+    return db_rubric
+
+@app.get("/rubric/", response_model=List[RubricScoreModel])
+async def read_rubrics(db: db_dependency, skip: int=0, limit: int=100):
+    rubrics = db.query(models.RubricScore).offset(skip).limit(limit).all()
+    return rubrics
+
+@app.post("/skill/", response_model=SkillModel)
+async def create_skill(skill: SkillBase, db: db_dependency):
+    db_skill = models.Skill(**skill.model_dump())
+    db.add(db_skill)
+    db.commit()
+    db.refresh(db_skill)
+    return db_skill
+
+@app.post("/level/", response_model=LevelModel)
+async def create_level(level: LevelBase, db: db_dependency):
+    db_level = models.Level(**level.model_dump())
+    db.add(db_level)
+    db.commit()
+    db.refresh(db_level)
+    return db_level
+
+@app.post("/criteria/", response_model=CriteriaModel)
+async def create_criterion(criterion: CriteriaBase, db: db_dependency):
+    db_criterion = models.Criteria(**criterion.model_dump())
+    db.add(db_criterion)
+    db.commit()
+    db.refresh(db_criterion)
+    return db_criterion
 
 # PDF Text Extraction Endpoint
 @app.post("/portfolio/import")
@@ -89,15 +154,20 @@ async def extract_document(file: UploadFile = File(...)):
         openai_service = get_openai_service()
         
         # Extract text from PDF
-        result = await openai_service.extract_text_from_pdf(file)
+        extracted = await openai_service.extract_text_from_pdf(file)
         # result = {"text": "test", "metadata": "test data"}
         
-        return JSONResponse(
-            status_code=200,
-            content={
+        text = extracted["text"]
+        logger.info(f"Extracted text: {text[:100]}...")  # Log first 100 characters
+        metadata = extracted["metadata"]
+        # classify
+        classified_text = await openai_service.classify_text(text)
+        
+        return JSONResponse(status_code=200, content={
                 "success": True,
-            }
-        )
+                "metadata": metadata,
+                "classification": classified_text
+            })
         
     except ValueError as e:
         logger.error(f"Validation error: {str(e)}")
