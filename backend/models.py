@@ -30,7 +30,7 @@ class Level (Base):
     rank = Column(Integer)
     
 class Criteria (Base):
-    __tablename__ = 'criterion'
+    __tablename__ = 'criteria'
     id = Column(Integer, primary_key=True, index=True)
     skill_id = Column(Integer)
     level_id = Column(Integer)
