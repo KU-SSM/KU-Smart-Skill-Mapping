@@ -117,6 +117,11 @@ async def read_rubrics(db: db_dependency, skip: int=0, limit: int=100):
 
 @app.post("/skill/", response_model=SkillModel)
 async def create_skill(skill: SkillBase, db: db_dependency):
+    # validate rubric_id exists
+    rubric = db.query(models.RubricScore).filter(models.RubricScore.id == skill.rubric_id).first()
+    if not rubric:
+        raise HTTPException(status_code=400, detail=f"rubric_id {skill.rubric_id} does not exist")
+
     db_skill = models.Skill(**skill.model_dump())
     db.add(db_skill)
     db.commit()
@@ -132,7 +137,7 @@ async def create_level(level: LevelBase, db: db_dependency):
     return db_level
 
 @app.post("/criteria/", response_model=CriteriaModel)
-async def create_criterion(criterion: CriteriaBase, db: db_dependency):
+async def create_criteria(criterion: CriteriaBase, db: db_dependency):
     db_criterion = models.Criteria(**criterion.model_dump())
     db.add(db_criterion)
     db.commit()
