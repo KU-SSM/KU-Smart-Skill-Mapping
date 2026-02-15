@@ -11,6 +11,7 @@ interface TableData {
 }
 
 const RubricScore: React.FC = () => {
+  const [title, setTitle] = useState<string>('New Rubric Score');
   const [headers, setHeaders] = useState<string[]>([]);
   const [rows, setRows] = useState<TableData[]>([]);
 
@@ -61,6 +62,11 @@ const RubricScore: React.FC = () => {
   };
 
   const handleSaveChanges = () => {
+    // Simple save handler - API integration will be added later
+    console.log('Save Changes clicked');
+    console.log('Title:', title);
+    console.log('Headers:', headers);
+    console.log('Rows:', rows);
   };
 
   const tableWrapperRef = useRef<HTMLDivElement>(null);
@@ -136,7 +142,25 @@ const RubricScore: React.FC = () => {
   return (
     <div className="rubric-score-wrapper">
       <div className="rubric-score-container">
-        <h1 className="rubric-score-title">Rubric Score</h1>
+        <div className="rubric-score-title-container">
+          <input
+            type="text"
+            className="rubric-score-title-input"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Enter Rubric Score Title"
+            style={{
+              fontSize: '40px',
+              fontWeight: 'bold',
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              width: '100%',
+              padding: '10px',
+              marginBottom: '20px'
+            }}
+          />
+        </div>
         <div className="table-container">
           <div className="table-wrapper" ref={tableWrapperRef}>
             <table className="rubric-table">

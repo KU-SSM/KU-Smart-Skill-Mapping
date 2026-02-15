@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AiOutlineClose, AiOutlinePlus, AiOutlineEdit, AiOutlineCheck } from 'react-icons/ai';
 import { FiSave, FiX } from 'react-icons/fi';
 import './RubricScore.css';
+import { getRubricScores, createRubricScore } from '../services/rubricScoreApi';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const PlusIcon = AiOutlinePlus as React.ComponentType;
@@ -14,6 +15,7 @@ const CancelIcon = FiX as React.ComponentType;
 interface RubricScore {
   id: string;
   title: string;
+  isNew?: boolean; // Track if this is a new rubric score not yet saved to backend
 }
 
 const RubricScoreList: React.FC = () => {
@@ -22,13 +24,36 @@ const RubricScoreList: React.FC = () => {
   const [isEditMode, setIsEditMode] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
-  const [rubricScores, setRubricScores] = useState<RubricScore[]>([
-    { id: '1', title: 'Software Engineering Rubric' },
-    { id: '2', title: 'Data Science Rubric' },
-    { id: '3', title: 'Web Development Rubric' },
-    { id: '4', title: 'Machine Learning Rubric' },
-  ]);
+  const [rubricScores, setRubricScores] = useState<RubricScore[]>([]);
+
+  // Load rubric scores from API on component mount
+  useEffect(() => {
+    const loadRubricScores = async () => {
+      try {
+        setIsLoading(true);
+        console.log('📥 Loading rubric scores from API...');
+        const scores = await getRubricScores();
+        console.log('✅ Loaded rubric scores:', scores);
+        setRubricScores(scores.map(score => ({ ...score, isNew: false })));
+      } catch (error) {
+        console.error('❌ Error loading rubric scores:', error);
+        // If API fails, start with empty array
+        setRubricScores([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadRubricScores();
+  }, []);
+
+  // Check if there are any new (unsaved) rubric scores
+  const hasNewRubricScores = useMemo(() => {
+    return rubricScores.some(rubric => rubric.isNew === true);
+  }, [rubricScores]);
 
   const filteredRubricScores = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -74,10 +99,83 @@ const RubricScoreList: React.FC = () => {
     setRubricScores(rubricScores.filter(rubric => rubric.id !== id));
   };
 
-  const handleSave = () => {
-    // Save functionality - can be implemented based on requirements
-    console.log('Saving rubric scores...', rubricScores);
-    // Add your save logic here (e.g., API call)
+  const handleSave = async () => {
+    const newRubricScores = rubricScores.filter(rubric => rubric.isNew === true);
+    
+    if (newRubricScores.length === 0) {
+      console.log('ℹ️ No new rubric scores to save');
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      console.log('═══════════════════════════════════════════════════════');
+      console.log('🚀 SAVING NEW RUBRIC SCORES');
+      console.log('═══════════════════════════════════════════════════════');
+      console.log(`📋 Found ${newRubricScores.length} new rubric score(s) to save`);
+      console.log('───────────────────────────────────────────────────────');
+
+      const savedScores: RubricScore[] = [];
+      const errors: string[] = [];
+
+      for (let i = 0; i < newRubricScores.length; i++) {
+        const rubric = newRubricScores[i];
+        try {
+          console.log(`\n📤 [${i + 1}/${newRubricScores.length}] Creating rubric: "${rubric.title}"`);
+          
+          // Create rubric with empty headers and rows (just the title)
+          const result = await createRubricScore({
+            title: rubric.title,
+            headers: [],
+            rows: []
+          });
+
+          console.log(`✅ Successfully created rubric ID: ${result.id}`);
+          savedScores.push({ ...rubric, id: result.id, isNew: false });
+        } catch (error: any) {
+          console.error(`❌ Failed to save "${rubric.title}":`, error);
+          errors.push(`${rubric.title}: ${error?.message || 'Unknown error'}`);
+        }
+      }
+
+      console.log('───────────────────────────────────────────────────────');
+      console.log('📊 SAVE SUMMARY:');
+      console.log(`   ✅ Successfully saved: ${savedScores.length}`);
+      console.log(`   ❌ Failed: ${errors.length}`);
+      if (errors.length > 0) {
+        console.log('   Errors:', errors);
+      }
+      console.log('═══════════════════════════════════════════════════════');
+
+      // Update the rubric scores list - replace new ones with saved ones
+      const updatedScores = [...rubricScores];
+      
+      savedScores.forEach(saved => {
+        const index = updatedScores.findIndex(r => 
+          (r.isNew && r.title === saved.title) || r.id === saved.id
+        );
+        if (index !== -1) {
+          // Replace the new rubric with the saved one
+          updatedScores[index] = saved;
+        } else {
+          // Add if not found (shouldn't happen, but just in case)
+          updatedScores.push(saved);
+        }
+      });
+
+      setRubricScores(updatedScores);
+
+      if (errors.length === 0) {
+        console.log(`✅ Successfully saved ${savedScores.length} rubric score(s)!`);
+      } else {
+        console.warn(`⚠️ Saved ${savedScores.length}, but ${errors.length} failed. Check console for details.`);
+      }
+    } catch (error: any) {
+      console.error('❌ Error saving rubric scores:', error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleCancel = () => {
@@ -88,10 +186,11 @@ const RubricScoreList: React.FC = () => {
   };
 
   const handleAddNew = () => {
-    const newId = String(Date.now());
+    const newId = `new-${Date.now()}`; // Prefix with 'new-' to identify as new
     const newRubric: RubricScore = {
       id: newId,
-      title: 'New Rubric Score'
+      title: 'New Rubric Score',
+      isNew: true // Mark as new (not yet saved to backend)
     };
     setRubricScores([...rubricScores, newRubric]);
     setEditingId(newId);
@@ -129,6 +228,19 @@ const RubricScoreList: React.FC = () => {
       inputRef.current.select();
     }
   }, [editingId]);
+
+  if (isLoading) {
+    return (
+      <div className="rubric-score-wrapper">
+        <div className="rubric-score-container">
+          <h1 className="rubric-score-title">Rubric Score</h1>
+          <div style={{ textAlign: 'center', padding: '40px' }}>
+            <p>Loading rubric scores...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rubric-score-wrapper">
@@ -217,13 +329,19 @@ const RubricScoreList: React.FC = () => {
               <button 
                 className="save-rubric-score-button"
                 onClick={handleSave}
+                disabled={!hasNewRubricScores || isSaving}
+                style={{
+                  opacity: (!hasNewRubricScores || isSaving) ? 0.5 : 1,
+                  cursor: (!hasNewRubricScores || isSaving) ? 'not-allowed' : 'pointer'
+                }}
               >
                 {React.createElement(SaveIcon)}
-                <span>Save</span>
+                <span>{isSaving ? 'Saving...' : 'Save'}</span>
               </button>
               <button 
                 className="cancel-rubric-score-button"
                 onClick={handleCancel}
+                disabled={isSaving}
               >
                 {React.createElement(CancelIcon)}
                 <span>Cancel</span>

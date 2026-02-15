@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { AiOutlineDelete, AiOutlineArrowLeft } from 'react-icons/ai';
 import { FiSave, FiX } from 'react-icons/fi';
 import RubricScoreTable from './RubricScoreTable';
+import { getRubricScore } from '../services/rubricScoreApi';
 import './RubricScore.css';
 
 const DeleteIcon = AiOutlineDelete as React.ComponentType;
@@ -23,61 +24,37 @@ const RubricScoreDetail: React.FC = () => {
   const [title, setTitle] = useState<string>('');
   const [isEditingTitle, setIsEditingTitle] = useState<boolean>(false);
   const [editingTitle, setEditingTitle] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    // In a real app, fetch the rubric score data based on id
-    // For now, using mock data
-    const rubricScores: Record<string, { title: string; headers: string[]; rows: TableData[] }> = {
-      '1': {
-        title: 'Software Engineering Rubric',
-        headers: ['Beginner', 'Intermediate', 'Advanced', 'Expert'],
-        rows: [
-          { skillArea: 'Code Quality', values: ['Basic syntax', 'Clean code', 'Best practices', 'Design patterns'] },
-          { skillArea: 'Testing', values: ['No tests', 'Unit tests', 'Integration tests', 'Full test coverage'] },
-          { skillArea: 'Documentation', values: ['No docs', 'Basic comments', 'API docs', 'Comprehensive docs'] },
-        ],
-      },
-      '2': {
-        title: 'Data Science Rubric',
-        headers: ['Novice', 'Competent', 'Proficient', 'Expert'],
-        rows: [
-          { skillArea: 'Data Analysis', values: ['Basic stats', 'EDA', 'Advanced analysis', 'Research-level'] },
-          { skillArea: 'Modeling', values: ['Simple models', 'Multiple models', 'Ensemble methods', 'Custom models'] },
-          { skillArea: 'Visualization', values: ['Basic charts', 'Good visuals', 'Interactive', 'Publication quality'] },
-        ],
-      },
-      '3': {
-        title: 'Web Development Rubric',
-        headers: ['Level 1', 'Level 2', 'Level 3', 'Level 4'],
-        rows: [
-          { skillArea: 'Frontend', values: ['HTML/CSS', 'JavaScript', 'Frameworks', 'Advanced patterns'] },
-          { skillArea: 'Backend', values: ['Basic API', 'Database integration', 'Authentication', 'Microservices'] },
-          { skillArea: 'Deployment', values: ['Local only', 'Basic hosting', 'CI/CD', 'Cloud architecture'] },
-        ],
-      },
-      '4': {
-        title: 'Machine Learning Rubric',
-        headers: ['Beginner', 'Intermediate', 'Advanced', 'Expert'],
-        rows: [
-          { skillArea: 'Algorithms', values: ['Basic ML', 'Multiple algorithms', 'Deep learning', 'Research'] },
-          { skillArea: 'Data Preprocessing', values: ['Raw data', 'Basic cleaning', 'Feature engineering', 'Advanced techniques'] },
-          { skillArea: 'Evaluation', values: ['Accuracy only', 'Multiple metrics', 'Cross-validation', 'Advanced evaluation'] },
-        ],
-      },
+    const loadRubricScore = async () => {
+      if (!id) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        setIsLoading(true);
+        console.log('📥 Loading rubric score with ID:', id);
+        const rubricData = await getRubricScore(id);
+        console.log('✅ Loaded rubric score:', rubricData);
+        
+        setTitle(rubricData.title);
+        setHeaders(rubricData.headers);
+        setRows(rubricData.rows);
+      } catch (error) {
+        console.error('❌ Error loading rubric score:', error);
+        // Set default empty rubric on error
+        setTitle('Rubric Score Not Found');
+        setHeaders([]);
+        setRows([]);
+      } finally {
+        setIsLoading(false);
+      }
     };
 
-    const rubric = rubricScores[id || '1'];
-    if (rubric) {
-      setTitle(rubric.title);
-      setHeaders(rubric.headers);
-      setRows(rubric.rows);
-    } else {
-      // Default empty rubric
-      setTitle('New Rubric Score');
-      setHeaders([]);
-      setRows([]);
-    }
+    loadRubricScore();
   }, [id]);
 
   const handleSaveChanges = () => {
@@ -134,6 +111,16 @@ const RubricScoreDetail: React.FC = () => {
       titleInputRef.current.select();
     }
   }, [isEditingTitle]);
+
+  if (isLoading) {
+    return (
+      <div className="rubric-score-wrapper">
+        <div className="rubric-score-container">
+          <h1 className="rubric-score-title">Loading...</h1>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="rubric-score-wrapper">
