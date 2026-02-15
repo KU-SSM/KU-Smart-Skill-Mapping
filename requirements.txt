@@ -1,11 +1,12 @@
 fastapi
 uvicorn
 sqlalchemy
-openai>=1.0.0
+openai
 python-multipart
 python-dotenv
+pypdf
 pdfplumber
 pdf2image
-pillow
 pytesseract
-pydantic
+Pillow
+python-dotenv
