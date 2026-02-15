@@ -4,3 +4,8 @@ sqlalchemy
 openai>=1.0.0
 python-multipart
 python-dotenv
+pdfplumber
+pdf2image
+pillow
+pytesseract
+pydantic
