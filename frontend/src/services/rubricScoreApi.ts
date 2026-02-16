@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '../api/index';
+
 export interface TableData {
   skillArea: string;
   values: string[];
@@ -40,8 +42,6 @@ interface BackendCriteria {
   level_id: number;
   description: string;
 }
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export const getRubricScores = async (): Promise<RubricScoreListItem[]> => {
   try {
@@ -146,6 +146,12 @@ export const createRubricScore = async (
   rubricScore: Omit<RubricScoreDetail, 'id'>
 ): Promise<RubricScoreDetail> => {
   try {
+    console.log('═══════════════════════════════════════════════════════');
+    console.log('[createRubricScore] Function called');
+    console.log('API_BASE_URL:', API_BASE_URL);
+    console.log('Rubric Score Data:', JSON.stringify(rubricScore, null, 2));
+    console.log('═══════════════════════════════════════════════════════');
+    
     const now = new Date().toISOString();
     
     const rubricPayload = {
@@ -155,8 +161,8 @@ export const createRubricScore = async (
     };
 
     console.log('[POST /rubric/] Creating rubric...');
-    console.log('   Request URL:', `${API_BASE_URL}/rubric/`);
-    console.log('   Request Body:', JSON.stringify(rubricPayload, null, 2));
+    console.log('Request URL:', `${API_BASE_URL}/rubric/`);
+    console.log('Request Body:', JSON.stringify(rubricPayload, null, 2));
     
     const rubricResponse = await fetch(`${API_BASE_URL}/rubric/`, {
       method: 'POST',
@@ -166,17 +172,17 @@ export const createRubricScore = async (
       body: JSON.stringify(rubricPayload),
     });
 
-    console.log('   Response Status:', rubricResponse.status, rubricResponse.statusText);
+    console.log('Response Status:', rubricResponse.status, rubricResponse.statusText);
     
     if (!rubricResponse.ok) {
       const errorText = await rubricResponse.text();
-      console.error('   Error Response:', errorText);
+      console.error('Error Response:', errorText);
       throw new Error(`Failed to create rubric: ${rubricResponse.statusText}`);
     }
 
     const rubric: BackendRubric = await rubricResponse.json();
-    console.log('   Success! Response JSON:', JSON.stringify(rubric, null, 2));
-    console.log('   Created Rubric ID:', rubric.id);
+    console.log('Success! Response JSON:', JSON.stringify(rubric, null, 2));
+    console.log('Created Rubric ID:', rubric.id);
 
     const rubricId = rubric.id;
     const createdSkills: BackendSkill[] = [];
@@ -189,7 +195,8 @@ export const createRubricScore = async (
         rank: i + 1,
       };
       console.log(`[POST /level/] Creating level ${i + 1}...`);
-      console.log(`   Request Body:`, JSON.stringify(levelPayload, null, 2));
+      console.log(`Request URL:`, `${API_BASE_URL}/level/`);
+      console.log(`Request Body:`, JSON.stringify(levelPayload, null, 2));
       
       const levelResponse = await fetch(`${API_BASE_URL}/level/`, {
         method: 'POST',
@@ -197,16 +204,16 @@ export const createRubricScore = async (
         body: JSON.stringify(levelPayload),
       });
       
-      console.log(`   Response Status:`, levelResponse.status, levelResponse.statusText);
+      console.log(`Response Status:`, levelResponse.status, levelResponse.statusText);
       
       if (levelResponse.ok) {
         const level: BackendLevel = await levelResponse.json();
         createdLevels.push(level);
-        console.log(`   Success! Response JSON:`, JSON.stringify(level, null, 2));
-        console.log(`   Created Level ID:`, level.id);
+        console.log(`Success! Response JSON:`, JSON.stringify(level, null, 2));
+        console.log(`Created Level ID:`, level.id);
       } else {
         const errorText = await levelResponse.text();
-        console.error(`   Error Response:`, errorText);
+        console.error(`Error Response:`, errorText);
       }
     }
 
@@ -216,7 +223,8 @@ export const createRubricScore = async (
         display_order: i + 1,
       };
       console.log(`[POST /skill/] Creating skill ${i + 1}...`);
-      console.log(`   Request Body:`, JSON.stringify(skillPayload, null, 2));
+      console.log(`Request URL:`, `${API_BASE_URL}/skill/`);
+      console.log(`Request Body:`, JSON.stringify(skillPayload, null, 2));
       
       const skillResponse = await fetch(`${API_BASE_URL}/skill/`, {
         method: 'POST',
@@ -224,13 +232,13 @@ export const createRubricScore = async (
         body: JSON.stringify(skillPayload),
       });
       
-      console.log(`   Response Status:`, skillResponse.status, skillResponse.statusText);
+      console.log(`Response Status:`, skillResponse.status, skillResponse.statusText);
       
       if (skillResponse.ok) {
         const skill: BackendSkill = await skillResponse.json();
         createdSkills.push(skill);
-        console.log(`   Success! Response JSON:`, JSON.stringify(skill, null, 2));
-        console.log(`   Created Skill ID:`, skill.id);
+        console.log(`Success! Response JSON:`, JSON.stringify(skill, null, 2));
+        console.log(`Created Skill ID:`, skill.id);
 
         for (let j = 0; j < rubricScore.rows[i].values.length; j++) {
           if (rubricScore.rows[i].values[j].trim()) {
@@ -240,7 +248,8 @@ export const createRubricScore = async (
               description: rubricScore.rows[i].values[j].trim(),
             };
             console.log(`[POST /criteria/] Creating criteria for skill ${i + 1}, level ${j + 1}...`);
-            console.log(`   Request Body:`, JSON.stringify(criteriaPayload, null, 2));
+            console.log(`Request URL:`, `${API_BASE_URL}/criteria/`);
+            console.log(`Request Body:`, JSON.stringify(criteriaPayload, null, 2));
             
             const criteriaResponse = await fetch(`${API_BASE_URL}/criteria/`, {
               method: 'POST',
@@ -248,16 +257,16 @@ export const createRubricScore = async (
               body: JSON.stringify(criteriaPayload),
             });
             
-            console.log(`   Response Status:`, criteriaResponse.status, criteriaResponse.statusText);
+            console.log(`Response Status:`, criteriaResponse.status, criteriaResponse.statusText);
             
             if (criteriaResponse.ok) {
               const criteria: BackendCriteria = await criteriaResponse.json();
               createdCriteria.push(criteria);
-              console.log(`   Success! Response JSON:`, JSON.stringify(criteria, null, 2));
-              console.log(`   Created Criteria ID:`, criteria.id);
+              console.log(`Success! Response JSON:`, JSON.stringify(criteria, null, 2));
+              console.log(`Created Criteria ID:`, criteria.id);
             } else {
               const errorText = await criteriaResponse.text();
-              console.error(`   Error Response:`, errorText);
+              console.error(`Error Response:`, errorText);
             }
           }
         }

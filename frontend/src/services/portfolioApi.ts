@@ -1,3 +1,5 @@
+import { API_BASE_URL } from '../api/index';
+
 export interface PortfolioFile {
   name: string;
   size: number;
@@ -16,8 +18,6 @@ export interface PortfolioImportResponse {
   success: boolean;
   message?: string;
 }
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
 export const importPortfolio = async (
   portfolioId: string,
@@ -67,17 +67,17 @@ export const importPortfolio = async (
       body: formData,
     });
 
-    console.log('📥 Response Status:', response.status, response.statusText);
+    console.log('Response Status:', response.status, response.statusText);
     
     if (!response.ok) {
       let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
       try {
         const errorData = await response.json();
-        console.log('❌ Error Response Data:', errorData);
+        console.log('Error Response Data:', errorData);
         errorMessage = errorData.detail || errorData.message || errorMessage;
       } catch (e) {
         const text = await response.text();
-        console.log('❌ Error Response Text:', text);
+        console.log('Error Response Text:', text);
         if (text) {
           errorMessage = text;
         }
@@ -86,7 +86,7 @@ export const importPortfolio = async (
     }
 
     const data = await response.json();
-    console.log('✅ Success Response Data:', data);
+    console.log('Success Response Data:', data);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     return {
