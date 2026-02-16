@@ -36,15 +36,15 @@ const RubricScoreDetail: React.FC = () => {
 
       try {
         setIsLoading(true);
-        console.log('📥 Loading rubric score with ID:', id);
+        console.log('Loading rubric score with ID:', id);
         const rubricData = await getRubricScore(id);
-        console.log('✅ Loaded rubric score:', rubricData);
+        console.log('Loaded rubric score:', rubricData);
         
         setTitle(rubricData.title);
         setHeaders(rubricData.headers);
         setRows(rubricData.rows);
       } catch (error) {
-        console.error('❌ Error loading rubric score:', error);
+        console.error('Error loading rubric score:', error);
         // Set default empty rubric on error
         setTitle('Rubric Score Not Found');
         setHeaders([]);
