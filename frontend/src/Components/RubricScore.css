@@ -1,9 +1,13 @@
 .rubric-score-wrapper {
   width: 100%;
   max-width: 100%;
+  display: -webkit-flex;
   display: flex;
+  -webkit-justify-content: center;
   justify-content: center;
+  -webkit-align-items: flex-start;
   align-items: flex-start;
+  -webkit-box-sizing: border-box;
   box-sizing: border-box;
   padding: 0;
 }
@@ -11,25 +15,97 @@
 .rubric-score-container {
   background-color: #ffffff;
   padding: 20px 30px 30px 30px;
+  display: -webkit-flex;
   display: flex;
+  -webkit-flex-direction: column;
   flex-direction: column;
+  -webkit-align-items: flex-start;
   align-items: flex-start;
   width: 100%;
   max-width: 1200px;
   border-radius: 8px;
+  -webkit-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  -webkit-box-sizing: border-box;
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: visible;
+  min-height: 0;
+}
+
+.rubric-score-title-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 24px;
+  gap: 16px;
 }
 
 .rubric-score-title {
   font-family: 'Roboto', sans-serif;
   font-size: 40px;
-  margin-bottom: 30px;
-  margin-top: 0;
+  margin: 0 0 20px 0;
   color: #333;
   text-align: left;
+  flex: 1;
+}
+
+.rubric-score-title-container .rubric-score-title {
+  margin-bottom: 0;
+}
+
+.rubric-score-title-input {
+  font-family: 'Roboto', sans-serif;
+  font-size: 40px;
+  color: #333;
+  text-align: left;
+  flex: 1;
+  border: none;
+  border-radius: 4px;
+  padding: 0;
+  background-color: transparent;
+  outline: none;
+  box-sizing: border-box;
+  line-height: 1.2;
+  margin: 0;
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  font-weight: inherit;
+}
+
+.rubric-score-title-input:focus {
+  outline: 2px solid #b2bb1e;
+  outline-offset: 2px;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(178, 187, 30, 0.1);
+}
+
+.delete-rubric-button {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 6px;
+  background-color: #ff4444;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  transition: all 0.2s ease;
+  padding: 0;
   flex-shrink: 0;
+}
+
+.delete-rubric-button:hover {
+  background-color: #cc0000;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(255, 68, 68, 0.3);
 }
 
 .table-container {
@@ -70,6 +146,7 @@
   border-radius: 6px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
 }
+
 
 .rubric-table thead tr th.add-column-cell {
   border-top-right-radius: 6px;
@@ -120,6 +197,11 @@
   max-width: 200px;
   border-top-left-radius: 6px;
   border-bottom-left-radius: 6px;
+}
+
+.rubric-table.table-empty th.fixed-column {
+  min-width: 120px;
+  max-width: 120px;
 }
 
 .rubric-table tbody tr {
@@ -176,6 +258,11 @@
   max-width: 200px;
   border-top-left-radius: 6px;
   border-bottom-left-radius: 6px;
+}
+
+.rubric-table.table-empty td.fixed-column {
+  min-width: 120px;
+  max-width: 120px;
 }
 
 .rubric-table tbody tr:hover td.fixed-column {
@@ -303,18 +390,655 @@
   background: #9aa017;
 }
 
+.header-with-delete {
+  position: relative;
+}
+
+.header-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.header-content:hover .delete-button {
+  opacity: 1;
+  visibility: visible;
+}
+
+.header-content .editable-header {
+  flex: 1;
+}
+
+.delete-button {
+  width: 24px;
+  height: 24px;
+  border: none;
+  border-radius: 4px;
+  background-color: #ff4444;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 0.2s ease;
+  padding: 0;
+  flex-shrink: 0;
+  min-width: 24px;
+  min-height: 24px;
+  box-sizing: border-box;
+  opacity: 0;
+  visibility: hidden;
+}
+
+.delete-button:hover {
+  background-color: #cc0000;
+  transform: scale(1.1);
+}
+
+.delete-column-button {
+  margin-top: 2px;
+}
+
+.skill-area-with-delete {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+}
+
+.skill-area-with-delete:hover .delete-button {
+  opacity: 1;
+  visibility: visible;
+}
+
+.skill-area-with-delete .editable-cell {
+  flex: 1;
+}
+
+.delete-row-button {
+  margin-top: 2px;
+}
+
+.save-button-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-top: 20px;
+  padding-top: 20px;
+  gap: 12px;
+}
+
+.save-cancel-buttons-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-changes-button {
+  padding: 8px 20px;
+  background-color: #b2bb1e;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.save-changes-button svg {
+  font-size: 16px;
+}
+
+.save-changes-button:hover {
+  background-color: #9aa017;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(178, 187, 30, 0.3);
+}
+
+.cancel-changes-button {
+  padding: 8px 20px;
+  background-color: #f5f5f5;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cancel-changes-button svg {
+  font-size: 16px;
+}
+
+.cancel-changes-button:hover {
+  background-color: #e0e0e0;
+  border-color: #ccc;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.rubric-score-search-container {
+  position: relative;
+  width: 100%;
+  margin-bottom: 24px;
+}
+
+.rubric-score-search-input {
+  width: 100%;
+  padding: 12px 40px 12px 16px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease;
+}
+
+.rubric-score-search-input:focus {
+  outline: none;
+  border-color: rgba(178, 187, 30, 1);
+}
+
+.rubric-score-clear-search {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #999;
+  font-size: 18px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  transition: color 0.2s ease;
+}
+
+.rubric-score-clear-search:hover {
+  color: #333;
+}
+
+.rubric-score-bars-container {
+  width: 100%;
+  display: -webkit-grid;
+  display: grid;
+  -webkit-grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(3, 1fr);
+  -webkit-grid-auto-rows: minmax(auto, auto);
+  grid-auto-rows: minmax(auto, auto);
+  -webkit-grid-gap: 16px;
+  grid-gap: 16px;
+  gap: 16px;
+  -webkit-align-items: stretch;
+  align-items: stretch;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  overflow: visible;
+  min-height: 0;
+}
+
+.rubric-score-list-button-container {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-justify-content: flex-end;
+  justify-content: flex-end;
+  -webkit-align-items: center;
+  align-items: center;
+  width: 100%;
+  margin-top: 20px;
+  padding-top: 20px;
+  -webkit-gap: 12px;
+  gap: 12px;
+}
+
+.add-rubric-score-button {
+  padding: 8px;
+  background-color: #b2bb1e;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+  line-height: 1;
+  min-width: auto;
+}
+
+.add-rubric-score-button:hover {
+  background-color: #9aa017;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(178, 187, 30, 0.3);
+}
+
+.save-rubric-score-button {
+  padding: 6px 16px;
+  background-color: rgba(178, 187, 30, 0.6);
+  color: #ffffff;
+  border: none;
+  border-radius: 5px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-transition: all 0.2s ease;
+  transition: all 0.2s ease;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-gap: 6px;
+  gap: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.save-rubric-score-button svg {
+  font-size: 14px;
+}
+
+.save-rubric-score-button:hover {
+  background-color: rgba(178, 187, 30, 0.8);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(178, 187, 30, 0.3);
+}
+
+.cancel-rubric-score-button {
+  padding: 6px 16px;
+  background-color: #f5f5f5;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  border-radius: 5px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-transition: all 0.2s ease;
+  transition: all 0.2s ease;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-gap: 6px;
+  gap: 6px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.cancel-rubric-score-button svg {
+  font-size: 14px;
+}
+
+.cancel-rubric-score-button:hover {
+  background-color: #e0e0e0;
+  border-color: #ccc;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.edit-rubric-score-button {
+  padding: 8px 20px;
+  background-color: rgba(178, 187, 30);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  -webkit-transition: all 0.2s ease;
+  transition: all 0.2s ease;
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-gap: 8px;
+  gap: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.edit-rubric-score-button svg {
+  font-size: 16px;
+}
+
+.edit-rubric-score-button:hover {
+  background-color: rgba(178, 187, 30, 0.8);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(178, 187, 30, 0.3);
+}
+
+.rubric-score-bar {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-justify-content: center;
+  justify-content: center;
+  padding: 16px 20px;
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-transition: all 0.2s ease;
+  transition: all 0.2s ease;
+  -webkit-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  text-align: center;
+  position: relative;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  overflow: visible;
+  -webkit-align-self: stretch;
+  align-self: stretch;
+}
+
+.rubric-score-bar:hover {
+  background-color: #f5f5f5;
+  border-color: rgba(178, 187, 30, 0.5);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.rubric-score-add-box {
+  display: -webkit-flex;
+  display: flex;
+  -webkit-align-items: center;
+  align-items: center;
+  -webkit-justify-content: center;
+  justify-content: center;
+  padding: 16px 20px;
+  background-color: #ffffff;
+  border: 1px solid #b2bb1e;
+  border-style: dashed;
+  border-radius: 8px;
+  cursor: pointer;
+  -webkit-transition: all 0.2s ease;
+  transition: all 0.2s ease;
+  -webkit-box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  text-align: center;
+  position: relative;
+  -webkit-box-sizing: border-box;
+  box-sizing: border-box;
+  min-height: 0;
+  min-width: 0;
+  width: 100%;
+  overflow: visible;
+}
+
+.rubric-score-add-box-spacer {
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 1.5;
+  width: 100%;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  white-space: nowrap;
+  overflow: hidden;
+  flex: 1;
+}
+
+.rubric-score-add-box-spacer::before {
+  content: 'Data Science Rubric';
+}
+
+.rubric-score-add-box-placeholder {
+  position: absolute;
+  opacity: 0;
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px;
+  font-weight: 500;
+  line-height: 1.5;
+  width: 100%;
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.rubric-score-add-box:hover {
+  background-color: #fafafa;
+  border-color: #9aa017;
+  border-style: solid;
+  transform: translateY(-2px);
+}
+
+.rubric-score-add-box-button {
+  width: 40px;
+  height: 40px;
+  border: 2px solid #b2bb1e;
+  border-radius: 50%;
+  background-color: #ffffff;
+  color: #b2bb1e;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  transition: all 0.2s ease;
+  padding: 0;
+  margin: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  position: absolute;
+  z-index: 1;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+}
+
+.rubric-score-add-box-button:hover {
+  background-color: #b2bb1e;
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.rubric-score-bar-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  width: 100%;
+  text-align: center;
+  cursor: pointer;
+  display: block;
+  line-height: 1.5;
+}
+
+.rubric-score-bar-title-input {
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  width: 100%;
+  text-align: center;
+  border: none;
+  border-radius: 4px;
+  padding: 0;
+  background-color: transparent;
+  outline: none;
+  box-sizing: border-box;
+  line-height: 1.5;
+  margin: 0;
+  display: block;
+  height: auto;
+  min-height: 0;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  resize: none;
+  overflow: visible;
+}
+
+.rubric-score-bar-title-input:focus {
+  outline: 2px solid #b2bb1e;
+  outline-offset: 2px;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(178, 187, 30, 0.1);
+}
+
+.rubric-score-bar-delete-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  background-color: #ff4444;
+  color: #ffffff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  padding: 0;
+  transition: all 0.2s ease;
+  z-index: 10;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.rubric-score-bar-delete-button:hover {
+  background-color: #cc0000;
+  transform: scale(1.1);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.rubric-score-bar-delete-button:active {
+  transform: scale(0.95);
+}
+
+.rubric-score-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  margin-bottom: 30px;
+}
+
+.back-button {
+  padding: 8px 20px;
+  background-color: #f5f5f5;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.back-button svg {
+  font-size: 16px;
+}
+
+.back-button:hover {
+  background-color: #e0e0e0;
+  border-color: rgba(178, 187, 30, 0.5);
+  color: rgba(178, 187, 30, 1);
+}
+
+.rubric-score-detail-header .rubric-score-title {
+  margin-bottom: 0;
+  flex: 1;
+}
+
 @media (max-width: 768px) {
   .rubric-score-container {
     padding: 15px;
+  }
+
+  .rubric-score-title-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
   }
 
   .rubric-score-title {
     font-size: 24px;
   }
 
+  .rubric-score-title-input {
+    font-size: 24px;
+  }
+
+  .delete-rubric-button {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
   .rubric-table th,
   .rubric-table td {
     padding: 12px 15px;
     font-size: 13px;
+  }
+
+  .rubric-score-bars-container {
+    grid-template-columns: 1fr;
+  }
+
+  .rubric-score-bar {
+    padding: 16px 20px;
+  }
+
+  .rubric-score-add-box {
+    padding: 16px 20px;
+  }
+
+  .rubric-score-bar-title {
+    font-size: 16px;
+  }
+
+  .save-button-container {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .save-cancel-buttons-group {
+    width: 100%;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .back-button {
+    width: 100%;
+  }
+
+  .cancel-changes-button {
+    width: 100%;
+  }
+
+  .save-changes-button {
+    width: 100%;
   }
 }

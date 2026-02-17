@@ -56,5 +56,6 @@ span {
   flex: 80%;
   display: grid;
   justify-items: left;
+  font-family: 'Roboto', sans-serif;
 }
 

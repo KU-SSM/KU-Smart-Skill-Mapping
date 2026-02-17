@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import './RubricScore.css';
-import { AiOutlinePlus } from 'react-icons/ai';
+import { AiOutlinePlus, AiOutlineClose } from 'react-icons/ai';
 
 const PlusIcon = AiOutlinePlus as React.ComponentType;
+const CloseIcon = AiOutlineClose as React.ComponentType;
 
 interface TableData {
   skillArea: string;
@@ -10,12 +11,9 @@ interface TableData {
 }
 
 const RubricScore: React.FC = () => {
-  const [headers, setHeaders] = useState<string[]>(['Level 1', 'Level 2', 'Level 3']);
-  const [rows, setRows] = useState<TableData[]>([
-    { skillArea: 'Communication', values: ['Good', 'Great', 'Awesome'] },
-    { skillArea: 'Technical Skills', values: ['Zero', 'Hero', 'Superhero'] },
-    { skillArea: 'Problem Solving', values: ['Amateur', 'Sophisticated', 'Pro'] },
-  ]);
+  const [title, setTitle] = useState<string>('New Rubric Score');
+  const [headers, setHeaders] = useState<string[]>([]);
+  const [rows, setRows] = useState<TableData[]>([]);
 
   const handleHeaderChange = (index: number, value: string) => {
     const newHeaders = [...headers];
@@ -48,6 +46,27 @@ const RubricScore: React.FC = () => {
       skillArea: '',
       values: Array(headers.length).fill('')
     }]);
+  };
+
+  const deleteColumn = (colIndex: number) => {
+    const newHeaders = headers.filter((_, index) => index !== colIndex);
+    setHeaders(newHeaders);
+    setRows(rows.map(row => ({
+      ...row,
+      values: row.values.filter((_, index) => index !== colIndex)
+    })));
+  };
+
+  const deleteRow = (rowIndex: number) => {
+    setRows(rows.filter((_, index) => index !== rowIndex));
+  };
+
+  const handleSaveChanges = () => {
+    // Simple save handler - API integration will be added later
+    console.log('Save Changes clicked');
+    console.log('Title:', title);
+    console.log('Headers:', headers);
+    console.log('Rows:', rows);
   };
 
   const tableWrapperRef = useRef<HTMLDivElement>(null);
@@ -123,7 +142,25 @@ const RubricScore: React.FC = () => {
   return (
     <div className="rubric-score-wrapper">
       <div className="rubric-score-container">
-        <h1 className="rubric-score-title">Rubric Score</h1>
+        <div className="rubric-score-title-container">
+          <input
+            type="text"
+            className="rubric-score-title-input"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Enter Rubric Score Title"
+            style={{
+              fontSize: '40px',
+              fontWeight: 'bold',
+              border: 'none',
+              outline: 'none',
+              background: 'transparent',
+              width: '100%',
+              padding: '10px',
+              marginBottom: '20px'
+            }}
+          />
+        </div>
         <div className="table-container">
           <div className="table-wrapper" ref={tableWrapperRef}>
             <table className="rubric-table">
@@ -131,13 +168,22 @@ const RubricScore: React.FC = () => {
                 <tr>
                   <th className="fixed-column">Skill Area</th>
                   {headers.map((header, index) => (
-                    <th key={index}>
-                      <textarea
-                        value={header}
-                        onChange={(e) => handleHeaderChange(index, e.target.value)}
-                        className="editable-header"
-                        rows={1}
-                      />
+                    <th key={index} className="header-with-delete">
+                      <div className="header-content">
+                        <textarea
+                          value={header}
+                          onChange={(e) => handleHeaderChange(index, e.target.value)}
+                          className="editable-header"
+                          rows={1}
+                        />
+                        <button 
+                          className="delete-button delete-column-button" 
+                          onClick={() => deleteColumn(index)} 
+                          title="Delete Column"
+                        >
+                          {React.createElement(CloseIcon)}
+                        </button>
+                      </div>
                     </th>
                   ))}
                   <th className="add-column-cell">
@@ -151,13 +197,22 @@ const RubricScore: React.FC = () => {
                 {rows.map((row, rowIndex) => (
                   <tr key={rowIndex}>
                     <td className="fixed-column">
-                      <textarea
-                        value={row.skillArea}
-                        onChange={(e) => handleSkillAreaChange(rowIndex, e.target.value)}
-                        className="editable-cell"
-                        placeholder="Skill Area"
-                        rows={1}
-                      />
+                      <div className="skill-area-with-delete">
+                        <textarea
+                          value={row.skillArea}
+                          onChange={(e) => handleSkillAreaChange(rowIndex, e.target.value)}
+                          className="editable-cell"
+                          placeholder="Skill Area"
+                          rows={1}
+                        />
+                        <button 
+                          className="delete-button delete-row-button" 
+                          onClick={() => deleteRow(rowIndex)} 
+                          title="Delete Row"
+                        >
+                          {React.createElement(CloseIcon)}
+                        </button>
+                      </div>
                     </td>
                     {row.values.map((value, colIndex) => (
                       <td key={colIndex}>
@@ -187,6 +242,11 @@ const RubricScore: React.FC = () => {
               </tbody>
             </table>
           </div>
+        </div>
+        <div className="save-button-container">
+          <button className="save-changes-button" onClick={handleSaveChanges}>
+            Save Changes
+          </button>
         </div>
       </div>
     </div>
