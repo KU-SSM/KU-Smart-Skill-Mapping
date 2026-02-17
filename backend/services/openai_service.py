@@ -137,60 +137,82 @@ class OpenAIService:
 
     async def classify_text(self, text: str, task_prompt: str = None) -> dict:
         """
-        Chunk text and call OpenAI to classify/extract skills and categories.
-        Returns parsed JSON (or raw text if model returns text).
+        Chunk text and classify. Debug logging included.
         """
-        # Simple chunking by characters (adjust for tokens if needed)
+        logger.info(f"classify_text called. Text length: {len(text)}, chunks will be: {math.ceil(len(text) / 3000)}")
+        
+        if not text or len(text.strip()) < 50:
+            logger.warning(f"Text too short or empty: {len(text)} chars")
+            return {"skills": [], "categories": [], "summary": "Text too short or empty"}
+
         max_chunk_chars = 3000
         chunks = [text[i:i+max_chunk_chars] for i in range(0, len(text), max_chunk_chars)]
         results = []
+        
         for i, chunk in enumerate(chunks):
-            system_msg = {"role": "system", "content": "You are an assistant that extracts skills, categories and a short summary from resume/portfolio text. Return JSON."}
+            logger.info(f"Processing chunk {i+1}/{len(chunks)}, length: {len(chunk)}")
+            
+            system_msg = {"role": "system", "content": "You are an assistant that extracts skills, categories and a short summary from resume/portfolio text. Return valid JSON only."}
             user_content = (task_prompt or
                             "Extract a JSON object with keys: skills (array of strings), categories (array), summary (short string). "
                             "Only output valid JSON. Do not include extra commentary.\n\n"
                             f"Text:\n{chunk}")
             user_msg = {"role": "user", "content": user_content}
 
-            # Use thread to call blocking client
-            resp = await asyncio.to_thread(
-                lambda: self.client.chat.completions.create(
+            try:
+                # Call OpenAI (blocking, so wrap in thread)
+                resp = await asyncio.to_thread(
+                    self.client.chat.completions.create,
                     model=self.model,
                     messages=[system_msg, user_msg],
-                    temperature=0.0,
-                    max_tokens=800
+                    temperature=0.2,  # slightly higher than 0 for stability
+                    max_tokens=500
                 )
-            )
-            # adapt to returned structure
-            try:
-                content = resp.choices[0].message["content"]
-            except Exception:
-                # fallback if different response shape
-                content = getattr(resp, "content", str(resp))
+                logger.info(f"OpenAI response received for chunk {i+1}")
+                
+                # FIX: Use .content (object attr) not ["content"] (dict)
+                content = resp.choices[0].message.content
+                logger.info(f"Raw response: {content[:200]}")  # log first 200 chars
+                
+            except Exception as e:
+                logger.error(f"OpenAI call failed for chunk {i+1}: {e}")
+                continue  # skip this chunk, don't crash
+            
             # Try parse JSON
             try:
                 parsed = json.loads(content)
-            except Exception:
-                # If model returned plain text, keep raw
-                parsed = {"raw": content}
-            results.append(parsed)
+                logger.info(f"Successfully parsed JSON for chunk {i+1}")
+                results.append(parsed)
+            except json.JSONDecodeError as je:
+                logger.warning(f"JSON parse failed for chunk {i+1}: {je}. Raw: {content[:100]}")
+                results.append({"raw": content})  # keep raw response
 
-        # Simple merge strategy: concatenate summaries and merge lists
+        if not results:
+            logger.warning("No results collected from any chunk")
+            return {"skills": [], "categories": [], "summary": "No results from OpenAI"}
+
+        # Merge results
         merged = {"skills": [], "categories": [], "summary": ""}
         for r in results:
             if isinstance(r, dict):
-                merged["skills"].extend(r.get("skills", []))
-                merged["categories"].extend(r.get("categories", []))
-                if r.get("summary"):
-                    merged["summary"] += (r.get("summary") + " ")
+                skills = r.get("skills", [])
+                if isinstance(skills, list):
+                    merged["skills"].extend(skills)
+                categories = r.get("categories", [])
+                if isinstance(categories, list):
+                    merged["categories"].extend(categories)
+                summary = r.get("summary", "")
+                if summary:
+                    merged["summary"] += (summary + " ")
             else:
                 merged["summary"] += (str(r) + " ")
 
-        # Deduplicate lists
-        merged["skills"] = list(dict.fromkeys([s.strip() for s in merged["skills"] if s]))
-        merged["categories"] = list(dict.fromkeys([c.strip() for c in merged["categories"] if c]))
+        merged["skills"] = list(dict.fromkeys([s.strip() for s in merged["skills"] if isinstance(s, str) and s.strip()]))
+        merged["categories"] = list(dict.fromkeys([c.strip() for c in merged["categories"] if isinstance(c, str) and c.strip()]))
         merged["summary"] = merged["summary"].strip()
-        return merged 
+        
+        logger.info(f"Final merged result: {len(merged['skills'])} skills, {len(merged['categories'])} categories, summary length: {len(merged['summary'])}")
+        return merged
 
 # Create a singleton instance
 _openai_service: Optional[OpenAIService] = None

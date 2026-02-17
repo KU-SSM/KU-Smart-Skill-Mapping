@@ -166,12 +166,13 @@ async def extract_document(file: UploadFile = File(...)):
         logger.info(f"Extracted text: {text[:100]}...")  # Log first 100 characters
         metadata = extracted["metadata"]
         # classify
-        classified_text = await openai_service.classify_text(text)
+        response = await openai_service.classify_text(text)
+        logger.info(f"Classification response: {response}")
         
         return JSONResponse(status_code=200, content={
                 "success": True,
                 "metadata": metadata,
-                "classification": classified_text
+                "classification": response
             })
         
     except ValueError as e:
