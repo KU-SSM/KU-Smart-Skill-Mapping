@@ -56,7 +56,6 @@ class OpenAIService:
     async def extract_text_from_pdf(self, pdf_file) -> dict:
         """
         Extract text from PDF file using OpenAI's file processing API.
-        
         Args:
             pdf_file: FastAPI UploadFile object containing the PDF
             
