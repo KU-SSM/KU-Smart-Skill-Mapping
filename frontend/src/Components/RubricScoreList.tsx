@@ -58,6 +58,21 @@ const RubricScoreList: React.FC = () => {
     return rubricScores.some(rubric => rubric.isNew === true) || deletedRubricIds.size > 0 || renamedRubrics.size > 0;
   }, [rubricScores, deletedRubricIds, renamedRubrics]);
 
+  // Used to control the Cancel button disabled state (should be disabled when there's nothing to cancel)
+  const hasUnsavedEdits = useMemo(() => {
+    // Any tracked changes (new/deleted/renamed)
+    if (hasNewRubricScores) return true;
+
+    // If user is currently editing a title, consider it "unsaved edits" even before blur happens
+    if (editingId) {
+      const current = rubricScores.find(r => r.id === editingId);
+      const currentTitle = current?.title ?? '';
+      return editingTitle.trim() !== '' && editingTitle !== currentTitle;
+    }
+
+    return false;
+  }, [hasNewRubricScores, editingId, editingTitle, rubricScores]);
+
   const filteredRubricScores = useMemo(() => {
     if (!searchQuery.trim()) {
       return rubricScores;
@@ -231,10 +246,23 @@ const RubricScoreList: React.FC = () => {
 
       setRubricScores(updatedScores);
       
-      // Clear deleted IDs, renamed rubrics, and original state since we've successfully saved
+      // Re-sync from backend so deletes/renames are reflected immediately (and persist after refresh)
+      try {
+        console.log('\n📥 Refreshing rubric score list from backend after save...');
+        const refreshed = await getRubricScores();
+        console.log('✅ Refreshed rubric scores:', refreshed);
+        setRubricScores(refreshed.map(score => ({ ...score, isNew: false })));
+        // Also refresh the "original" snapshot so Cancel works correctly after a save
+        setOriginalRubricScores(refreshed.map(score => ({ ...score, isNew: false })));
+      } catch (refreshError) {
+        console.warn('⚠️ Failed to refresh rubric scores after save. Keeping local state.', refreshError);
+        // If refresh fails, fall back to local updatedScores
+        setOriginalRubricScores(updatedScores);
+      }
+      
+      // Clear deleted IDs and renamed rubrics since we've attempted to save them
       setDeletedRubricIds(new Set());
       setRenamedRubrics(new Map());
-      setOriginalRubricScores([]);
 
       if (errors.length === 0) {
         console.log(`Successfully saved ${savedScores.length} rubric score(s), updated ${updatedCount.length} rubric score(s), and deleted ${deletedCount.length} rubric score(s)!`);
@@ -430,7 +458,7 @@ const RubricScoreList: React.FC = () => {
               <button 
                 className="cancel-rubric-score-button"
                 onClick={handleCancel}
-                disabled={isSaving}
+                disabled={!hasUnsavedEdits || isSaving}
               >
                 {React.createElement(CancelIcon)}
                 <span>Cancel</span>

@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AiOutlineDelete, AiOutlineArrowLeft } from 'react-icons/ai';
 import { FiSave, FiX } from 'react-icons/fi';
 import RubricScoreTable from './RubricScoreTable';
-import { getRubricScore, updateRubricScore } from '../services/rubricScoreApi';
+import { getRubricScore, updateRubricScore, deleteRubricScore } from '../services/rubricScoreApi';
 import './RubricScore.css';
 
 const DeleteIcon = AiOutlineDelete as React.ComponentType;
@@ -26,6 +26,7 @@ const RubricScoreDetail: React.FC = () => {
   const [editingTitle, setEditingTitle] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   
   // Store original data to restore on cancel
@@ -85,6 +86,8 @@ const RubricScoreDetail: React.FC = () => {
 
     try {
       console.log('Saving rubric score:', { id, title, headers, rows });
+      console.log('Headers count:', headers.length);
+      console.log('Rows count:', rows.length);
       
       // updateRubricScore returns the updated data, so we use it directly
       const rubricData = await updateRubricScore(id, {
@@ -94,6 +97,7 @@ const RubricScoreDetail: React.FC = () => {
       });
 
       console.log('Successfully saved rubric score!');
+      console.log('Returned data:', rubricData);
       
       // Update the state with the returned data (no need to fetch again)
       setTitle(rubricData.title);
@@ -107,8 +111,10 @@ const RubricScoreDetail: React.FC = () => {
         skillArea: row.skillArea,
         values: row.values.map(v => v) // Deep copy of values array
       })));
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving rubric score:', error);
+      const errorMessage = error?.message || 'Failed to save rubric score. Please check the console for details.';
+      alert(`Error: ${errorMessage}`);
     } finally {
       setIsSaving(false);
     }
@@ -133,11 +139,26 @@ const RubricScoreDetail: React.FC = () => {
     setIsEditingTitle(false);
   };
 
-  const handleDelete = () => {
-    // In a real app, delete from backend
-    console.log('Deleting rubric score:', id);
-    // Navigate back to main page after deletion
-    navigate('/rubric_score');
+  const handleDelete = async () => {
+    if (!id) {
+      console.error('Cannot delete: No rubric ID');
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      console.log('Deleting rubric score:', id);
+      await deleteRubricScore(id);
+      console.log('Successfully deleted rubric score!');
+      
+      // Navigate back to main page after successful deletion
+      navigate('/rubric_score');
+    } catch (error) {
+      console.error('Error deleting rubric score:', error);
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleTitleClick = () => {
@@ -173,6 +194,30 @@ const RubricScoreDetail: React.FC = () => {
       titleInputRef.current.select();
     }
   }, [isEditingTitle]);
+
+  // Check if there are unsaved changes
+  const hasUnsavedChanges = useMemo(() => {
+    // Check if title changed (including if currently editing)
+    const titleChanged = isEditingTitle 
+      ? editingTitle.trim() !== originalTitle
+      : title !== originalTitle;
+    
+    // Check if headers changed
+    const headersChanged = headers.length !== originalHeaders.length ||
+      headers.some((h, i) => h !== (originalHeaders[i] || ''));
+    
+    // Check if rows changed
+    const rowsChanged = rows.length !== originalRows.length ||
+      rows.some((row, i) => {
+        const originalRow = originalRows[i];
+        if (!originalRow) return true;
+        if (row.skillArea !== originalRow.skillArea) return true;
+        if (row.values.length !== originalRow.values.length) return true;
+        return row.values.some((val, j) => val !== (originalRow.values[j] || ''));
+      });
+    
+    return titleChanged || headersChanged || rowsChanged;
+  }, [title, editingTitle, isEditingTitle, headers, rows, originalTitle, originalHeaders, originalRows]);
 
   if (isLoading) {
     return (
@@ -210,6 +255,7 @@ const RubricScoreDetail: React.FC = () => {
           <button 
             className="delete-rubric-button" 
             onClick={handleDelete}
+            disabled={isDeleting}
             title="Delete Rubric Score"
           >
             {React.createElement(DeleteIcon)}
@@ -228,14 +274,18 @@ const RubricScoreDetail: React.FC = () => {
             <span>Back</span>
           </button>
           <div className="save-cancel-buttons-group">
-            <button className="cancel-changes-button" onClick={handleCancel}>
+            <button 
+              className="cancel-changes-button" 
+              onClick={handleCancel}
+              disabled={!hasUnsavedChanges || isSaving}
+            >
               {React.createElement(CancelIcon)}
               <span>Cancel</span>
             </button>
             <button 
               className="save-changes-button" 
               onClick={handleSaveChanges}
-              disabled={isSaving}
+              disabled={!hasUnsavedChanges || isSaving}
             >
               {React.createElement(SaveIcon)}
               <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
