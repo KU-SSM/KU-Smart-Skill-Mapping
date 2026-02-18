@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { AiOutlineDelete, AiOutlineArrowLeft } from 'react-icons/ai';
 import { FiSave, FiX } from 'react-icons/fi';
 import RubricScoreTable from './RubricScoreTable';
-import { getRubricScore } from '../services/rubricScoreApi';
+import { getRubricScore, updateRubricScore } from '../services/rubricScoreApi';
 import './RubricScore.css';
 
 const DeleteIcon = AiOutlineDelete as React.ComponentType;
@@ -25,7 +25,13 @@ const RubricScoreDetail: React.FC = () => {
   const [isEditingTitle, setIsEditingTitle] = useState<boolean>(false);
   const [editingTitle, setEditingTitle] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
+  
+  // Store original data to restore on cancel
+  const [originalTitle, setOriginalTitle] = useState<string>('');
+  const [originalHeaders, setOriginalHeaders] = useState<string[]>([]);
+  const [originalRows, setOriginalRows] = useState<TableData[]>([]);
 
   useEffect(() => {
     const loadRubricScore = async () => {
@@ -40,15 +46,27 @@ const RubricScoreDetail: React.FC = () => {
         const rubricData = await getRubricScore(id);
         console.log('Loaded rubric score:', rubricData);
         
+        // Set current data
         setTitle(rubricData.title);
         setHeaders(rubricData.headers);
         setRows(rubricData.rows);
+        
+        // Store original data for cancel functionality (deep copy to prevent mutation)
+        setOriginalTitle(rubricData.title);
+        setOriginalHeaders(rubricData.headers.map(h => h)); // Deep copy
+        setOriginalRows(rubricData.rows.map(row => ({
+          skillArea: row.skillArea,
+          values: row.values.map(v => v) // Deep copy of values array
+        })));
       } catch (error) {
         console.error('Error loading rubric score:', error);
         // Set default empty rubric on error
         setTitle('Rubric Score Not Found');
         setHeaders([]);
         setRows([]);
+        setOriginalTitle('Rubric Score Not Found');
+        setOriginalHeaders([]);
+        setOriginalRows([]);
       } finally {
         setIsLoading(false);
       }
@@ -57,9 +75,43 @@ const RubricScoreDetail: React.FC = () => {
     loadRubricScore();
   }, [id]);
 
-  const handleSaveChanges = () => {
-    // In a real app, save to backend
-    console.log('Saving rubric score:', { id, title, headers, rows });
+  const handleSaveChanges = async () => {
+    if (!id) {
+      console.error('Cannot save: No rubric ID');
+      return;
+    }
+
+    setIsSaving(true);
+
+    try {
+      console.log('Saving rubric score:', { id, title, headers, rows });
+      
+      // updateRubricScore returns the updated data, so we use it directly
+      const rubricData = await updateRubricScore(id, {
+        title,
+        headers,
+        rows,
+      });
+
+      console.log('Successfully saved rubric score!');
+      
+      // Update the state with the returned data (no need to fetch again)
+      setTitle(rubricData.title);
+      setHeaders(rubricData.headers);
+      setRows(rubricData.rows);
+      
+      // Update original data to match saved data (deep copy to prevent mutation)
+      setOriginalTitle(rubricData.title);
+      setOriginalHeaders(rubricData.headers.map(h => h)); // Deep copy
+      setOriginalRows(rubricData.rows.map(row => ({
+        skillArea: row.skillArea,
+        values: row.values.map(v => v) // Deep copy of values array
+      })));
+    } catch (error) {
+      console.error('Error saving rubric score:', error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleBack = () => {
@@ -67,8 +119,18 @@ const RubricScoreDetail: React.FC = () => {
   };
 
   const handleCancel = () => {
-    // Cancel changes and go back
-    navigate('/rubric_score');
+    // Cancel all changes - restore original data and stay on the page
+    // Always restore to original values (create new references to ensure React detects the change)
+    setTitle(originalTitle);
+    setEditingTitle(originalTitle);
+    setHeaders(originalHeaders.map(h => h)); // Create new array with deep copy
+    setRows(originalRows.map(row => ({
+      skillArea: row.skillArea,
+      values: row.values.map(v => v) // Create new array for values with deep copy
+    })));
+    
+    // Close title editing if active
+    setIsEditingTitle(false);
   };
 
   const handleDelete = () => {
@@ -170,9 +232,13 @@ const RubricScoreDetail: React.FC = () => {
               {React.createElement(CancelIcon)}
               <span>Cancel</span>
             </button>
-            <button className="save-changes-button" onClick={handleSaveChanges}>
+            <button 
+              className="save-changes-button" 
+              onClick={handleSaveChanges}
+              disabled={isSaving}
+            >
               {React.createElement(SaveIcon)}
-              <span>Save Changes</span>
+              <span>{isSaving ? 'Saving...' : 'Save Changes'}</span>
             </button>
           </div>
         </div>

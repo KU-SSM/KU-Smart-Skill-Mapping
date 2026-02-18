@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AiOutlineClose, AiOutlinePlus, AiOutlineEdit, AiOutlineCheck } from 'react-icons/ai';
 import { FiSave, FiX } from 'react-icons/fi';
 import './RubricScore.css';
-import { getRubricScores, createRubricScore } from '../services/rubricScoreApi';
+import { getRubricScores, createRubricScore, deleteRubricScore, updateRubricName } from '../services/rubricScoreApi';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const PlusIcon = AiOutlinePlus as React.ComponentType;
@@ -28,6 +28,9 @@ const RubricScoreList: React.FC = () => {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const [rubricScores, setRubricScores] = useState<RubricScore[]>([]);
+  const [originalRubricScores, setOriginalRubricScores] = useState<RubricScore[]>([]); // Store original state when entering edit mode
+  const [deletedRubricIds, setDeletedRubricIds] = useState<Set<string>>(new Set()); // Track deleted rubric IDs
+  const [renamedRubrics, setRenamedRubrics] = useState<Map<string, string>>(new Map()); // Track renamed rubrics: id -> newTitle
 
   // Load rubric scores from API on component mount
   useEffect(() => {
@@ -50,10 +53,10 @@ const RubricScoreList: React.FC = () => {
     loadRubricScores();
   }, []);
 
-  // Check if there are any new (unsaved) rubric scores
+  // Check if there are any new (unsaved) rubric scores, deleted items, or renamed items
   const hasNewRubricScores = useMemo(() => {
-    return rubricScores.some(rubric => rubric.isNew === true);
-  }, [rubricScores]);
+    return rubricScores.some(rubric => rubric.isNew === true) || deletedRubricIds.size > 0 || renamedRubrics.size > 0;
+  }, [rubricScores, deletedRubricIds, renamedRubrics]);
 
   const filteredRubricScores = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -80,30 +83,54 @@ const RubricScoreList: React.FC = () => {
 
   const handleEditMode = () => {
     if (isEditMode) {
-      // Save any ongoing edits before exiting edit mode
-      if (editingId && editingTitle.trim()) {
-        setRubricScores(rubricScores.map(rubric =>
-          rubric.id === editingId
-            ? { ...rubric, title: editingTitle.trim() }
-            : rubric
-        ));
+      // Exiting edit mode - check if we should restore original state
+      // Only restore if there are new rubric scores, deletions, or renames that weren't saved
+      const hasUnsavedChanges = rubricScores.some(rubric => rubric.isNew === true) || deletedRubricIds.size > 0 || renamedRubrics.size > 0;
+      
+      if (hasUnsavedChanges) {
+        // Restore original state, removing any newly added rubric scores and restoring deleted/renamed ones
+        setRubricScores(originalRubricScores);
+        setDeletedRubricIds(new Set());
+        setRenamedRubrics(new Map());
+      } else {
+        // Save any ongoing edits before exiting edit mode
+        if (editingId && editingTitle.trim()) {
+          setRubricScores(rubricScores.map(rubric =>
+            rubric.id === editingId
+              ? { ...rubric, title: editingTitle.trim() }
+              : rubric
+          ));
+        }
       }
+      
       setEditingId(null);
       setEditingTitle('');
+      setOriginalRubricScores([]); // Clear the stored original state
+    } else {
+      // Entering edit mode - save current state as original
+      setOriginalRubricScores([...rubricScores]);
     }
     setIsEditMode(!isEditMode);
   };
 
   const handleDeleteRubric = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
+    // Remove from display
     setRubricScores(rubricScores.filter(rubric => rubric.id !== id));
+    // Track deletion if it's not a new (unsaved) item
+    const rubric = rubricScores.find(r => r.id === id);
+    if (rubric && !rubric.isNew) {
+      setDeletedRubricIds(prev => new Set(prev).add(id));
+    }
   };
 
   const handleSave = async () => {
     const newRubricScores = rubricScores.filter(rubric => rubric.isNew === true);
+    const deletedIds = Array.from(deletedRubricIds);
+    const renamedIds = Array.from(renamedRubrics.keys());
     
-    if (newRubricScores.length === 0) {
-      console.log('ℹ️ No new rubric scores to save');
+    if (newRubricScores.length === 0 && deletedIds.length === 0 && renamedIds.length === 0) {
+      console.log('ℹ️ No changes to save');
       return;
     }
 
@@ -111,18 +138,54 @@ const RubricScoreList: React.FC = () => {
 
     try {
       console.log('═══════════════════════════════════════════════════════');
-      console.log('🚀 SAVING NEW RUBRIC SCORES');
+      console.log('SAVING CHANGES');
       console.log('═══════════════════════════════════════════════════════');
-      console.log(`📋 Found ${newRubricScores.length} new rubric score(s) to save`);
+      console.log(`Found ${newRubricScores.length} new rubric score(s) to save`);
+      console.log(`Found ${deletedIds.length} rubric score(s) to delete`);
+      console.log(`Found ${renamedIds.length} rubric score(s) to rename`);
       console.log('───────────────────────────────────────────────────────');
 
       const savedScores: RubricScore[] = [];
       const errors: string[] = [];
+      const deletedCount: number[] = [];
+      const updatedCount: number[] = [];
 
+      // First, update renamed items
+      for (let i = 0; i < renamedIds.length; i++) {
+        const id = renamedIds[i];
+        const newTitle = renamedRubrics.get(id);
+        if (!newTitle) continue;
+        
+        try {
+          console.log(`\n[${i + 1}/${renamedIds.length}] Updating rubric ID: ${id} to "${newTitle}"`);
+          await updateRubricName(id, newTitle);
+          updatedCount.push(1);
+          console.log(`Successfully updated rubric ID: ${id}`);
+        } catch (error: any) {
+          console.error(`Failed to update rubric ID ${id}:`, error);
+          errors.push(`Update ${id}: ${error?.message || 'Unknown error'}`);
+        }
+      }
+
+      // Then, delete items from backend
+      for (let i = 0; i < deletedIds.length; i++) {
+        const id = deletedIds[i];
+        try {
+          console.log(`\n[${i + 1}/${deletedIds.length}] Deleting rubric ID: ${id}`);
+          await deleteRubricScore(id);
+          deletedCount.push(1);
+          console.log(`Successfully deleted rubric ID: ${id}`);
+        } catch (error: any) {
+          console.error(`Failed to delete rubric ID ${id}:`, error);
+          errors.push(`Delete ${id}: ${error?.message || 'Unknown error'}`);
+        }
+      }
+
+      // Finally, create new items
       for (let i = 0; i < newRubricScores.length; i++) {
         const rubric = newRubricScores[i];
         try {
-          console.log(`\n📤 [${i + 1}/${newRubricScores.length}] Creating rubric: "${rubric.title}"`);
+          console.log(`\n[${i + 1}/${newRubricScores.length}] Creating rubric: "${rubric.title}"`);
           
           // Create rubric with empty headers and rows (just the title)
           const result = await createRubricScore({
@@ -131,18 +194,20 @@ const RubricScoreList: React.FC = () => {
             rows: []
           });
 
-          console.log(`✅ Successfully created rubric ID: ${result.id}`);
+          console.log(`Successfully created rubric ID: ${result.id}`);
           savedScores.push({ ...rubric, id: result.id, isNew: false });
         } catch (error: any) {
-          console.error(`❌ Failed to save "${rubric.title}":`, error);
+          console.error(`Failed to save "${rubric.title}":`, error);
           errors.push(`${rubric.title}: ${error?.message || 'Unknown error'}`);
         }
       }
 
       console.log('───────────────────────────────────────────────────────');
-      console.log('📊 SAVE SUMMARY:');
-      console.log(`   ✅ Successfully saved: ${savedScores.length}`);
-      console.log(`   ❌ Failed: ${errors.length}`);
+      console.log('SAVE SUMMARY:');
+      console.log(`   Successfully saved: ${savedScores.length}`);
+      console.log(`   Successfully updated: ${updatedCount.length}`);
+      console.log(`   Successfully deleted: ${deletedCount.length}`);
+      console.log(`   Failed: ${errors.length}`);
       if (errors.length > 0) {
         console.log('   Errors:', errors);
       }
@@ -165,24 +230,35 @@ const RubricScoreList: React.FC = () => {
       });
 
       setRubricScores(updatedScores);
+      
+      // Clear deleted IDs, renamed rubrics, and original state since we've successfully saved
+      setDeletedRubricIds(new Set());
+      setRenamedRubrics(new Map());
+      setOriginalRubricScores([]);
 
       if (errors.length === 0) {
-        console.log(`✅ Successfully saved ${savedScores.length} rubric score(s)!`);
+        console.log(`Successfully saved ${savedScores.length} rubric score(s), updated ${updatedCount.length} rubric score(s), and deleted ${deletedCount.length} rubric score(s)!`);
       } else {
-        console.warn(`⚠️ Saved ${savedScores.length}, but ${errors.length} failed. Check console for details.`);
+        console.warn(`Saved ${savedScores.length}, updated ${updatedCount.length}, and deleted ${deletedCount.length}, but ${errors.length} failed. Check console for details.`);
       }
     } catch (error: any) {
-      console.error('❌ Error saving rubric scores:', error);
+      console.error('Error saving rubric scores:', error);
     } finally {
       setIsSaving(false);
     }
   };
 
   const handleCancel = () => {
-    // Cancel edit mode without saving
+    // Cancel changes without saving - restore original state but stay in edit mode
+    const restoredScores = [...originalRubricScores];
+    setRubricScores(restoredScores); // Remove any newly added rubric scores
+    setDeletedRubricIds(new Set()); // Clear deleted IDs
+    setRenamedRubrics(new Map()); // Clear renamed rubrics
     setEditingId(null);
     setEditingTitle('');
-    setIsEditMode(false);
+    // Update originalRubricScores to the restored state so cancel can be used again
+    setOriginalRubricScores(restoredScores);
+    // Stay in edit mode - don't call setIsEditMode(false)
   };
 
   const handleAddNew = () => {
@@ -203,11 +279,24 @@ const RubricScoreList: React.FC = () => {
 
   const handleTitleBlur = () => {
     if (editingId && editingTitle.trim()) {
+      const rubric = rubricScores.find(r => r.id === editingId);
+      const newTitle = editingTitle.trim();
+      
+      // Update the display
       setRubricScores(rubricScores.map(rubric =>
         rubric.id === editingId
-          ? { ...rubric, title: editingTitle.trim() }
+          ? { ...rubric, title: newTitle }
           : rubric
       ));
+      
+      // Track rename if it's an existing (non-new) item and the title changed
+      if (rubric && !rubric.isNew && rubric.title !== newTitle) {
+        setRenamedRubrics(prev => {
+          const newMap = new Map(prev);
+          newMap.set(editingId, newTitle);
+          return newMap;
+        });
+      }
     }
     setEditingId(null);
     setEditingTitle('');
