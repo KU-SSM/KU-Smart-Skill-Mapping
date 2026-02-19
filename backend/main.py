@@ -219,6 +219,14 @@ async def create_level(level: LevelBase, db: db_dependency):
     db.refresh(db_level)
     return db_level
 
+@app.get("/rubric/{rubric_id}/levels", response_model=List[LevelModel])
+async def read_levels_for_rubric(rubric_id: int, db: db_dependency):
+    rubric = db.query(models.RubricScore).filter(models.RubricScore.id == rubric_id).first()
+    if not rubric:
+        raise HTTPException(status_code=404, detail=f"rubric_id {rubric_id} not found")
+    level = db.query(models.Level).filter(models.Level.rubric_id == rubric_id).all()
+    return level
+
 @app.get("/level/{level_id}", response_model=LevelModel)
 async def read_level(level_id: int, db: db_dependency):
     level = db.query(models.Level).filter(models.Level.id == level_id).first()
@@ -266,6 +274,14 @@ async def create_criteria(criterion: CriteriaBase, db: db_dependency):
     db.commit()
     db.refresh(db_criterion)
     return db_criterion
+
+@app.get("/rubric/{rubric_id}/criteria", response_model=List[CriteriaModel])
+async def read_criteria_for_rubric(rubric_id: int, db: db_dependency):
+    rubric = db.query(models.RubricScore).filter(models.RubricScore.id == rubric_id).first()
+    if not rubric:
+        raise HTTPException(status_code=404, detail=f"rubric_id {rubric_id} not found")
+    criteria = db.query(models.Criteria).join(models.Skill, models.Criteria.skill_id == models.Skill.id).filter(models.Skill.rubric_id == rubric_id).all()
+    return criteria
 
 @app.get("/criteria/{criteria_id}", response_model=CriteriaModel)
 async def read_criteria(criteria_id: int, db: db_dependency):

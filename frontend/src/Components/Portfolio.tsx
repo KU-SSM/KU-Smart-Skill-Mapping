@@ -1,21 +1,41 @@
 import React, { useRef, useState } from 'react';
 import './Portfolio.css';
 import { FaBriefcase } from 'react-icons/fa';
+import { importPortfolio } from '../services/portfolioApi';
 
 const Portfolio: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const files = event.target.files;
     if (files) {
       const fileArray = Array.from(files);
       setSelectedFiles(fileArray);
       console.log('Selected files:', fileArray);
+      
+      const pdfFiles = fileArray.filter(file => file.name.toLowerCase().endsWith('.pdf'));
+      
+      if (pdfFiles.length > 0) {
+        setIsUploading(true);
+        try {
+          const result = await importPortfolio(
+            'portfolio-general',
+            'General Portfolio',
+            pdfFiles
+          );
+          console.log('Portfolio import successful:', result);
+        } catch (error: any) {
+          console.error('Error importing portfolio:', error);
+        } finally {
+          setIsUploading(false);
+        }
+      }
     }
   };
 
@@ -33,13 +53,14 @@ const Portfolio: React.FC = () => {
             multiple
             style={{ display: 'none' }}
             onChange={handleFileChange}
-            accept=".jpg,.jpeg"
+            accept=".pdf"
           />
           <button 
             className="upload-portfolio-button"
             onClick={handleUploadClick}
+            disabled={isUploading}
           >
-            Upload Portfolio
+            {isUploading ? 'Uploading...' : 'Upload Portfolio'}
           </button>
           {selectedFiles.length > 0 && (
             <div className="selected-files">
