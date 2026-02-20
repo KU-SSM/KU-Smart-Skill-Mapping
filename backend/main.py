@@ -26,20 +26,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
-
-
-class SkillMapBase(BaseModel):
-    skills: List[str]
-    category: str
-    description: str
-    date: str
-
-class SkillMapModel(SkillMapBase):
-    id: int
     
-    # class Config:
-    #     orm_mode = True
-    
+# Should be refactored to separate file later on.
 class RubricScoreBase(BaseModel):
     name: str
     created_at: datetime
@@ -51,6 +39,7 @@ class RubricScoreModel(RubricScoreBase):
 class SkillBase(BaseModel):
     rubric_id: int
     display_order: int
+    name: str
 
 class SkillModel(SkillBase):
     id: int
@@ -70,6 +59,25 @@ class CriteriaBase(BaseModel):
 class CriteriaModel(CriteriaBase):
     id: int
 
+class PortfolioBase(BaseModel):
+    filename: str
+    classification_json: dict
+
+class PortfolioModel(PortfolioBase):
+    id: int
+    created_at: datetime
+
+class EvaluatedSkillBase(BaseModel):
+    skill_id: int
+    level_id: int
+    confidence: float
+    matched_from: str
+
+class EvaluatedSkillModel(EvaluatedSkillBase):
+    id: int
+    portfolio_id: int
+    created_at: datetime
+    
 def get_db():
     db = SessionLocal()
     try:
@@ -81,20 +89,6 @@ def get_db():
 db_dependency = Annotated[Session, Depends(get_db)]
 
 models.Base.metadata.create_all(bind=engine)
-
-@app.post("/map/", response_model=SkillMapModel)
-async def create_map(map: SkillMapBase, db: db_dependency):
-    print('he')
-    db_map = models.SkillMap(**map.model_dump())
-    db.add(db_map)
-    db.commit()
-    db.refresh(db_map)
-    return db_map
-
-@app.get("/map/", response_model=List[SkillMapModel])
-async def read_maps(db: db_dependency, skip: int=0, limit: int=100):
-    maps = db.query(models.SkillMap).offset(skip).limit(limit).all()
-    return maps
 
 @app.post("/rubric/", response_model=RubricScoreModel)
 async def create_rubric(rubric: RubricScoreBase, db: db_dependency):
@@ -251,11 +245,11 @@ async def update_level(level_id: int, level: LevelBase, db: db_dependency):
 
 @app.post("/criteria/", response_model=CriteriaModel)
 async def create_criteria(criterion: CriteriaBase, db: db_dependency):
-    db_criterion = models.Criteria(**criterion.model_dump())
-    db.add(db_criterion)
+    db_criteria = models.Criteria(**criterion.model_dump())
+    db.add(db_criteria)
     db.commit()
-    db.refresh(db_criterion)
-    return db_criterion
+    db.refresh(db_criteria)
+    return db_criteria
 
 @app.get("/rubric/{rubric_id}/criteria", response_model=List[CriteriaModel])
 async def read_criteria_for_rubric(rubric_id: int, db: db_dependency):
@@ -347,3 +341,14 @@ async def extract_document(file: UploadFile = File(...)):
             status_code=500,
             detail=f"Failed to extract text from PDF: {str(e)}"
         )
+        
+@app.post("/portfolio/evaluate")
+async def evaluate_and_save(
+    classification: dict,  # {"skills": [...], "categories": [...], "summary": "..."}
+    rubric_id: int,
+    db: db_dependency
+):
+    # Match extracted skills to rubric
+    # Save evaluated_skills table
+    # No need for original text
+    pass
