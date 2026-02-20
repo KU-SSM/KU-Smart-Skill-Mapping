@@ -15,10 +15,6 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
-@app.get('/')
-async def check():
-    return 'hello'
-
 origins = [
     "http://localhost:3000"
 ]
@@ -86,7 +82,6 @@ db_dependency = Annotated[Session, Depends(get_db)]
 
 models.Base.metadata.create_all(bind=engine)
 
-
 @app.post("/map/", response_model=SkillMapModel)
 async def create_map(map: SkillMapBase, db: db_dependency):
     print('he')
@@ -95,7 +90,6 @@ async def create_map(map: SkillMapBase, db: db_dependency):
     db.commit()
     db.refresh(db_map)
     return db_map
-
 
 @app.get("/map/", response_model=List[SkillMapModel])
 async def read_maps(db: db_dependency, skip: int=0, limit: int=100):
@@ -133,11 +127,7 @@ async def delete_rubric(rubric_id: int, db: db_dependency):
     if not rubric:
         raise HTTPException(status_code=404, detail=f"rubric_id {rubric_id} not found")
     
-    # delete associated skills, levels, and criteria
-    db.query(models.Skill).filter(models.Skill.rubric_id == rubric_id).delete()
-    db.query(models.Level).filter(models.Level.rubric_id == rubric_id).delete()
-    
-    # delete the rubric itself
+    # delete the rubric itself orphased automatically deleted with cascade
     db.delete(rubric)
     db.commit()
     
@@ -155,8 +145,6 @@ async def update_rubric(rubric_id: int, rubric: RubricScoreBase, db: db_dependen
     db.commit()
     db.refresh(db_rubric)
     return db_rubric
-
-
 
 @app.post("/skill/", response_model=SkillModel)
 async def create_skill(skill: SkillBase, db: db_dependency):
@@ -184,10 +172,7 @@ async def delete_skill(skill_id: int, db: db_dependency):
     if not skill:
         raise HTTPException(status_code=404, detail=f"skill_id {skill_id} not found")
     
-    # delete associated criteria
-    db.query(models.Criteria).filter(models.Criteria.skill_id == skill_id).delete()
-    
-    # delete the skill itself
+    # delete the skill and it's orphased criteria with cascade
     db.delete(skill)
     db.commit()
     
@@ -240,10 +225,7 @@ async def delete_level(level_id: int, db: db_dependency):
     if not level:
         raise HTTPException(status_code=404, detail=f"level_id {level_id} not found")
     
-    # delete associated criteria
-    db.query(models.Criteria).filter(models.Criteria.level_id == level_id).delete()
-    
-    # delete the level itself
+    # delete the level and it's orphased with cascade
     db.delete(level)
     db.commit()
     
@@ -285,26 +267,26 @@ async def read_criteria_for_rubric(rubric_id: int, db: db_dependency):
 
 @app.get("/criteria/{criteria_id}", response_model=CriteriaModel)
 async def read_criteria(criteria_id: int, db: db_dependency):
-    criterion = db.query(models.Criteria).filter(models.Criteria.id == criteria_id).first()
-    if not criterion:
+    criteria = db.query(models.Criteria).filter(models.Criteria.id == criteria_id).first()
+    if not criteria:
         raise HTTPException(status_code=404, detail=f"criteria_id {criteria_id} not found")
-    return criterion
+    return criteria
 
 @app.delete("/criteria/{criteria_id}")
 async def delete_criteria(criteria_id: int, db: db_dependency):
-    criterion = db.query(models.Criteria).filter(models.Criteria.id == criteria_id).first()
-    if not criterion:
+    criteria = db.query(models.Criteria).filter(models.Criteria.id == criteria_id).first()
+    if not criteria:
         raise HTTPException(status_code=404, detail=f"criteria_id {criteria_id} not found")
     
-    db.delete(criterion)
+    db.delete(criteria)
     db.commit()
     
     return JSONResponse(status_code=200, content={"detail": f"criteria_id {criteria_id} deleted successfully"})
 
 @app.put("/criteria/{criteria_id}", response_model=CriteriaModel)
 async def update_criteria(criteria_id: int, criterion: CriteriaBase, db: db_dependency):
-    db_criterion = db.query(models.Criteria).filter(models.Criteria.id == criteria_id).first()
-    if not db_criterion:
+    db_criteria = db.query(models.Criteria).filter(models.Criteria.id == criteria_id).first()
+    if not db_criteria:
         raise HTTPException(status_code=404, detail=f"criteria_id {criteria_id} not found")
     
     # validate skill_id exists
@@ -318,11 +300,11 @@ async def update_criteria(criteria_id: int, criterion: CriteriaBase, db: db_depe
         raise HTTPException(status_code=400, detail=f"level_id {criterion.level_id} does not exist")
     
     for key, value in criterion.model_dump().items():
-        setattr(db_criterion, key, value)
+        setattr(db_criteria, key, value)
     
     db.commit()
-    db.refresh(db_criterion)
-    return db_criterion
+    db.refresh(db_criteria)
+    return db_criteria
 
 # PDF Text Extraction Endpoint
 @app.post("/portfolio/import")
