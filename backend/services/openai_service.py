@@ -22,21 +22,18 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class OpenAIService:
-    """Service for handling OpenAI API interactions, specifically for PDF text extraction."""
+    """Service for handling OpenAI API interactions."""
     
     def __init__(self):
         """Initialize OpenAI client with API key from environment variables."""
         api_key = os.getenv("OPENAI_API_KEY")
-        logger.info(f"API Key: {api_key}") # DON'T FORGET TO REMOVE THIS
         if not api_key:
             raise ValueError("OPENAI_API_KEY not found in environment variables. Please set it in your .env file.")
         
         self.client = OpenAI(api_key=api_key)
         self.max_file_size = int(os.getenv("MAX_FILE_SIZE", 10485760))  # Default 10MB
         # Model for Assistants API - can be overridden via OPENAI_MODEL env variable
-        # Default: "gpt-4o-mini" (free tier friendly)
-        # Free tier options: "gpt-4o-mini", "gpt-3.5-turbo"
-        # Paid tier options: "gpt-4o", "gpt-4-turbo-preview", "gpt-4"
+        # Default: "gpt-4o-mini"
         self.model = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
         logger.info(f"Initializing OpenAI service with model: {self.model}")
         
@@ -110,25 +107,6 @@ class OpenAIService:
 
             metadata = {"filename": pdf_file.filename, "size": file_size}
             return {"text": full_text, "metadata": metadata}
-            
-            # try:
-            #     # Upload file to OpenAI
-            #     with open(temp_file_path, 'rb') as file:
-            #         uploaded_file = self.client.files.create(
-            #             file=file,
-            #             purpose='assistants'
-            #         )
-                
-            #     logger.info(f"File uploaded to OpenAI: {uploaded_file.id}")
-                
-            # except Exception as e:
-            #     # Clean up resources if they were created
-            #     try:
-            #         if 'uploaded_file' in locals():
-            #             self.client.files.delete(uploaded_file.id)
-            #     except Exception as cleanup_error:
-            #         logger.warning(f"Error during cleanup: {str(cleanup_error)}")
-            #     raise e
                     
         except Exception as e:
             logger.error(f"Error extracting text from PDF: {str(e)}")
@@ -212,6 +190,27 @@ class OpenAIService:
         
         logger.info(f"Final merged result: {len(merged['skills'])} skills, {len(merged['categories'])} categories, summary length: {len(merged['summary'])}")
         return merged
+
+    async def assess_skill_level(self, skill_name: str, evidence: str, criteria: list) -> dict:
+        """
+        Assess which level (proficiency) the candidate demonstrates.
+        criteria: list of {"level": 1, "description": "..."} from DB
+        """
+        prompt = f"""Based on the portfolio content and criteria, skill, level from rubric score provided, assign the appropriate skill and level of this person in following format.
+        
+                    Skill: {skill_name}
+                    Evidence: {evidence}
+                    Levels:{json.dumps(criteria, indent=2)}
+
+                    Return JSON: {{"level_id": <int>, "confidence": <0-1>, "reasoning": "<string>"}}"""
+        
+        response = await asyncio.to_thread(
+            self.client.chat.completions.create,
+            model=self.model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3
+        )
+        return json.loads(response.choices[0].message.content)
 
 # Create a singleton instance
 _openai_service: Optional[OpenAIService] = None
