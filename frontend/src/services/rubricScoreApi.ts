@@ -24,21 +24,23 @@ interface BackendRubric {
   updated_at: string;
 }
 
-interface BackendSkill {
+interface BackendRubricSkill {
   id: number;
   rubric_id: number;
   display_order: number;
+  name:string;
 }
 
 interface BackendLevel {
   id: number;
   rubric_id: number;
   rank: number;
+  description: string;
 }
 
 interface BackendCriteria {
   id: number;
-  skill_id: number;
+  rubric_skill_id: number;
   level_id: number;
   description: string;
 }
@@ -66,16 +68,16 @@ export const getRubricScores = async (): Promise<RubricScoreListItem[]> => {
 const fetchRubricData = async (rubricId: number) => {
   try {
     // Get skills using the correct endpoint
-    console.log(`[GET /rubric/${rubricId}/skills] Fetching skills...`);
-    const skillsResponse = await fetch(`${API_BASE_URL}/rubric/${rubricId}/skills`);
+    console.log(`[GET /rubric/${rubricId}/rubric_skills] Fetching skills...`);
+    const skillsResponse = await fetch(`${API_BASE_URL}/rubric/${rubricId}/rubric_skills`);
     
     if (!skillsResponse.ok) {
       console.warn('Failed to fetch skills. Returning empty arrays.');
       return { skills: [], levels: [], criteria: [] };
     }
 
-    const skills: BackendSkill[] = await skillsResponse.json();
-    console.log(`Found ${skills.length} skills`);
+    const skills: BackendRubricSkill[] = await skillsResponse.json();
+    console.log(`Found ${skills.length} rubric_skills`);
 
     // Get levels using the new endpoint
     console.log(`[GET /rubric/${rubricId}/levels] Fetching levels...`);
@@ -110,7 +112,7 @@ const fetchRubricData = async (rubricId: number) => {
 
 const transformBackendToFrontend = (
   rubric: BackendRubric,
-  skills: BackendSkill[],
+  skills: BackendRubricSkill[],
   levels: BackendLevel[],
   criteria: BackendCriteria[],
   savedHeaders?: string[],
@@ -125,7 +127,7 @@ const transformBackendToFrontend = (
     : sortedLevels.map(() => '');
 
   const rows: TableData[] = sortedSkills.map((skill, index) => {
-    const skillCriteria = criteria.filter((c) => c.skill_id === skill.id);
+    const skillCriteria = criteria.filter((c) => c.rubric_skill_id === skill.id);
     const values = sortedLevels.map((level) => {
       const criterion = skillCriteria.find((c) => c.level_id === level.id);
       return criterion ? criterion.description : '';
@@ -229,7 +231,7 @@ export const createRubricScore = async (
     console.log('Created Rubric ID:', rubric.id);
 
     const rubricId = rubric.id;
-    const createdSkills: BackendSkill[] = [];
+    const createdSkills: BackendRubricSkill[] = [];
     const createdLevels: BackendLevel[] = [];
     const createdCriteria: BackendCriteria[] = [];
 
@@ -237,6 +239,7 @@ export const createRubricScore = async (
       const levelPayload = {
         rubric_id: rubricId,
         rank: i + 1,
+        description: rubricScore.headers[i],
       };
       console.log(`[POST /level/] Creating level ${i + 1}...`);
       console.log(`Request URL:`, `${API_BASE_URL}/level/`);
@@ -265,12 +268,13 @@ export const createRubricScore = async (
       const skillPayload = {
         rubric_id: rubricId,
         display_order: i + 1,
+        name: rubricScore.rows[i].skillArea,
       };
-      console.log(`[POST /skill/] Creating skill ${i + 1}...`);
-      console.log(`Request URL:`, `${API_BASE_URL}/skill/`);
+      console.log(`[POST /rubric_skill/] Creating skill ${i + 1}...`);
+      console.log(`Request URL:`, `${API_BASE_URL}/rubric_skill/`);
       console.log(`Request Body:`, JSON.stringify(skillPayload, null, 2));
       
-      const skillResponse = await fetch(`${API_BASE_URL}/skill/`, {
+      const skillResponse = await fetch(`${API_BASE_URL}/rubric_skill/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(skillPayload),
@@ -279,7 +283,7 @@ export const createRubricScore = async (
       console.log(`Response Status:`, skillResponse.status, skillResponse.statusText);
       
       if (skillResponse.ok) {
-        const skill: BackendSkill = await skillResponse.json();
+        const skill: BackendRubricSkill = await skillResponse.json();
         createdSkills.push(skill);
         console.log(`Success! Response JSON:`, JSON.stringify(skill, null, 2));
         console.log(`Created Skill ID:`, skill.id);
@@ -287,7 +291,7 @@ export const createRubricScore = async (
         for (let j = 0; j < rubricScore.rows[i].values.length; j++) {
           if (rubricScore.rows[i].values[j].trim()) {
             const criteriaPayload = {
-              skill_id: skill.id,
+              rubric_skill_id: skill.id,
               level_id: createdLevels[j].id,
               description: rubricScore.rows[i].values[j].trim(),
             };
@@ -425,7 +429,7 @@ export const updateRubricScore = async (
     try {
       await updateRubricName(id, rubricScore.title);
     } catch (error) {
-      console.warn('Failed to update rubric name, continuing with levels/skills/criteria...', error);
+      console.warn('Failed to update rubric name, continuing with levels/rubric_skills/criteria...', error);
     }
 
     // Delete existing skills and levels to avoid duplicates
@@ -433,15 +437,15 @@ export const updateRubricScore = async (
     const deletionPromises: Promise<void>[] = [];
     
     try {
-      console.log('[GET /rubric/{id}/skills] Fetching existing skills...');
-      const skillsResponse = await fetch(`${API_BASE_URL}/rubric/${rubricId}/skills`);
+      console.log('[GET /rubric/{id}/rubric_skills] Fetching existing rubric_skills...');
+      const skillsResponse = await fetch(`${API_BASE_URL}/rubric/${rubricId}/rubric_skills`);
       if (skillsResponse.ok) {
-        const existingSkills: BackendSkill[] = await skillsResponse.json();
-        console.log(`Found ${existingSkills.length} existing skills to delete`);
+        const existingSkills: BackendRubricSkill[] = await skillsResponse.json();
+        console.log(`Found ${existingSkills.length} existing rubric_skills to delete`);
         
         // Delete each skill (this will cascade delete associated criteria)
         for (const skill of existingSkills) {
-          const deletePromise = fetch(`${API_BASE_URL}/skill/${skill.id}`, {
+          const deletePromise = fetch(`${API_BASE_URL}/rubric_skill/${skill.id}`, {
             method: 'DELETE',
           }).then(response => {
             if (response.ok) {
@@ -495,7 +499,7 @@ export const updateRubricScore = async (
       await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    const createdSkills: BackendSkill[] = [];
+    const createdSkills: BackendRubricSkill[] = [];
     const createdLevels: BackendLevel[] = [];
     const createdCriteria: BackendCriteria[] = [];
 
@@ -508,6 +512,7 @@ export const updateRubricScore = async (
       const levelPayload = {
         rubric_id: rubricId,
         rank: i + 1,
+        description: rubricScore.headers[i],
       };
       console.log(`[POST /level/] Creating level ${i + 1}...`);
       console.log(`Request URL:`, `${API_BASE_URL}/level/`);
@@ -547,12 +552,13 @@ export const updateRubricScore = async (
       const skillPayload = {
         rubric_id: rubricId,
         display_order: i + 1,
+        name: rubricScore.rows[i].skillArea,
       };
-      console.log(`[POST /skill/] Creating skill ${i + 1}...`);
-      console.log(`Request URL:`, `${API_BASE_URL}/skill/`);
+      console.log(`[POST /rubric_skill/] Creating skill ${i + 1}...`);
+      console.log(`Request URL:`, `${API_BASE_URL}/rubric_skill/`);
       console.log(`Request Body:`, JSON.stringify(skillPayload, null, 2));
       
-      const skillResponse = await fetch(`${API_BASE_URL}/skill/`, {
+      const skillResponse = await fetch(`${API_BASE_URL}/rubric_skill/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(skillPayload),
@@ -561,7 +567,7 @@ export const updateRubricScore = async (
       console.log(`Response Status:`, skillResponse.status, skillResponse.statusText);
       
       if (skillResponse.ok) {
-        const skill: BackendSkill = await skillResponse.json();
+        const skill: BackendRubricSkill = await skillResponse.json();
         createdSkills.push(skill);
         console.log(`Success! Response JSON:`, JSON.stringify(skill, null, 2));
         console.log(`Created Skill ID:`, skill.id);
@@ -581,7 +587,7 @@ export const updateRubricScore = async (
           // Save all cells, even if empty, to preserve all user edits
           const cellValue = (rubricScore.rows[i].values[j] || '').trim();
           const criteriaPayload = {
-            skill_id: skill.id,
+            rubric_skill_id: skill.id,
             level_id: createdLevels[j].id,
             description: cellValue,
           };
@@ -655,7 +661,7 @@ export const updateRubricScore = async (
 
     // Preserve rows with skillArea and values from input
     const rows: TableData[] = sortedSkills.map((skill, skillIndex) => {
-      const skillCriteria = createdCriteria.filter((c) => c.skill_id === skill.id);
+      const skillCriteria = createdCriteria.filter((c) => c.rubric_skill_id === skill.id);
       const values = sortedLevels.map((level, levelIndex) => {
         const criterion = skillCriteria.find((c) => c.level_id === level.id);
         // Use criterion description if exists, otherwise preserve from input
