@@ -27,6 +27,7 @@ class Level (Base):
     id = Column(Integer, primary_key=True, index=True)
     rubric_id = Column(Integer, ForeignKey('rubricscore.id', ondelete='CASCADE'), index=True)
     rank = Column(Integer)
+    description = Column(String)
     
     rubric_score = relationship("RubricScore", back_populates="levels")
     criteria = relationship("Criteria", back_populates="level", cascade="all,delete-orphan")

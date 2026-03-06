@@ -47,6 +47,7 @@ class RubricSkillModel(RubricSkillBase):
 class LevelBase(BaseModel):
     rubric_id: int
     rank: int
+    description: str
 
 class LevelModel(LevelBase):
     id: int
@@ -110,8 +111,8 @@ async def read_rubric(rubric_id: int, db: db_dependency):
         raise HTTPException(status_code=404, detail=f"rubric_id {rubric_id} not found")
     return rubric
 
-@app.get("/rubric/{rubric_id}/skills", response_model=List[RubricSkillModel])
-async def read_skills_for_rubric(rubric_id: int, db: db_dependency):
+@app.get("/rubric/{rubric_id}/rubric_skills", response_model=List[RubricSkillModel])
+async def read_rubric_skills(rubric_id: int, db: db_dependency):
     rubric_skills = db.query(models.RubricSkill).filter(models.RubricSkill.rubric_id == rubric_id).all()
     return rubric_skills
 
@@ -125,7 +126,7 @@ async def delete_rubric(rubric_id: int, db: db_dependency):
     db.delete(rubric)
     db.commit()
     
-    return JSONResponse(status_code=200, content={"detail": f"rubric_id {rubric_id} and associated skills and levels deleted successfully"})
+    return JSONResponse(status_code=200, content={"detail": f"rubric_id {rubric_id} and associated rubric_skills and levels deleted successfully"})
 
 @app.put("/rubric/{rubric_id}", response_model=RubricScoreModel)
 async def update_rubric(rubric_id: int, rubric: RubricScoreBase, db: db_dependency):
