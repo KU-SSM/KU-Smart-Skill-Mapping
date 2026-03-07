@@ -59,8 +59,10 @@ const RubricScoreDetail: React.FC = () => {
           skillArea: row.skillArea,
           values: row.values.map(v => v) // Deep copy of values array
         })));
-      } catch (error) {
+      } catch (error: any) {
         console.error('Error loading rubric score:', error);
+        const errorMessage = error?.message || 'Failed to load rubric score';
+        alert(`Error: ${errorMessage}`);
         // Set default empty rubric on error
         setTitle('Rubric Score Not Found');
         setHeaders([]);

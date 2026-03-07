@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../api/index';
+import api from '../api/index';
 
 export interface PortfolioFile {
   name: string;
@@ -62,30 +62,10 @@ export const importPortfolio = async (
     console.log('  File Type:', firstFile.type);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-    const response = await fetch(`${API_BASE_URL}/portfolio/import`, {
-      method: 'POST',
-      body: formData,
-    });
+    const response = await api.post('portfolio/import', formData);
 
     console.log('Response Status:', response.status, response.statusText);
-    
-    if (!response.ok) {
-      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-      try {
-        const errorData = await response.json();
-        console.log('Error Response Data:', errorData);
-        errorMessage = errorData.detail || errorData.message || errorMessage;
-      } catch (e) {
-        const text = await response.text();
-        console.log('Error Response Text:', text);
-        if (text) {
-          errorMessage = text;
-        }
-      }
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
+    const data = response.data;
     console.log('Success Response Data:', data);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     

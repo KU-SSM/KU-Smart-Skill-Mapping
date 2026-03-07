@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../api/index';
+import api from '../api/index';
 
 export interface TableData {
   skillArea: string;
@@ -47,21 +47,16 @@ interface BackendCriteria {
 
 export const getRubricScores = async (): Promise<RubricScoreListItem[]> => {
   try {
-    const response = await fetch(`${API_BASE_URL}/rubric/`);
+    const response = await api.get<BackendRubric[]>('rubric/');
     
-    if (!response.ok) {
-      throw new Error(`Failed to fetch rubric scores: ${response.statusText}`);
-    }
-    
-    const data: BackendRubric[] = await response.json();
-    
-    return data.map((item) => ({
+    return response.data.map((item) => ({
       id: String(item.id),
-      title: item.name,
+      title: item.name || 'Untitled Rubric',
     }));
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching rubric scores:', error);
-    throw error;
+    const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to fetch rubric scores';
+    throw new Error(errorMessage);
   }
 };
 
@@ -69,41 +64,38 @@ const fetchRubricData = async (rubricId: number) => {
   try {
     // Get skills using the correct endpoint
     console.log(`[GET /rubric/${rubricId}/rubric_skills] Fetching skills...`);
-    const skillsResponse = await fetch(`${API_BASE_URL}/rubric/${rubricId}/rubric_skills`);
-    
-    if (!skillsResponse.ok) {
+    try {
+      const skillsResponse = await api.get<BackendRubricSkill[]>(`rubric/${rubricId}/rubric_skills`);
+      const skills = skillsResponse.data;
+      console.log(`Found ${skills.length} rubric_skills`);
+
+      // Get levels using the new endpoint
+      console.log(`[GET /rubric/${rubricId}/levels] Fetching levels...`);
+      try {
+        const levelsResponse = await api.get<BackendLevel[]>(`rubric/${rubricId}/levels`);
+        const levels = levelsResponse.data;
+        console.log(`Found ${levels.length} levels`);
+
+        // Get criteria using the new endpoint
+        console.log(`[GET /rubric/${rubricId}/criteria] Fetching criteria...`);
+        try {
+          const criteriaResponse = await api.get<BackendCriteria[]>(`rubric/${rubricId}/criteria`);
+          const criteria = criteriaResponse.data;
+          console.log(`Found ${criteria.length} criteria`);
+
+          return { skills, levels, criteria };
+        } catch (error) {
+          console.warn('Failed to fetch criteria. Returning empty array.');
+          return { skills, levels, criteria: [] };
+        }
+      } catch (error) {
+        console.warn('Failed to fetch levels. Returning empty array.');
+        return { skills, levels: [], criteria: [] };
+      }
+    } catch (error) {
       console.warn('Failed to fetch skills. Returning empty arrays.');
       return { skills: [], levels: [], criteria: [] };
     }
-
-    const skills: BackendRubricSkill[] = await skillsResponse.json();
-    console.log(`Found ${skills.length} rubric_skills`);
-
-    // Get levels using the new endpoint
-    console.log(`[GET /rubric/${rubricId}/levels] Fetching levels...`);
-    const levelsResponse = await fetch(`${API_BASE_URL}/rubric/${rubricId}/levels`);
-    
-    if (!levelsResponse.ok) {
-      console.warn('Failed to fetch levels. Returning empty array.');
-      return { skills, levels: [], criteria: [] };
-    }
-
-    const levels: BackendLevel[] = await levelsResponse.json();
-    console.log(`Found ${levels.length} levels`);
-
-    // Get criteria using the new endpoint
-    console.log(`[GET /rubric/${rubricId}/criteria] Fetching criteria...`);
-    const criteriaResponse = await fetch(`${API_BASE_URL}/rubric/${rubricId}/criteria`);
-    
-    if (!criteriaResponse.ok) {
-      console.warn('Failed to fetch criteria. Returning empty array.');
-      return { skills, levels, criteria: [] };
-    }
-
-    const criteria: BackendCriteria[] = await criteriaResponse.json();
-    console.log(`Found ${criteria.length} criteria`);
-
-    return { skills, levels, criteria };
   } catch (error) {
     console.warn('Error fetching rubric components:', error);
     return { skills: [], levels: [], criteria: [] };
@@ -121,10 +113,15 @@ const transformBackendToFrontend = (
   const sortedLevels = [...levels].sort((a, b) => a.rank - b.rank);
   const sortedSkills = [...skills].sort((a, b) => a.display_order - b.display_order);
 
-  // Use saved headers if available, otherwise create empty ones
-  const headers = savedHeaders && savedHeaders.length === sortedLevels.length
-    ? [...savedHeaders]
-    : sortedLevels.map(() => '');
+  // Use saved headers if available, otherwise use level descriptions from backend
+  let headers: string[];
+  if (savedHeaders && savedHeaders.length === sortedLevels.length) {
+    headers = [...savedHeaders];
+  } else if (sortedLevels.length > 0) {
+    headers = sortedLevels.map((level) => level.description || '');
+  } else {
+    headers = [];
+  }
 
   const rows: TableData[] = sortedSkills.map((skill, index) => {
     const skillCriteria = criteria.filter((c) => c.rubric_skill_id === skill.id);
@@ -135,14 +132,14 @@ const transformBackendToFrontend = (
     return {
       skillArea: savedSkillAreas && savedSkillAreas[index] !== undefined
         ? savedSkillAreas[index]
-        : '',
+        : (skill.name || ''),
       values,
     };
   });
 
   return {
     id: String(rubric.id),
-    title: rubric.name,
+    title: rubric.name || 'Untitled Rubric',
     headers,
     rows,
   };
@@ -151,13 +148,8 @@ const transformBackendToFrontend = (
 export const getRubricScore = async (id: string): Promise<RubricScoreDetail> => {
   try {
     // Get the rubric
-    const rubricResponse = await fetch(`${API_BASE_URL}/rubric/${id}`);
-    
-    if (!rubricResponse.ok) {
-      throw new Error(`Failed to fetch rubric: ${rubricResponse.statusText}`);
-    }
-    
-    const rubric: BackendRubric = await rubricResponse.json();
+    const rubricResponse = await api.get<BackendRubric>(`rubric/${id}`);
+    const rubric = rubricResponse.data;
     
     // Get skills, levels, and criteria using the new endpoints
     const { skills, levels, criteria } = await fetchRubricData(rubric.id);
@@ -182,9 +174,10 @@ export const getRubricScore = async (id: string): Promise<RubricScoreDetail> => 
     
     // Transform backend data to frontend format, including saved metadata
     return transformBackendToFrontend(rubric, skills, levels, criteria, savedHeaders, savedSkillAreas);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error fetching rubric score:', error);
-    throw error;
+    const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to fetch rubric score';
+    throw new Error(errorMessage);
   }
 };
 
@@ -194,7 +187,6 @@ export const createRubricScore = async (
   try {
     console.log('═══════════════════════════════════════════════════════');
     console.log('[createRubricScore] Function called');
-    console.log('API_BASE_URL:', API_BASE_URL);
     console.log('Rubric Score Data:', JSON.stringify(rubricScore, null, 2));
     console.log('═══════════════════════════════════════════════════════');
     
@@ -207,26 +199,12 @@ export const createRubricScore = async (
     };
 
     console.log('[POST /rubric/] Creating rubric...');
-    console.log('Request URL:', `${API_BASE_URL}/rubric/`);
     console.log('Request Body:', JSON.stringify(rubricPayload, null, 2));
     
-    const rubricResponse = await fetch(`${API_BASE_URL}/rubric/`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(rubricPayload),
-    });
+    const rubricResponse = await api.post<BackendRubric>('rubric/', rubricPayload);
 
     console.log('Response Status:', rubricResponse.status, rubricResponse.statusText);
-    
-    if (!rubricResponse.ok) {
-      const errorText = await rubricResponse.text();
-      console.error('Error Response:', errorText);
-      throw new Error(`Failed to create rubric: ${rubricResponse.statusText}`);
-    }
-
-    const rubric: BackendRubric = await rubricResponse.json();
+    const rubric = rubricResponse.data;
     console.log('Success! Response JSON:', JSON.stringify(rubric, null, 2));
     console.log('Created Rubric ID:', rubric.id);
 
@@ -242,25 +220,17 @@ export const createRubricScore = async (
         description: rubricScore.headers[i],
       };
       console.log(`[POST /level/] Creating level ${i + 1}...`);
-      console.log(`Request URL:`, `${API_BASE_URL}/level/`);
       console.log(`Request Body:`, JSON.stringify(levelPayload, null, 2));
       
-      const levelResponse = await fetch(`${API_BASE_URL}/level/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(levelPayload),
-      });
-      
-      console.log(`Response Status:`, levelResponse.status, levelResponse.statusText);
-      
-      if (levelResponse.ok) {
-        const level: BackendLevel = await levelResponse.json();
+      try {
+        const levelResponse = await api.post<BackendLevel>('level/', levelPayload);
+        const level = levelResponse.data;
         createdLevels.push(level);
+        console.log(`Response Status:`, levelResponse.status, levelResponse.statusText);
         console.log(`Success! Response JSON:`, JSON.stringify(level, null, 2));
         console.log(`Created Level ID:`, level.id);
-      } else {
-        const errorText = await levelResponse.text();
-        console.error(`Error Response:`, errorText);
+      } catch (error: any) {
+        console.error(`Error Response:`, error.response?.data || error.message);
       }
     }
 
@@ -271,20 +241,13 @@ export const createRubricScore = async (
         name: rubricScore.rows[i].skillArea,
       };
       console.log(`[POST /rubric_skill/] Creating skill ${i + 1}...`);
-      console.log(`Request URL:`, `${API_BASE_URL}/rubric_skill/`);
       console.log(`Request Body:`, JSON.stringify(skillPayload, null, 2));
       
-      const skillResponse = await fetch(`${API_BASE_URL}/rubric_skill/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(skillPayload),
-      });
-      
-      console.log(`Response Status:`, skillResponse.status, skillResponse.statusText);
-      
-      if (skillResponse.ok) {
-        const skill: BackendRubricSkill = await skillResponse.json();
+      try {
+        const skillResponse = await api.post<BackendRubricSkill>('rubric_skill/', skillPayload);
+        const skill = skillResponse.data;
         createdSkills.push(skill);
+        console.log(`Response Status:`, skillResponse.status, skillResponse.statusText);
         console.log(`Success! Response JSON:`, JSON.stringify(skill, null, 2));
         console.log(`Created Skill ID:`, skill.id);
 
@@ -296,28 +259,22 @@ export const createRubricScore = async (
               description: rubricScore.rows[i].values[j].trim(),
             };
             console.log(`[POST /criteria/] Creating criteria for skill ${i + 1}, level ${j + 1}...`);
-            console.log(`Request URL:`, `${API_BASE_URL}/criteria/`);
             console.log(`Request Body:`, JSON.stringify(criteriaPayload, null, 2));
             
-            const criteriaResponse = await fetch(`${API_BASE_URL}/criteria/`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(criteriaPayload),
-            });
-            
-            console.log(`Response Status:`, criteriaResponse.status, criteriaResponse.statusText);
-            
-            if (criteriaResponse.ok) {
-              const criteria: BackendCriteria = await criteriaResponse.json();
+            try {
+              const criteriaResponse = await api.post<BackendCriteria>('criteria/', criteriaPayload);
+              const criteria = criteriaResponse.data;
               createdCriteria.push(criteria);
+              console.log(`Response Status:`, criteriaResponse.status, criteriaResponse.statusText);
               console.log(`Success! Response JSON:`, JSON.stringify(criteria, null, 2));
               console.log(`Created Criteria ID:`, criteria.id);
-            } else {
-              const errorText = await criteriaResponse.text();
-              console.error(`Error Response:`, errorText);
+            } catch (error: any) {
+              console.error(`Error Response:`, error.response?.data || error.message);
             }
           }
         }
+      } catch (error: any) {
+        console.error(`Error Response:`, error.response?.data || error.message);
       }
     }
 
@@ -348,9 +305,10 @@ export const createRubricScore = async (
     }
     
     return transformBackendToFrontend(rubric, skills, levels, criteria);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating rubric score:', error);
-    throw error;
+    const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to create rubric score';
+    throw new Error(errorMessage);
   }
 };
 
@@ -362,16 +320,9 @@ export const updateRubricName = async (
     // Backend expects full RubricScoreBase: { name, created_at, updated_at }
     // So we first fetch the existing rubric to preserve created_at.
     console.log('[GET /rubric/{id}] Fetching existing rubric before rename...');
-    console.log('Request URL:', `${API_BASE_URL}/rubric/${id}`);
 
-    const existingRes = await fetch(`${API_BASE_URL}/rubric/${id}`);
-    if (!existingRes.ok) {
-      const errorText = await existingRes.text();
-      console.error('Error Response:', errorText);
-      throw new Error(`Failed to fetch rubric before rename: ${existingRes.statusText}`);
-    }
-
-    const existing: BackendRubric = await existingRes.json();
+    const existingRes = await api.get<BackendRubric>(`rubric/${id}`);
+    const existing = existingRes.data;
 
     const now = new Date().toISOString();
     const payload = {
@@ -381,31 +332,18 @@ export const updateRubricName = async (
     };
 
     console.log('[PUT /rubric/{id}] Updating rubric name...');
-    console.log('Request URL:', `${API_BASE_URL}/rubric/${id}`);
     console.log('Request Body:', JSON.stringify(payload, null, 2));
 
-    const response = await fetch(`${API_BASE_URL}/rubric/${id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
+    const response = await api.put<BackendRubric>(`rubric/${id}`, payload);
 
     console.log('Response Status:', response.status, response.statusText);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error Response:', errorText);
-      throw new Error(`Failed to update rubric name: ${response.statusText}`);
-    }
-
-    const data: BackendRubric = await response.json();
+    const data = response.data;
     console.log('Success! Response JSON:', JSON.stringify(data, null, 2));
     return data;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating rubric name:', error);
-    throw error;
+    const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to update rubric name';
+    throw new Error(errorMessage);
   }
 };
 
@@ -438,26 +376,20 @@ export const updateRubricScore = async (
     
     try {
       console.log('[GET /rubric/{id}/rubric_skills] Fetching existing rubric_skills...');
-      const skillsResponse = await fetch(`${API_BASE_URL}/rubric/${rubricId}/rubric_skills`);
-      if (skillsResponse.ok) {
-        const existingSkills: BackendRubricSkill[] = await skillsResponse.json();
-        console.log(`Found ${existingSkills.length} existing rubric_skills to delete`);
-        
-        // Delete each skill (this will cascade delete associated criteria)
-        for (const skill of existingSkills) {
-          const deletePromise = fetch(`${API_BASE_URL}/rubric_skill/${skill.id}`, {
-            method: 'DELETE',
-          }).then(response => {
-            if (response.ok) {
-              console.log(`Successfully deleted skill ID: ${skill.id}`);
-            } else {
-              console.warn(`Failed to delete skill ID: ${skill.id}`);
-            }
-          }).catch(error => {
+      const skillsResponse = await api.get<BackendRubricSkill[]>(`rubric/${rubricId}/rubric_skills`);
+      const existingSkills = skillsResponse.data;
+      console.log(`Found ${existingSkills.length} existing rubric_skills to delete`);
+      
+      // Delete each skill (this will cascade delete associated criteria)
+      for (const skill of existingSkills) {
+        const deletePromise = api.delete(`rubric_skill/${skill.id}`)
+          .then(() => {
+            console.log(`Successfully deleted skill ID: ${skill.id}`);
+          })
+          .catch(error => {
             console.warn(`Error deleting skill ID ${skill.id}:`, error);
           });
-          deletionPromises.push(deletePromise);
-        }
+        deletionPromises.push(deletePromise);
       }
     } catch (error) {
       console.warn('Could not fetch existing skills, continuing with creation...', error);
@@ -466,25 +398,19 @@ export const updateRubricScore = async (
     // Get existing levels using the new endpoint
     try {
       console.log(`[GET /rubric/${rubricId}/levels] Fetching existing levels...`);
-      const levelsResponse = await fetch(`${API_BASE_URL}/rubric/${rubricId}/levels`);
-      if (levelsResponse.ok) {
-        const existingLevels: BackendLevel[] = await levelsResponse.json();
-        console.log(`Found ${existingLevels.length} existing levels to delete`);
-        // Delete each level (this will cascade delete associated criteria)
-        for (const level of existingLevels) {
-          const deletePromise = fetch(`${API_BASE_URL}/level/${level.id}`, {
-            method: 'DELETE',
-          }).then(response => {
-            if (response.ok) {
-              console.log(`Successfully deleted level ID: ${level.id}`);
-            } else {
-              console.warn(`Failed to delete level ID: ${level.id}`);
-            }
-          }).catch(error => {
+      const levelsResponse = await api.get<BackendLevel[]>(`rubric/${rubricId}/levels`);
+      const existingLevels = levelsResponse.data;
+      console.log(`Found ${existingLevels.length} existing levels to delete`);
+      // Delete each level (this will cascade delete associated criteria)
+      for (const level of existingLevels) {
+        const deletePromise = api.delete(`level/${level.id}`)
+          .then(() => {
+            console.log(`Successfully deleted level ID: ${level.id}`);
+          })
+          .catch(error => {
             console.warn(`Error deleting level ID ${level.id}:`, error);
           });
-          deletionPromises.push(deletePromise);
-        }
+        deletionPromises.push(deletePromise);
       }
     } catch (error) {
       console.warn('Could not fetch existing levels, continuing with creation...', error);
@@ -515,26 +441,18 @@ export const updateRubricScore = async (
         description: rubricScore.headers[i],
       };
       console.log(`[POST /level/] Creating level ${i + 1}...`);
-      console.log(`Request URL:`, `${API_BASE_URL}/level/`);
       console.log(`Request Body:`, JSON.stringify(levelPayload, null, 2));
       
-      const levelResponse = await fetch(`${API_BASE_URL}/level/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(levelPayload),
-      });
-      
-      console.log(`Response Status:`, levelResponse.status, levelResponse.statusText);
-      
-      if (levelResponse.ok) {
-        const level: BackendLevel = await levelResponse.json();
+      try {
+        const levelResponse = await api.post<BackendLevel>('level/', levelPayload);
+        const level = levelResponse.data;
         createdLevels.push(level);
+        console.log(`Response Status:`, levelResponse.status, levelResponse.statusText);
         console.log(`Success! Response JSON:`, JSON.stringify(level, null, 2));
         console.log(`Created Level ID:`, level.id);
-      } else {
-        const errorText = await levelResponse.text();
-        console.error(`Error Response:`, errorText);
-        throw new Error(`Failed to create level ${i + 1}: ${errorText}`);
+      } catch (error: any) {
+        console.error(`Failed to create level ${i + 1}:`, error.response?.data || error.message);
+        throw new Error(`Failed to create level ${i + 1}: ${error.response?.data?.detail || error.message || 'Unknown error'}`);
       }
     }
 
@@ -555,80 +473,65 @@ export const updateRubricScore = async (
         name: rubricScore.rows[i].skillArea,
       };
       console.log(`[POST /rubric_skill/] Creating skill ${i + 1}...`);
-      console.log(`Request URL:`, `${API_BASE_URL}/rubric_skill/`);
       console.log(`Request Body:`, JSON.stringify(skillPayload, null, 2));
       
-      const skillResponse = await fetch(`${API_BASE_URL}/rubric_skill/`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(skillPayload),
-      });
-      
-      console.log(`Response Status:`, skillResponse.status, skillResponse.statusText);
-      
-      if (skillResponse.ok) {
-        const skill: BackendRubricSkill = await skillResponse.json();
+      let skill: BackendRubricSkill;
+      try {
+        const skillResponse = await api.post<BackendRubricSkill>('rubric_skill/', skillPayload);
+        skill = skillResponse.data;
         createdSkills.push(skill);
+        console.log(`Response Status:`, skillResponse.status, skillResponse.statusText);
         console.log(`Success! Response JSON:`, JSON.stringify(skill, null, 2));
         console.log(`Created Skill ID:`, skill.id);
+      } catch (error: any) {
+        console.error(`Failed to create skill ${i + 1}:`, error.response?.data || error.message);
+        throw new Error(`Failed to create skill ${i + 1}: ${error.response?.data?.detail || error.message || 'Unknown error'}`);
+      }
 
-        // Create criteria for each cell value (save ALL cells, including empty ones)
-        if (rubricScore.rows[i].values.length !== createdLevels.length) {
-          console.warn(`Row ${i + 1} has ${rubricScore.rows[i].values.length} values but ${createdLevels.length} levels. Adjusting...`);
+      // Create criteria for each cell value (save ALL cells, including empty ones)
+      if (rubricScore.rows[i].values.length !== createdLevels.length) {
+        console.warn(`Row ${i + 1} has ${rubricScore.rows[i].values.length} values but ${createdLevels.length} levels. Adjusting...`);
+      }
+      
+      for (let j = 0; j < Math.max(rubricScore.rows[i].values.length, createdLevels.length); j++) {
+        // Skip if we don't have a level for this column
+        if (j >= createdLevels.length) {
+          console.warn(`Skipping criteria creation for column ${j + 1} - no level exists`);
+          continue;
         }
         
-        for (let j = 0; j < Math.max(rubricScore.rows[i].values.length, createdLevels.length); j++) {
-          // Skip if we don't have a level for this column
-          if (j >= createdLevels.length) {
-            console.warn(`Skipping criteria creation for column ${j + 1} - no level exists`);
-            continue;
-          }
-          
-          // Save all cells, even if empty, to preserve all user edits
-          const cellValue = (rubricScore.rows[i].values[j] || '').trim();
-          const criteriaPayload = {
-            rubric_skill_id: skill.id,
-            level_id: createdLevels[j].id,
-            description: cellValue,
-          };
-          console.log(`[POST /criteria/] Creating criteria for skill ${i + 1}, level ${j + 1}...`);
-          console.log(`Request URL:`, `${API_BASE_URL}/criteria/`);
-          console.log(`Request Body:`, JSON.stringify(criteriaPayload, null, 2));
-          
-          const criteriaResponse = await fetch(`${API_BASE_URL}/criteria/`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(criteriaPayload),
-          });
-          
+        // Save all cells, even if empty, to preserve all user edits
+        const cellValue = (rubricScore.rows[i].values[j] || '').trim();
+        const criteriaPayload = {
+          rubric_skill_id: skill.id,
+          level_id: createdLevels[j].id,
+          description: cellValue,
+        };
+        console.log(`[POST /criteria/] Creating criteria for skill ${i + 1}, level ${j + 1}...`);
+        console.log(`Request Body:`, JSON.stringify(criteriaPayload, null, 2));
+        
+        try {
+          const criteriaResponse = await api.post<BackendCriteria>('criteria/', criteriaPayload);
+          const criteria = criteriaResponse.data;
+          createdCriteria.push(criteria);
           console.log(`Response Status:`, criteriaResponse.status, criteriaResponse.statusText);
+          console.log(`Success! Response JSON:`, JSON.stringify(criteria, null, 2));
+          console.log(`Created Criteria ID:`, criteria.id);
+        } catch (error: any) {
+          console.error(`Error Response:`, error.response?.data || error.message);
           
-          if (criteriaResponse.ok) {
-            const criteria: BackendCriteria = await criteriaResponse.json();
-            createdCriteria.push(criteria);
-            console.log(`Success! Response JSON:`, JSON.stringify(criteria, null, 2));
-            console.log(`Created Criteria ID:`, criteria.id);
+          // Check if it's a unique constraint violation (duplicate entry)
+          if (error.response?.status === 400 || error.response?.status === 409) {
+            console.warn(`Criteria already exists for skill ${skill.id}, level ${createdLevels[j].id}. This is expected if deletion didn't complete.`);
+            // Try to get the existing criteria instead
+            // Note: We can't easily get it without a GET endpoint, so we'll just skip it
+            // The data will still be preserved in the return value from input
           } else {
-            const errorText = await criteriaResponse.text();
-            console.error(`Error Response:`, errorText);
-            
-            // Check if it's a unique constraint violation (duplicate entry)
-            if (criteriaResponse.status === 400 || criteriaResponse.status === 409) {
-              console.warn(`Criteria already exists for skill ${skill.id}, level ${createdLevels[j].id}. This is expected if deletion didn't complete.`);
-              // Try to get the existing criteria instead
-              // Note: We can't easily get it without a GET endpoint, so we'll just skip it
-              // The data will still be preserved in the return value from input
-            } else {
-              // For other errors, log but continue
-              console.warn(`Failed to create criteria for skill ${skill.id}, level ${createdLevels[j].id}, but continuing...`);
-            }
-            // Continue even if one criteria fails, so other cells can still be saved
+            // For other errors, log but continue
+            console.warn(`Failed to create criteria for skill ${skill.id}, level ${createdLevels[j].id}, but continuing...`);
           }
+          // Continue even if one criteria fails, so other cells can still be saved
         }
-      } else {
-        const errorText = await skillResponse.text();
-        console.error(`Error Response:`, errorText);
-        throw new Error(`Failed to create skill ${i + 1}: ${errorText}`);
       }
     }
 
@@ -708,32 +611,24 @@ export const updateRubricScore = async (
     }
     
     return result;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error updating rubric score:', error);
-    throw error;
+    const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to update rubric score';
+    throw new Error(errorMessage);
   }
 };
 
 export const deleteRubricScore = async (id: string): Promise<void> => {
   try {
     console.log('[DELETE /rubric/{id}] Deleting rubric...');
-    console.log('Request URL:', `${API_BASE_URL}/rubric/${id}`);
     
-    const response = await fetch(`${API_BASE_URL}/rubric/${id}`, {
-      method: 'DELETE',
-    });
+    const response = await api.delete(`rubric/${id}`);
     
     console.log('Response Status:', response.status, response.statusText);
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Error Response:', errorText);
-      throw new Error(`Failed to delete rubric score: ${response.statusText}`);
-    }
-    
     console.log('Success! Rubric deleted:', id);
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error deleting rubric score:', error);
-    throw error;
+    const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to delete rubric score';
+    throw new Error(errorMessage);
   }
 };
