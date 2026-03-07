@@ -11,6 +11,7 @@ import RubricScoreDetail from './Components/RubricScoreDetail';
 import Login from './Components/Login';
 import SignUp from './Components/SignUp';
 import Profile from './Components/Profile';
+import Profile2 from './Components/Profile2';
 
 const App: React.FC = () => {
   const location = useLocation();
@@ -30,6 +31,7 @@ const App: React.FC = () => {
               <Route path="/rubric_score" element={<RubricScoreList />} />
               <Route path="/rubric_score/:id" element={<RubricScoreDetail />} />
               <Route path="/profile" element={<Profile />} />
+              <Route path="/profile2" element={<Profile2 />} />
             </Routes>
           </main>
         </div>

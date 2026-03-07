@@ -41,6 +41,11 @@ export const SideBarData: SidebarItem[] = [
         icon: BsPersonLinesFill
     },
     {
+        title: "Your Profile #2",
+        link:"/profile2",
+        icon: BsPersonLinesFill
+    },
+    {
         title: "Skill Map",
         link:"/skill_map",
         icon: AiIcons.AiOutlineRadarChart
