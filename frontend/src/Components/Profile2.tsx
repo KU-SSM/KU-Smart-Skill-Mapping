@@ -1,15 +1,22 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import './Profile.css';
 import './RubricScore.css';
-import { AiOutlineClose } from 'react-icons/ai';
+import { AiOutlineClose, AiOutlineEye } from 'react-icons/ai';
 import { FaBriefcase } from 'react-icons/fa';
 import { importPortfolio } from '../services/portfolioApi';
 import { getRubricScores, getRubricScore, RubricScoreDetail } from '../services/rubricScoreApi';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const BriefcaseIcon = FaBriefcase as React.ComponentType;
+const ViewIcon = AiOutlineEye as React.ComponentType;
+
+interface Skill {
+  skillArea: string;
+}
 
 const Profile2: React.FC = () => {
+  const navigate = useNavigate();
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -21,10 +28,18 @@ const Profile2: React.FC = () => {
   const [isLoadingRubrics, setIsLoadingRubrics] = useState<boolean>(true);
   const [isLoadingRubricData, setIsLoadingRubricData] = useState<boolean>(false);
 
-  // Evaluation results state
-  const [teacherEvaluations, setTeacherEvaluations] = useState<{ [skillId: string]: number }>({});
-  const [aiEvaluations, setAiEvaluations] = useState<{ [skillId: string]: number }>({});
-  const [studentEvaluations, setStudentEvaluations] = useState<{ [skillId: string]: string }>({});
+  // Skills selection for evaluation results - 3 separate lists
+  const [aiSkills, setAiSkills] = useState<Skill[]>([]);
+  const [studentSkills, setStudentSkills] = useState<Skill[]>([]);
+  const [teacherSkills, setTeacherSkills] = useState<Skill[]>([]);
+  const [searchAi, setSearchAi] = useState<string>('');
+  const [searchStudent, setSearchStudent] = useState<string>('');
+  const [searchTeacher, setSearchTeacher] = useState<string>('');
+
+  // Evaluation scores state - using skill area names as keys
+  const [teacherEvaluations, setTeacherEvaluations] = useState<{ [skillArea: string]: string }>({});
+  const [aiEvaluations, setAiEvaluations] = useState<{ [skillArea: string]: string }>({});
+  const [studentEvaluations, setStudentEvaluations] = useState<{ [skillArea: string]: string }>({});
 
   // Load rubric scores on mount
   useEffect(() => {
@@ -57,93 +72,94 @@ const Profile2: React.FC = () => {
         const rubricData = await getRubricScore(selectedRubricId);
         setSelectedRubricData(rubricData);
         
-        // Initialize evaluations with random values for teacher and AI
-        const generateRandomLevel = () => Math.floor(Math.random() * 5) + 1;
-        const newTeacherValues: { [skillId: string]: number } = {};
-        const newAiValues: { [skillId: string]: number } = {};
+        // Initialize skills from rubric rows - all panels show the same skills
+        const skillsFromRubric: Skill[] = rubricData.rows.map(row => ({
+          skillArea: row.skillArea
+        }));
+        // All three panels show the same skill areas
+        setAiSkills(skillsFromRubric);
+        setStudentSkills(skillsFromRubric);
+        setTeacherSkills(skillsFromRubric);
         
-        rubricData.headers.forEach((header, index) => {
-          const skillId = `skill-${index}`;
-          newTeacherValues[skillId] = generateRandomLevel();
-          newAiValues[skillId] = hasPortfolioFiles ? generateRandomLevel() : 0;
+        // Initialize evaluations with random values for teacher and AI (as strings for input fields)
+        const generateRandomLevel = () => Math.floor(Math.random() * 5) + 1;
+        const newTeacherValues: { [skillArea: string]: string } = {};
+        const newAiValues: { [skillArea: string]: string } = {};
+        const newStudentValues: { [skillArea: string]: string } = {};
+        
+        // Use skill areas from rows
+        rubricData.rows.forEach((row) => {
+          const skillArea = row.skillArea;
+          newTeacherValues[skillArea] = String(generateRandomLevel());
+          newAiValues[skillArea] = String(generateRandomLevel()); // Always generate random AI score
+          newStudentValues[skillArea] = '';
         });
         
         setTeacherEvaluations(newTeacherValues);
         setAiEvaluations(newAiValues);
-      } catch (error) {
+        setStudentEvaluations(newStudentValues);
+      } catch (error: any) {
         console.error('Error loading rubric data:', error);
-        setSelectedRubricData(null);
+        // Only set to null if it's a critical error (like rubric not found or network failure)
+        if (error?.message?.includes('Failed to fetch rubric score') || 
+            error?.response?.status === 404 ||
+            error?.code === 'ERR_NETWORK') {
+          setSelectedRubricData(null);
+        } else {
+          // For other errors, try to continue with partial data or empty structure
+          console.warn('Continuing with partial rubric data due to:', error?.message);
+          // Set empty rubric structure so UI can show appropriate message
+          setSelectedRubricData({
+            id: selectedRubricId || '',
+            title: 'Unknown Rubric',
+            headers: [],
+            rows: [],
+          });
+        }
       } finally {
         setIsLoadingRubricData(false);
       }
     };
 
     loadRubricData();
-  }, [selectedRubricId]);
-
-  const hasPortfolioFiles = useMemo(() => {
-    return uploadedFiles.length > 0;
-  }, [uploadedFiles]);
-
-  // Update AI evaluations when portfolio files change
-  useEffect(() => {
-    if (!selectedRubricData) return;
-
-    if (hasPortfolioFiles) {
-      const generateRandomLevel = () => Math.floor(Math.random() * 5) + 1;
-      setAiEvaluations(prev => {
-        const newAiValues: { [skillId: string]: number } = {};
-        selectedRubricData.headers.forEach((header, index) => {
-          const skillId = `skill-${index}`;
-          // Preserve existing value or generate new one
-          newAiValues[skillId] = prev[skillId] || generateRandomLevel();
-        });
-        return newAiValues;
-      });
-    } else {
-      // Clear AI evaluations if no portfolio files
-      const newAiValues: { [skillId: string]: number } = {};
-      selectedRubricData.headers.forEach((header, index) => {
-        const skillId = `skill-${index}`;
-        newAiValues[skillId] = 0;
-      });
-      setAiEvaluations(newAiValues);
-    }
-  }, [hasPortfolioFiles, selectedRubricData]);
+  }, [selectedRubricId, uploadedFiles.length]);
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
   };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const files = event.target.files;
-    if (files) {
-      const fileArray = Array.from(files);
-      const pdfFiles = fileArray.filter(file => file.name.toLowerCase().endsWith('.pdf'));
-      
-      if (pdfFiles.length === 0 && fileArray.length > 0) {
-        console.warn('Please upload PDF files only. The backend only accepts PDF format.');
-        return;
-      }
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-      // Add new files to the uploaded files list
-      setUploadedFiles(prev => [...prev, ...pdfFiles]);
-      
-      try {
-        const result = await importPortfolio(
-          'portfolio-general',
-          'General Portfolio',
-          pdfFiles
-        );
-        console.log('Portfolio import successful:', result);
-      } catch (error: any) {
-        console.error('Error importing portfolio:', error);
-      }
+    // Accept only PDF
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      console.warn('Please upload PDF files only. The backend only accepts PDF format.');
+      event.target.value = '';
+      return;
     }
-  };
 
-  const handleRemoveFile = (index: number) => {
-    setUploadedFiles(prev => prev.filter((_, i) => i !== index));
+    // Enforce 10MB max (10 * 1024 * 1024 bytes)
+    const maxSizeBytes = 10 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      console.warn('File is too large. Maximum size is 10MB.');
+      event.target.value = '';
+      return;
+    }
+
+    // Store only a single selected file
+    setUploadedFiles([file]);
+    
+    try {
+      const result = await importPortfolio(
+        'portfolio-general',
+        'General Portfolio',
+        [file]
+      );
+      console.log('Portfolio import successful:', result);
+    } catch (error: any) {
+      console.error('Error importing portfolio:', error);
+    }
   };
 
   const filteredRubricScores = useMemo(() => {
@@ -160,37 +176,41 @@ const Profile2: React.FC = () => {
     setSelectedRubricId(rubricId);
   };
 
-  // Prepare evaluation data for display
-  const evaluationData = useMemo(() => {
-    if (!selectedRubricData || selectedRubricData.headers.length === 0) {
-      return [];
+  const handleViewDetails = (e: React.MouseEvent, rubricId: string) => {
+    e.stopPropagation(); // Prevent triggering the select action
+    navigate(`/rubric_score/${rubricId}`);
+  };
+
+  // Filter skills for each panel
+  const filteredAiSkills = useMemo(() => {
+    if (!searchAi.trim()) {
+      return aiSkills;
     }
+    const query = searchAi.toLowerCase();
+    return aiSkills.filter(skill =>
+      skill.skillArea.toLowerCase().includes(query)
+    );
+  }, [aiSkills, searchAi]);
 
-    const teacherLevels = selectedRubricData.headers.map((header, index) => {
-      const skillId = `skill-${index}`;
-      return teacherEvaluations[skillId] || '-';
-    });
+  const filteredStudentSkills = useMemo(() => {
+    if (!searchStudent.trim()) {
+      return studentSkills;
+    }
+    const query = searchStudent.toLowerCase();
+    return studentSkills.filter(skill =>
+      skill.skillArea.toLowerCase().includes(query)
+    );
+  }, [studentSkills, searchStudent]);
 
-    const aiLevels = selectedRubricData.headers.map((header, index) => {
-      const skillId = `skill-${index}`;
-      if (!hasPortfolioFiles) {
-        return '-';
-      }
-      return aiEvaluations[skillId] || '-';
-    });
-
-    const studentLevels = selectedRubricData.headers.map((header, index) => {
-      const skillId = `skill-${index}`;
-      const storedValue = studentEvaluations[skillId];
-      return storedValue !== undefined ? storedValue : '-';
-    });
-
-    return [
-      { evaluator: 'Teacher', levels: teacherLevels },
-      { evaluator: 'AI', levels: aiLevels },
-      { evaluator: 'Student (You)', levels: studentLevels },
-    ];
-  }, [selectedRubricData, teacherEvaluations, aiEvaluations, studentEvaluations, hasPortfolioFiles]);
+  const filteredTeacherSkills = useMemo(() => {
+    if (!searchTeacher.trim()) {
+      return teacherSkills;
+    }
+    const query = searchTeacher.toLowerCase();
+    return teacherSkills.filter(skill =>
+      skill.skillArea.toLowerCase().includes(query)
+    );
+  }, [teacherSkills, searchTeacher]);
 
   return (
     <div className="profile-wrapper">
@@ -198,53 +218,32 @@ const Profile2: React.FC = () => {
       <div className="portfolio-container">
         <div className="portfolio-section">
           <h2 className="portfolio-section-title">Your Profile</h2>
-          <div className="profile-upload-container">
-            {/* Upload Portfolio Card */}
-            <div className="profile-upload-card">
-              <div className="portfolio-box-icon">
-                {React.createElement(BriefcaseIcon)}
-              </div>
-              <input
-                ref={(el) => (fileInputRef.current = el)}
-                type="file"
-                multiple
-                style={{ display: 'none' }}
-                onChange={handleFileChange}
-                accept=".pdf"
-              />
-              <button
-                className="portfolio-upload-button"
-                onClick={handleUploadClick}
-              >
-                Upload Portfolio
-              </button>
-            </div>
 
-            {/* Uploaded Files Card */}
-            <div className="profile-uploaded-files-card">
-              <h3 className="uploaded-files-title">Uploaded Files</h3>
-              {uploadedFiles.length > 0 ? (
-                <ul className="uploaded-files-list">
-                  {uploadedFiles.map((file, index) => (
-                    <li key={index} className="uploaded-file-item">
-                      <span className="file-name">
-                        <span className="file-icon">📄</span>
-                        {file.name}
-                      </span>
-                      <button
-                        className="file-delete-button"
-                        onClick={() => handleRemoveFile(index)}
-                        title="Remove file"
-                      >
-                        {React.createElement(CloseIcon)}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="no-files-message">No files uploaded yet</p>
-              )}
-            </div>
+          <div className="profile2-upload-row">
+            <input
+              ref={(el) => (fileInputRef.current = el)}
+              type="file"
+              style={{ display: 'none' }}
+              onChange={handleFileChange}
+              accept=".pdf"
+            />
+
+            <button
+              className="profile2-upload-button"
+              onClick={handleUploadClick}
+              type="button"
+            >
+              <span className="profile2-upload-icon">
+                {React.createElement(BriefcaseIcon)}
+              </span>
+              <span className="profile2-upload-label">
+                {uploadedFiles[0]?.name || 'Upload File'}
+              </span>
+            </button>
+
+            <span className="profile2-upload-hint">
+              Max file size 10MB.
+            </span>
           </div>
         </div>
       </div>
@@ -276,14 +275,26 @@ const Profile2: React.FC = () => {
             filteredRubricScores.map((rubric) => (
               <div
                 key={rubric.id}
-                className={`rubric-score-bar ${selectedRubricId === rubric.id ? 'selected' : ''}`}
+                className={`rubric-score-bar profile2-rubric-bar ${selectedRubricId === rubric.id ? 'selected' : ''}`}
                 onClick={() => handleRubricSelect(rubric.id)}
                 style={{
                   backgroundColor: selectedRubricId === rubric.id ? 'rgba(178, 187, 30, 0.8)' : '#ffffff',
-                  cursor: 'pointer'
+                  cursor: 'pointer',
+                  position: 'relative'
                 }}
               >
                 <span className="rubric-score-bar-title">{rubric.title}</span>
+                <button
+                  className="profile2-view-details-button"
+                  onClick={(e) => handleViewDetails(e, rubric.id)}
+                  title="View/Edit Details"
+                  type="button"
+                >
+                  <span className="profile2-view-details-icon">
+                    {React.createElement(ViewIcon)}
+                  </span>
+                  <span className="profile2-view-details-text">View Details</span>
+                </button>
               </div>
             ))
           )}
@@ -292,7 +303,8 @@ const Profile2: React.FC = () => {
 
       {/* Evaluation Results Section */}
       <div className="evaluation-container">
-          <div className="evaluation-section">
+        <div className="evaluation-section">
+          <div className="evaluation-header-container">
             <h2 className="evaluation-section-title">
               Evaluation Results
               {selectedRubricData && (
@@ -301,102 +313,172 @@ const Profile2: React.FC = () => {
                 </span>
               )}
             </h2>
-            <div className="evaluation-box">
-              {isLoadingRubricData ? (
-                <div className="evaluation-content">
-                  <p className="evaluation-message">Loading rubric data...</p>
-                </div>
-              ) : selectedRubricData && selectedRubricData.headers.length > 0 ? (
-                <div className="evaluation-table-container">
-                  <table className="evaluation-table">
-                    <thead>
-                      <tr>
-                        <th className="evaluation-table-header">Evaluator</th>
-                        {selectedRubricData.headers.map((header, index) => (
-                          <th key={index} className="evaluation-table-header">
-                            {header}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {evaluationData.map((row, rowIndex) => (
-                        <tr key={rowIndex}>
-                          <td className="evaluation-table-row-header">{row.evaluator}</td>
-                          {row.levels.map((level, colIndex) => {
-                            const isStudentRow = row.evaluator === 'Student (You)';
-                            const skillId = `skill-${colIndex}`;
-                            const currentValue = isStudentRow 
-                              ? (studentEvaluations[skillId] !== undefined ? studentEvaluations[skillId] : level)
-                              : level;
-                            
-                            return (
-                              <td key={colIndex} className="evaluation-table-cell">
-                                {isStudentRow ? (
-                                  <input
-                                    type="text"
-                                    value={currentValue}
-                                    onKeyDown={(e) => {
-                                      if (currentValue === '-' && /^[1-9]$/.test(e.key)) {
-                                        e.preventDefault();
-                                        setStudentEvaluations(prev => ({
-                                          ...prev,
-                                          [skillId]: e.key
-                                        }));
-                                      }
-                                    }}
-                                    onChange={(e) => {
-                                      const value = e.target.value;
-                                      if (currentValue === '-' && value.length > 0 && /^[1-9]\d*$/.test(value)) {
-                                        setStudentEvaluations(prev => ({
-                                          ...prev,
-                                          [skillId]: value
-                                        }));
-                                      }
-                                      else if (value === '' || value === '-' || /^[1-9]\d*$/.test(value)) {
-                                        setStudentEvaluations(prev => ({
-                                          ...prev,
-                                          [skillId]: value
-                                        }));
-                                      }
-                                    }}
-                                    onFocus={(e) => {
-                                      if (currentValue === '-') {
-                                        e.target.select();
-                                      }
-                                    }}
-                                    onBlur={(e) => {
-                                      const value = e.target.value;
-                                      const numValue = parseInt(value, 10);
-                                      if (value === '' || isNaN(numValue) || numValue < 1) {
-                                        setStudentEvaluations(prev => ({
-                                          ...prev,
-                                          [skillId]: '-'
-                                        }));
-                                      }
-                                    }}
-                                    className="evaluation-input"
-                                  />
-                                ) : (
-                                  level
-                                )}
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="evaluation-content">
-                  <p className="evaluation-message">No evaluation results available yet.</p>
-                  <p className="evaluation-submessage">Select a rubric score to see evaluation results.</p>
-                </div>
-              )}
-            </div>
+            <button
+              className="profile2-request-evaluation-button"
+              type="button"
+              onClick={() => {
+                // Handle request teacher evaluation
+                console.log('Request Teacher Evaluation clicked');
+                alert('Teacher evaluation request sent!');
+              }}
+            >
+              Request Teacher Evaluation
+            </button>
           </div>
+          
+          {isLoadingRubricData ? (
+            <div className="evaluation-content">
+              <p className="evaluation-message">Loading rubric data...</p>
+            </div>
+          ) : selectedRubricData && selectedRubricData.rows.length > 0 ? (
+            <>
+              {/* Skills Selection Panels - 3 boxes in a row */}
+              <div className="skills-panels-container profile2-three-panels">
+                <div className="skills-panel profile2-panel">
+                  <h2 className="panel-title">
+                    AI
+                  </h2>
+                  <div className="search-container">
+                    <input
+                      type="text"
+                      className="search-input"
+                      placeholder="Search skills"
+                      value={searchAi}
+                      onChange={(e) => setSearchAi(e.target.value)}
+                    />
+                    {searchAi && (
+                      <button
+                        className="clear-search"
+                        onClick={() => setSearchAi('')}
+                      >
+                        {React.createElement(CloseIcon)}
+                      </button>
+                    )}
+                  </div>
+                  <div className="skills-list">
+                    {filteredAiSkills.map((skill, index) => (
+                      <div key={index} className="skill-item profile2-skill-item">
+                        <span className="skill-name">
+                          {skill.skillArea}
+                        </span>
+                        <input
+                          type="text"
+                          className="profile2-score-input ai-score-input"
+                          value={aiEvaluations[skill.skillArea] || ''}
+                          readOnly
+                          placeholder="Auto"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="skills-panel profile2-panel">
+                  <h2 className="panel-title">
+                    Student
+                  </h2>
+                  <div className="search-container">
+                    <input
+                      type="text"
+                      className="search-input"
+                      placeholder="Search skills"
+                      value={searchStudent}
+                      onChange={(e) => setSearchStudent(e.target.value)}
+                    />
+                    {searchStudent && (
+                      <button
+                        className="clear-search"
+                        onClick={() => setSearchStudent('')}
+                      >
+                        {React.createElement(CloseIcon)}
+                      </button>
+                    )}
+                  </div>
+                  <div className="skills-list">
+                    {filteredStudentSkills.map((skill, index) => (
+                      <div key={index} className="skill-item profile2-skill-item">
+                        <span className="skill-name">
+                          {skill.skillArea}
+                        </span>
+                        <input
+                          type="text"
+                          className="profile2-score-input student-score-input"
+                          value={studentEvaluations[skill.skillArea] || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            // Only allow numbers
+                            if (value === '' || /^\d+$/.test(value)) {
+                              setStudentEvaluations(prev => ({
+                                ...prev,
+                                [skill.skillArea]: value
+                              }));
+                            }
+                          }}
+                          onBlur={(e) => {
+                            // Ensure valid number on blur
+                            const value = e.target.value;
+                            if (value && (!/^\d+$/.test(value) || parseInt(value) < 1)) {
+                              setStudentEvaluations(prev => ({
+                                ...prev,
+                                [skill.skillArea]: ''
+                              }));
+                            }
+                          }}
+                          placeholder="Score"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="skills-panel profile2-panel">
+                  <h2 className="panel-title">
+                    Teacher
+                  </h2>
+                  <div className="search-container">
+                    <input
+                      type="text"
+                      className="search-input"
+                      placeholder="Search skills"
+                      value={searchTeacher}
+                      onChange={(e) => setSearchTeacher(e.target.value)}
+                    />
+                    {searchTeacher && (
+                      <button
+                        className="clear-search"
+                        onClick={() => setSearchTeacher('')}
+                      >
+                        {React.createElement(CloseIcon)}
+                      </button>
+                    )}
+                  </div>
+                  <div className="skills-list">
+                    {filteredTeacherSkills.map((skill, index) => (
+                      <div key={index} className="skill-item profile2-skill-item">
+                        <span className="skill-name">
+                          {skill.skillArea}
+                        </span>
+                        <input
+                          type="text"
+                          className="profile2-score-input teacher-score-input profile2-teacher-dashed"
+                          value={teacherEvaluations[skill.skillArea] || ''}
+                          readOnly
+                          placeholder="—"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* (Removed evaluation list box as requested) */}
+            </>
+          ) : (
+            <div className="evaluation-content">
+              <p className="evaluation-message">No evaluation results available yet.</p>
+              <p className="evaluation-submessage">Select a rubric score to see evaluation results.</p>
+            </div>
+          )}
         </div>
+      </div>
     </div>
   );
 };

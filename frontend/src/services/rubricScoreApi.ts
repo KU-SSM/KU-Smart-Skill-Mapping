@@ -35,7 +35,7 @@ interface BackendLevel {
   id: number;
   rubric_id: number;
   rank: number;
-  description: string;
+  description: string | null; // Backend may return null for description
 }
 
 interface BackendCriteria {
@@ -72,9 +72,17 @@ const fetchRubricData = async (rubricId: number) => {
       // Get levels using the new endpoint
       console.log(`[GET /rubric/${rubricId}/levels] Fetching levels...`);
       try {
+        // Backend may return 500 if levels have null descriptions, so we'll catch and handle it
         const levelsResponse = await api.get<BackendLevel[]>(`rubric/${rubricId}/levels`);
         const levels = levelsResponse.data;
         console.log(`Found ${levels.length} levels`);
+        // Filter out any levels with null descriptions or handle them gracefully
+        const validLevels = levels.map(level => ({
+          ...level,
+          description: level.description === null || level.description === undefined 
+            ? `Level ${level.rank}` 
+            : level.description
+        }));
 
         // Get criteria using the new endpoint
         console.log(`[GET /rubric/${rubricId}/criteria] Fetching criteria...`);
@@ -83,13 +91,15 @@ const fetchRubricData = async (rubricId: number) => {
           const criteria = criteriaResponse.data;
           console.log(`Found ${criteria.length} criteria`);
 
-          return { skills, levels, criteria };
+          return { skills, levels: validLevels, criteria };
         } catch (error) {
           console.warn('Failed to fetch criteria. Returning empty array.');
-          return { skills, levels, criteria: [] };
+          return { skills, levels: validLevels, criteria: [] };
         }
       } catch (error) {
         console.warn('Failed to fetch levels. Returning empty array.');
+        // If the error is a 500 due to validation (null descriptions), try to continue
+        // by returning empty levels - the frontend can work with skills only
         return { skills, levels: [], criteria: [] };
       }
     } catch (error) {
@@ -114,21 +124,32 @@ const transformBackendToFrontend = (
   const sortedSkills = [...skills].sort((a, b) => a.display_order - b.display_order);
 
   // Use saved headers if available, otherwise use level descriptions from backend
+  // Handle None/null descriptions from backend gracefully
   let headers: string[];
   if (savedHeaders && savedHeaders.length === sortedLevels.length) {
     headers = [...savedHeaders];
   } else if (sortedLevels.length > 0) {
-    headers = sortedLevels.map((level) => level.description || '');
+    headers = sortedLevels.map((level) => {
+      // Handle None/null/undefined descriptions
+      const desc = level.description;
+      if (desc === null || desc === undefined || desc === 'None') {
+        return `Level ${level.rank}`; // Fallback to "Level 1", "Level 2", etc.
+      }
+      return desc || `Level ${level.rank}`;
+    });
   } else {
     headers = [];
   }
 
   const rows: TableData[] = sortedSkills.map((skill, index) => {
     const skillCriteria = criteria.filter((c) => c.rubric_skill_id === skill.id);
-    const values = sortedLevels.map((level) => {
-      const criterion = skillCriteria.find((c) => c.level_id === level.id);
-      return criterion ? criterion.description : '';
-    });
+    // If levels are empty, create empty values array (still create the row for the skill)
+    const values = sortedLevels.length > 0 
+      ? sortedLevels.map((level) => {
+          const criterion = skillCriteria.find((c) => c.level_id === level.id);
+          return criterion ? criterion.description : '';
+        })
+      : []; // Empty array if no levels
     return {
       skillArea: savedSkillAreas && savedSkillAreas[index] !== undefined
         ? savedSkillAreas[index]
@@ -152,7 +173,25 @@ export const getRubricScore = async (id: string): Promise<RubricScoreDetail> => 
     const rubric = rubricResponse.data;
     
     // Get skills, levels, and criteria using the new endpoints
+    // This will return empty arrays for levels/criteria if they fail to load
     const { skills, levels, criteria } = await fetchRubricData(rubric.id);
+    
+    // If we have no skills, return empty rubric structure instead of throwing
+    // This allows the UI to show the rubric exists but has no skills yet
+    if (skills.length === 0) {
+      console.warn('No skills found for this rubric. Returning empty rubric structure.');
+      return {
+        id: String(rubric.id),
+        title: rubric.name || 'Untitled Rubric',
+        headers: [],
+        rows: [],
+      };
+    }
+    
+    // If we have no levels, log a warning but continue (skills are more important)
+    if (levels.length === 0) {
+      console.warn('No levels found for this rubric. Continuing with skills only.');
+    }
     
     // Try to get saved headers and skillAreas from localStorage (metadata not stored in backend)
     let savedHeaders: string[] | undefined;
@@ -173,6 +212,7 @@ export const getRubricScore = async (id: string): Promise<RubricScoreDetail> => 
     }
     
     // Transform backend data to frontend format, including saved metadata
+    // This will work even with empty levels - rows will be created from skills
     return transformBackendToFrontend(rubric, skills, levels, criteria, savedHeaders, savedSkillAreas);
   } catch (error: any) {
     console.error('Error fetching rubric score:', error);
@@ -214,10 +254,16 @@ export const createRubricScore = async (
     const createdCriteria: BackendCriteria[] = [];
 
     for (let i = 0; i < rubricScore.headers.length; i++) {
+      // Ensure description is always a valid string (not null, undefined, or empty)
+      const headerValue = rubricScore.headers[i];
+      const description = (headerValue && headerValue.trim() !== '') 
+        ? headerValue.trim() 
+        : `Level ${i + 1}`; // Fallback to "Level 1", "Level 2", etc.
+      
       const levelPayload = {
         rubric_id: rubricId,
         rank: i + 1,
-        description: rubricScore.headers[i],
+        description: description,
       };
       console.log(`[POST /level/] Creating level ${i + 1}...`);
       console.log(`Request Body:`, JSON.stringify(levelPayload, null, 2));
@@ -435,10 +481,16 @@ export const updateRubricScore = async (
     }
     
     for (let i = 0; i < rubricScore.headers.length; i++) {
+      // Ensure description is always a valid string (not null, undefined, or empty)
+      const headerValue = rubricScore.headers[i];
+      const description = (headerValue && headerValue.trim() !== '') 
+        ? headerValue.trim() 
+        : `Level ${i + 1}`; // Fallback to "Level 1", "Level 2", etc.
+      
       const levelPayload = {
         rubric_id: rubricId,
         rank: i + 1,
-        description: rubricScore.headers[i],
+        description: description,
       };
       console.log(`[POST /level/] Creating level ${i + 1}...`);
       console.log(`Request Body:`, JSON.stringify(levelPayload, null, 2));

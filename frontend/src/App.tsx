@@ -12,6 +12,8 @@ import Login from './Components/Login';
 import SignUp from './Components/SignUp';
 import Profile from './Components/Profile';
 import Profile2 from './Components/Profile2';
+import Profile3 from './Components/Profile3';
+import Profile3Detail from './Components/Profile3Detail';
 
 const App: React.FC = () => {
   const location = useLocation();
@@ -32,6 +34,8 @@ const App: React.FC = () => {
               <Route path="/rubric_score/:id" element={<RubricScoreDetail />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/profile2" element={<Profile2 />} />
+              <Route path="/profile3" element={<Profile3 />} />
+              <Route path="/profile3/:requestId" element={<Profile3Detail />} />
             </Routes>
           </main>
         </div>

@@ -462,6 +462,11 @@
   text-align: left;
 }
 
+.student-request-header-info {
+  text-align: left;
+  width: 100%;
+}
+
 .portfolio-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -551,6 +556,67 @@
 .portfolio-delete-button:hover {
   background-color: #cc0000;
   transform: translateY(-1px);
+}
+
+/* Profile2 single-file upload style */
+.profile2-upload-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px 24px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background-color: #f7f8fa;
+  box-sizing: border-box;
+}
+
+.profile2-upload-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #ffffff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.profile2-upload-button:hover {
+  background-color: #f5f5f5;
+  border-color: rgba(178, 187, 30, 0.8);
+}
+
+.profile2-upload-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.profile2-upload-label {
+  white-space: nowrap;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile2-upload-hint {
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #555;
+}
+
+@media (max-width: 640px) {
+  .profile2-upload-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
 }
 
 /* Profile2 Upload Container - Two Card Layout */
@@ -990,5 +1056,612 @@
 
   .modal-button {
     width: 100%;
+  }
+}
+
+/* Profile2 Evaluation Cards */
+.profile2-eval-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.profile2-eval-card {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 16px 20px;
+  background-color: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.profile2-eval-card-header {
+  margin-bottom: 8px;
+}
+
+.profile2-eval-skill-name {
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  color: #333;
+}
+
+.profile2-eval-card-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.profile2-eval-card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile2-eval-role {
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #555;
+}
+
+.profile2-eval-value {
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: #333;
+}
+
+/* Profile2 Rubric Bar with View Details Button */
+.profile2-rubric-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 12px;
+}
+
+.profile2-rubric-bar .rubric-score-bar-title {
+  flex: 1;
+  text-align: left;
+  padding-left: 0;
+}
+
+.profile2-view-details-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  background-color: #ffffff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  font-weight: 500;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 12px;
+}
+
+.profile2-view-details-button:hover {
+  background-color: #f5f5f5;
+  border-color: rgba(178, 187, 30, 0.8);
+  color: rgba(178, 187, 30, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.profile2-view-details-button:active {
+  transform: translateY(0);
+}
+
+.profile2-view-details-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.profile2-view-details-text {
+  font-size: 13px;
+}
+
+/* When rubric bar is selected, adjust button styling */
+.profile2-rubric-bar.selected .profile2-view-details-button {
+  background-color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.5);
+  color: #333;
+}
+
+.profile2-rubric-bar.selected .profile2-view-details-button:hover {
+  background-color: #ffffff;
+  border-color: rgba(255, 255, 255, 0.8);
+  color: rgba(178, 187, 30, 1);
+}
+
+@media (max-width: 768px) {
+  .profile2-view-details-button {
+    padding: 5px 10px;
+    font-size: 12px;
+  }
+
+  .profile2-view-details-text {
+    display: none; /* Hide text on mobile, show only icon */
+  }
+
+  .profile2-view-details-icon {
+    font-size: 18px;
+  }
+}
+
+/* Profile2 Three Panels Layout */
+.profile2-three-panels {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  width: 100%;
+}
+
+.profile2-panel {
+  width: 100%;
+  min-height: 400px;
+}
+
+/* Profile2 Skill Item with Score Input */
+.profile2-skill-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.profile2-skill-item .skill-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile2-score-input {
+  width: 80px;
+  padding: 6px 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  text-align: center;
+  background-color: #ffffff;
+  transition: all 0.2s ease;
+}
+
+.profile2-score-input:focus {
+  outline: none;
+  border-color: rgba(178, 187, 30, 0.8);
+  box-shadow: 0 0 0 2px rgba(178, 187, 30, 0.1);
+}
+
+.profile2-score-input::placeholder {
+  color: #999;
+  font-size: 12px;
+}
+
+/* Profile2 Evaluation Header with Button */
+.evaluation-header-container {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 20px;
+  gap: 20px;
+}
+
+.profile2-request-evaluation-button {
+  padding: 10px 20px;
+  border: 1px solid rgba(178, 187, 30, 0.8);
+  border-radius: 6px;
+  background-color: rgba(178, 187, 30, 1);
+  color: #ffffff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.profile2-request-evaluation-button:hover {
+  background-color: rgba(178, 187, 30, 0.9);
+  border-color: rgba(178, 187, 30, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.profile2-request-evaluation-button:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 968px) {
+  .profile2-three-panels {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  
+  .profile2-panel {
+    min-height: 300px;
+  }
+  
+  .profile2-score-input {
+    width: 70px;
+    font-size: 13px;
+  }
+  
+  .evaluation-header-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .profile2-request-evaluation-button {
+    width: 100%;
+  }
+}
+
+/* Profile3 Teacher Evaluation Styles */
+.student-requests-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+}
+
+.student-request-card {
+  background-color: #ffffff;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 20px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.student-request-card:hover {
+  border-color: rgba(178, 187, 30, 0.5);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.student-request-card.selected {
+  border-color: rgba(178, 187, 30, 1);
+  background-color: rgba(178, 187, 30, 0.05);
+  box-shadow: 0 2px 8px rgba(178, 187, 30, 0.2);
+}
+
+.student-request-card.completed {
+  opacity: 0.7;
+  background-color: #f5f5f5;
+}
+
+.student-request-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.student-request-info {
+  flex: 1;
+}
+
+.student-name {
+  font-family: 'Roboto', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 4px 0;
+}
+
+.student-id {
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
+.student-request-status {
+  flex-shrink: 0;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.status-badge.pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-badge.completed {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.student-request-details {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  align-items: flex-start;
+}
+
+.request-detail-item {
+  display: flex;
+  gap: 8px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  text-align: left;
+  justify-content: flex-start;
+  width: 100%;
+}
+
+.detail-label {
+  font-weight: 500;
+  color: #666;
+  min-width: 80px;
+  text-align: left;
+}
+
+.detail-value {
+  color: #333;
+  text-align: left;
+}
+
+.portfolio-display-box,
+.rubric-display-box {
+  background-color: #fafafa;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 40px;
+  box-sizing: border-box;
+  min-height: 200px;
+}
+
+.portfolio-file-display {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.portfolio-file-icon {
+  font-size: 48px;
+  color: #dc3545;
+  flex-shrink: 0;
+}
+
+.portfolio-file-info {
+  flex: 1;
+}
+
+.portfolio-file-name {
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  margin: 0 0 4px 0;
+}
+
+.portfolio-file-meta {
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
+.portfolio-view-button {
+  padding: 10px 20px;
+  border: 1px solid rgba(178, 187, 30, 0.8);
+  border-radius: 6px;
+  background-color: rgba(178, 187, 30, 1);
+  color: #ffffff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.portfolio-view-button:hover {
+  background-color: rgba(178, 187, 30, 0.9);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.rubric-info {
+  text-align: center;
+}
+
+.rubric-title-display {
+  font-family: 'Roboto', sans-serif;
+  font-size: 24px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 8px 0;
+}
+
+.rubric-skills-count {
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #666;
+  margin: 0;
+}
+
+.teacher-evaluation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+}
+
+.teacher-evaluation-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background-color: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.teacher-evaluation-item:hover {
+  border-color: rgba(178, 187, 30, 0.5);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.evaluation-skill-name {
+  font-family: 'Roboto', sans-serif;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  flex: 1;
+}
+
+.teacher-score-input {
+  width: 100px;
+}
+
+/* AI Score Input - Auto-filled and read-only */
+.ai-score-input {
+  background-color: #f5f5f5;
+  cursor: not-allowed;
+  color: #666;
+}
+
+.ai-score-input:focus {
+  border-color: #ddd;
+  box-shadow: none;
+}
+
+/* Teacher Score Input - Dashed border and read-only */
+.profile2-teacher-dashed {
+  border: 2px dashed #ccc;
+  background-color: #fafafa;
+  cursor: not-allowed;
+  color: #999;
+}
+
+.profile2-teacher-dashed:focus {
+  border-color: #ccc;
+  box-shadow: none;
+  outline: none;
+}
+
+.profile2-teacher-dashed::placeholder {
+  color: #bbb;
+}
+
+.profile2-request-evaluation-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.profile2-request-evaluation-button:disabled:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+@media (max-width: 768px) {
+  .student-request-header {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .portfolio-file-display {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .portfolio-view-button {
+    width: 100%;
+  }
+  
+  .teacher-evaluation-item {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+  
+  .teacher-score-input {
+    width: 100%;
+  }
+}
+
+/* Profile3 Detail Page Styles */
+.profile3-submit-button-container {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 20px;
+  width: 100%;
+}
+
+.profile3-back-button-container {
+  display: flex;
+  justify-content: flex-start;
+  align-items: flex-start;
+  margin: 0 auto;
+  padding: 0;
+  width: 100%;
+  max-width: 1200px;
+  box-sizing: border-box;
+}
+
+.profile3-back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #333;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.profile3-back-button:hover {
+  background-color: #f5f5f5;
+  border-color: rgba(178, 187, 30, 0.8);
+  color: rgba(178, 187, 30, 1);
+}
+
+.back-button-icon {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+}
+
+.student-request-header-info {
+  flex: 1;
+}
+
+@media (max-width: 768px) {
+  .profile3-detail-footer {
+    justify-content: center;
+  }
+  
+  .profile3-back-button {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
