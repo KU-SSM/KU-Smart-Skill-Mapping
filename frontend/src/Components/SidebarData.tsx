@@ -36,17 +36,17 @@ export const SideBarData: SidebarItem[] = [
         icon: LuChartLine
     },
     {
-        title: "Your Profile",
+        title: "Your Profile (Old)",
         link:"/profile",
         icon: BsPersonLinesFill
     },
     {
-        title: "Your Profile #2",
+        title: "Your Profile (Student)",
         link:"/profile2",
         icon: BsPersonLinesFill
     },
     {
-        title: "Your Profile #3",
+        title: "Your Profile (Teacher)",
         link:"/profile3",
         icon: BsPersonLinesFill
     },
