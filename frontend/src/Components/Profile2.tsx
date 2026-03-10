@@ -24,6 +24,7 @@ const Profile2: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [rubricScores, setRubricScores] = useState<{ id: string; title: string }[]>([]);
   const [selectedRubricId, setSelectedRubricId] = useState<string | null>(null);
+  const [confirmedRubricId, setConfirmedRubricId] = useState<string | null>(null);
   const [selectedRubricData, setSelectedRubricData] = useState<RubricScoreDetail | null>(null);
   const [isLoadingRubrics, setIsLoadingRubrics] = useState<boolean>(true);
   const [isLoadingRubricData, setIsLoadingRubricData] = useState<boolean>(false);
@@ -59,17 +60,17 @@ const Profile2: React.FC = () => {
     loadRubricScores();
   }, []);
 
-  // Load selected rubric data
+  // Load confirmed rubric data (only after user confirms selection)
   useEffect(() => {
     const loadRubricData = async () => {
-      if (!selectedRubricId) {
+      if (!confirmedRubricId) {
         setSelectedRubricData(null);
         return;
       }
 
       try {
         setIsLoadingRubricData(true);
-        const rubricData = await getRubricScore(selectedRubricId);
+        const rubricData = await getRubricScore(confirmedRubricId);
         setSelectedRubricData(rubricData);
         
         // Initialize skills from rubric rows - all panels show the same skills
@@ -110,7 +111,7 @@ const Profile2: React.FC = () => {
           console.warn('Continuing with partial rubric data due to:', error?.message);
           // Set empty rubric structure so UI can show appropriate message
           setSelectedRubricData({
-            id: selectedRubricId || '',
+            id: confirmedRubricId || '',
             title: 'Unknown Rubric',
             headers: [],
             rows: [],
@@ -122,7 +123,7 @@ const Profile2: React.FC = () => {
     };
 
     loadRubricData();
-  }, [selectedRubricId, uploadedFiles.length]);
+  }, [confirmedRubricId, uploadedFiles.length]);
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
@@ -176,6 +177,14 @@ const Profile2: React.FC = () => {
     setSelectedRubricId(rubricId);
   };
 
+  const handleConfirmRubric = () => {
+    if (!selectedRubricId) {
+      return;
+    }
+    setConfirmedRubricId(selectedRubricId);
+    console.log('Confirmed rubric selection:', selectedRubricId);
+  };
+
   const handleViewDetails = (e: React.MouseEvent, rubricId: string) => {
     e.stopPropagation(); // Prevent triggering the select action
     navigate(`/rubric_score/${rubricId}`);
@@ -211,6 +220,9 @@ const Profile2: React.FC = () => {
       skill.skillArea.toLowerCase().includes(query)
     );
   }, [teacherSkills, searchTeacher]);
+
+  const isConfirmDisabled =
+    !selectedRubricId || selectedRubricId === confirmedRubricId;
 
   return (
     <div className="profile-wrapper">
@@ -299,6 +311,16 @@ const Profile2: React.FC = () => {
             ))
           )}
         </div>
+        <div className="rubric-score-actions">
+          <button
+            type="button"
+            className="profile2-confirm-rubric-button"
+            onClick={handleConfirmRubric}
+            disabled={isConfirmDisabled}
+          >
+            Confirm Selection
+          </button>
+        </div>
       </div>
 
       {/* Evaluation Results Section */}
@@ -316,10 +338,10 @@ const Profile2: React.FC = () => {
             <button
               className="profile2-request-evaluation-button"
               type="button"
+              disabled={!confirmedRubricId || !selectedRubricData}
               onClick={() => {
-                // Handle request teacher evaluation
+                // Handle request teacher evaluation (placeholder)
                 console.log('Request Teacher Evaluation clicked');
-                alert('Teacher evaluation request sent!');
               }}
             >
               Request Teacher Evaluation

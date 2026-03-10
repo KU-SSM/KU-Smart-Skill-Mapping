@@ -1576,6 +1576,44 @@
   box-shadow: none;
 }
 
+/* Profile2 Rubric Confirm Button */
+.rubric-score-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  width: 100%;
+}
+
+.profile2-confirm-rubric-button {
+  padding: 10px 20px;
+  border: 1px solid rgba(178, 187, 30, 0.8);
+  border-radius: 6px;
+  background-color: rgba(178, 187, 30, 1);
+  color: #ffffff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.profile2-confirm-rubric-button:hover:not(:disabled) {
+  background-color: rgba(178, 187, 30, 0.9);
+  border-color: rgba(178, 187, 30, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.profile2-confirm-rubric-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.profile2-confirm-rubric-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   .student-request-header {
     flex-direction: column;
