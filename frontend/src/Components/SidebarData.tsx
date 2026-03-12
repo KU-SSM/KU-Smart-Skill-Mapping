@@ -61,8 +61,13 @@ export const SideBarData: SidebarItem[] = [
         icon: FaCertificate
     },
     {
-        title: "Rubric Score",
+        title: "Rubric Score (Teacher)",
         link:"/rubric_score",
+        icon: AiOutlineCheckSquare
+    },
+    {
+        title: "Rubric Score (Student)",
+        link:"/rubric_score_student",
         icon: AiOutlineCheckSquare
     },
     {
