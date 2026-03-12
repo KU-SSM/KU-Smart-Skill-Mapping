@@ -41,8 +41,10 @@ const RubricScoreList: React.FC = () => {
         const scores = await getRubricScores();
         console.log('✅ Loaded rubric scores:', scores);
         setRubricScores(scores.map(score => ({ ...score, isNew: false })));
-      } catch (error) {
+      } catch (error: any) {
         console.error('❌ Error loading rubric scores:', error);
+        const errorMessage = error?.message || 'Failed to load rubric scores';
+        alert(`Error: ${errorMessage}`);
         // If API fails, start with empty array
         setRubricScores([]);
       } finally {
