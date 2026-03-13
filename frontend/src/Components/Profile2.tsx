@@ -1,22 +1,20 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import './Profile.css';
 import './RubricScore.css';
-import { AiOutlineClose, AiOutlineEye } from 'react-icons/ai';
+import { AiOutlineClose, AiOutlineInfoCircle } from 'react-icons/ai';
 import { FaBriefcase } from 'react-icons/fa';
 import { importPortfolio } from '../services/portfolioApi';
 import { getRubricScores, getRubricScore, RubricScoreDetail } from '../services/rubricScoreApi';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const BriefcaseIcon = FaBriefcase as React.ComponentType;
-const ViewIcon = AiOutlineEye as React.ComponentType;
+const InfoIcon = AiOutlineInfoCircle as React.ComponentType;
 
 interface Skill {
   skillArea: string;
 }
 
 const Profile2: React.FC = () => {
-  const navigate = useNavigate();
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -28,6 +26,10 @@ const Profile2: React.FC = () => {
   const [selectedRubricData, setSelectedRubricData] = useState<RubricScoreDetail | null>(null);
   const [isLoadingRubrics, setIsLoadingRubrics] = useState<boolean>(true);
   const [isLoadingRubricData, setIsLoadingRubricData] = useState<boolean>(false);
+  const [isRubricInfoOpen, setIsRubricInfoOpen] = useState<boolean>(false);
+  const [rubricInfoData, setRubricInfoData] = useState<RubricScoreDetail | null>(null);
+  const [isRubricInfoLoading, setIsRubricInfoLoading] = useState<boolean>(false);
+  const [rubricInfoError, setRubricInfoError] = useState<string | null>(null);
 
   // Skills selection for evaluation results - 3 separate lists
   const [aiSkills, setAiSkills] = useState<Skill[]>([]);
@@ -185,9 +187,27 @@ const Profile2: React.FC = () => {
     console.log('Confirmed rubric selection:', selectedRubricId);
   };
 
-  const handleViewDetails = (e: React.MouseEvent, rubricId: string) => {
-    e.stopPropagation(); // Prevent triggering the select action
-    navigate(`/rubric_score/${rubricId}`);
+  const handleOpenRubricInfo = async (e: React.MouseEvent, rubricId: string) => {
+    e.stopPropagation();
+    setIsRubricInfoOpen(true);
+    setIsRubricInfoLoading(true);
+    setRubricInfoError(null);
+    try {
+      const data = await getRubricScore(rubricId);
+      setRubricInfoData(data);
+    } catch (error: any) {
+      console.error('Error loading rubric info:', error);
+      setRubricInfoData(null);
+      setRubricInfoError(
+        error?.message || 'Failed to load rubric details. Please try again.'
+      );
+    } finally {
+      setIsRubricInfoLoading(false);
+    }
+  };
+
+  const handleCloseRubricInfo = () => {
+    setIsRubricInfoOpen(false);
   };
 
   // Filter skills for each panel
@@ -298,14 +318,14 @@ const Profile2: React.FC = () => {
                 <span className="rubric-score-bar-title">{rubric.title}</span>
                 <button
                   className="profile2-view-details-button"
-                  onClick={(e) => handleViewDetails(e, rubric.id)}
-                  title="View/Edit Details"
+                  title="View rubric details"
                   type="button"
+                  aria-label="More information"
+                  onClick={(e) => handleOpenRubricInfo(e, rubric.id)}
                 >
                   <span className="profile2-view-details-icon">
-                    {React.createElement(ViewIcon)}
+                    {React.createElement(InfoIcon)}
                   </span>
-                  <span className="profile2-view-details-text">View Details</span>
                 </button>
               </div>
             ))
@@ -501,6 +521,79 @@ const Profile2: React.FC = () => {
           )}
         </div>
       </div>
+
+      {isRubricInfoOpen && (
+        <div
+          className="modal-overlay"
+          onClick={handleCloseRubricInfo}
+        >
+          <div
+            className="modal-content"
+            style={{ maxWidth: '900px', width: '95%', maxHeight: '80vh', overflowY: 'auto' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="modal-title">
+              {rubricInfoData?.title || 'Rubric Details'}
+            </h2>
+
+            {isRubricInfoLoading && (
+              <div className="evaluation-content">
+                <p className="evaluation-message">Loading rubric table...</p>
+              </div>
+            )}
+
+            {!isRubricInfoLoading && rubricInfoError && (
+              <div className="evaluation-content">
+                <p className="evaluation-message">{rubricInfoError}</p>
+              </div>
+            )}
+
+            {!isRubricInfoLoading && !rubricInfoError && rubricInfoData && (
+              <div className="evaluation-table-container">
+                <table className="evaluation-table">
+                  <thead>
+                    <tr>
+                      <th className="evaluation-table-header">Skill Area</th>
+                      {rubricInfoData.headers.map((header, index) => (
+                        <th key={index} className="evaluation-table-header">
+                          {header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rubricInfoData.rows.map((row, rowIndex) => (
+                      <tr key={rowIndex}>
+                        <th className="evaluation-table-row-header">
+                          {row.skillArea}
+                        </th>
+                        {row.values.map((value, valueIndex) => (
+                          <td
+                            key={valueIndex}
+                            className="evaluation-table-cell"
+                          >
+                            {value}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="modal-buttons">
+              <button
+                type="button"
+                className="modal-button modal-button-cancel"
+                onClick={handleCloseRubricInfo}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

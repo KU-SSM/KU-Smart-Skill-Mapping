@@ -17,7 +17,7 @@ interface StudentRequest {
 
 const Profile3: React.FC = () => {
   const navigate = useNavigate();
-  
+
   // Mock student requests data - replace with API call later
   const [studentRequests] = useState<StudentRequest[]>([
     {
@@ -28,7 +28,7 @@ const Profile3: React.FC = () => {
       rubricId: '2',
       rubricTitle: 'Software Development Skills',
       requestedAt: '2024-01-15T10:30:00Z',
-      status: 'pending'
+      status: 'pending',
     },
     {
       id: '2',
@@ -38,8 +38,8 @@ const Profile3: React.FC = () => {
       rubricId: '1',
       rubricTitle: 'Test Rubric',
       requestedAt: '2024-01-16T14:20:00Z',
-      status: 'pending'
-    }
+      status: 'pending',
+    },
   ]);
 
   const handleCardClick = (requestId: string) => {
@@ -48,22 +48,22 @@ const Profile3: React.FC = () => {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'short', 
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
   return (
     <div className="profile-wrapper">
-      {/* Student Requests Selection Section */}
+      {/* Student Evaluation Requests Section */}
       <div className="portfolio-container">
         <div className="portfolio-section">
           <h2 className="portfolio-section-title">Student Evaluation Requests</h2>
-          
+
           {studentRequests.length === 0 ? (
             <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
               <p>No student evaluation requests available.</p>
@@ -106,7 +106,6 @@ const Profile3: React.FC = () => {
           )}
         </div>
       </div>
-
     </div>
   );
 };

@@ -8,6 +8,8 @@ import SkillMap from './Components/SkillMap';
 import Portfolio from './Components/Portfolio';
 import RubricScoreList from './Components/RubricScoreList';
 import RubricScoreDetail from './Components/RubricScoreDetail';
+import RubricScoreListStudent from './Components/RubricScoreListStudent';
+import RubricScoreDetailStudent from './Components/RubricScoreDetailStudent';
 import Login from './Components/Login';
 import SignUp from './Components/SignUp';
 import Profile from './Components/Profile';
@@ -32,6 +34,8 @@ const App: React.FC = () => {
               <Route path="/skill_map" element={<SkillMap />} />
               <Route path="/rubric_score" element={<RubricScoreList />} />
               <Route path="/rubric_score/:id" element={<RubricScoreDetail />} />
+              <Route path="/rubric_score_student" element={<RubricScoreListStudent />} />
+              <Route path="/rubric_score_student/:id" element={<RubricScoreDetailStudent />} />
               <Route path="/profile" element={<Profile />} />
               <Route path="/profile2" element={<Profile2 />} />
               <Route path="/profile3" element={<Profile3 />} />
