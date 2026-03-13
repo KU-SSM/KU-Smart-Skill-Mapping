@@ -174,6 +174,11 @@ const Profile3Detail: React.FC = () => {
     setIsRubricInfoOpen(false);
   };
 
+  const handleEditRubricFromInfo = () => {
+    if (!rubricInfoData?.id) return;
+    navigate(`/rubric_score/${rubricInfoData.id}`);
+  };
+
   // Get skills from selected rubric
   const skills = useMemo(() => {
     if (!selectedRubricData) return [];
@@ -600,6 +605,13 @@ const Profile3Detail: React.FC = () => {
             )}
 
             <div className="modal-buttons">
+              <button
+                type="button"
+                className="modal-button modal-button-apply"
+                onClick={handleEditRubricFromInfo}
+              >
+                Edit Rubric Score
+              </button>
               <button
                 type="button"
                 className="modal-button modal-button-cancel"
