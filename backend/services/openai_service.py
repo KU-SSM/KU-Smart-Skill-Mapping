@@ -212,6 +212,93 @@ class OpenAIService:
         )
         return json.loads(response.choices[0].message.content)
 
+    async def match_text_to_criteria(self, text: str, classification: dict, criteria: list) -> list:
+        """
+        Ask the model to match the provided text/classification to rubric criteria.
+
+        Returns a list of match objects with keys:
+          - criteria_id (int)
+          - rubric_skill_id (int)
+          - level_id (int)
+          - matched_text (string)  # snippet or summary that matched
+          - confidence (float 0.0-1.0)
+          - matched_from (string)  # e.g., skill name or 'text'
+        """
+        if not criteria:
+            return []
+
+        # Build prompt
+        system_msg = {"role": "system", "content": "You are an assistant that matches portfolio text to rubric criteria. Output valid JSON only."}
+        user_content = (
+            "Given the portfolio text and a list of rubric criteria, find which parts of the text or extracted skills match each criteria.\n"
+            "Return a JSON object with keys: \n"
+            "  - classification: { skills: [...], categories: [...], summary: '...' }\n"
+            "  - matches: an array of objects with keys: criteria_id, rubric_skill_id, level_id, matched_text, confidence (0-1), matched_from\n"
+            "If multiple criteria match the same text, include multiple objects. If nothing matches, return an object with empty arrays.\n\n"
+            f"Classification hint (if available):\n{json.dumps(classification, ensure_ascii=False, indent=2)}\n\n"
+            f"Criteria list:\n{json.dumps(criteria, ensure_ascii=False, indent=2)}\n\n"
+            f"Portfolio text (full):\n{text[:4000]}\n\n"
+            "Notes:\n- matched_text should be the exact snippet from the portfolio text when possible, else a short paraphrase.\n"
+            "- confidence should be a number between 0 and 1.\n"
+            "- matched_from should indicate which extracted skill or 'text' if matched from free text.\n"
+            "Only output valid JSON (an object). Do not include extra commentary."
+        )
+        user_msg = {"role": "user", "content": user_content}
+
+        try:
+            resp = await asyncio.to_thread(
+                self.client.chat.completions.create,
+                model=self.model,
+                messages=[system_msg, user_msg],
+                temperature=0.0,
+                max_tokens=1500
+            )
+            content = resp.choices[0].message.content
+            logger.info(f"match_text_to_criteria response length: {len(content)}")
+        except Exception as e:
+            logger.error(f"OpenAI call failed in match_text_to_criteria: {e}")
+            raise
+
+        # Parse JSON
+        try:
+            parsed = json.loads(content)
+            # Expect top-level object with 'classification' and 'matches'
+            if isinstance(parsed, dict):
+                matches = parsed.get("matches") or []
+                # normalize confidence
+                for item in matches:
+                    if "confidence" in item:
+                        try:
+                            item["confidence"] = float(item["confidence"])
+                        except Exception:
+                            item["confidence"] = 0.0
+                classification_out = parsed.get("classification") or {"skills": [], "categories": [], "summary": ""}
+                return {"classification": classification_out, "matches": matches}
+            # older fallback: if model returned array directly
+            if isinstance(parsed, list):
+                for item in parsed:
+                    if "confidence" in item:
+                        try:
+                            item["confidence"] = float(item["confidence"])
+                        except Exception:
+                            item["confidence"] = 0.0
+                return {"classification": {"skills": [], "categories": [], "summary": ""}, "matches": parsed}
+            # otherwise wrap it
+            logger.warning("match_text_to_criteria returned unexpected JSON; wrapping into object")
+            return {"classification": {"skills": [], "categories": [], "summary": ""}, "matches": [parsed]}
+        except json.JSONDecodeError as je:
+            logger.error(f"JSON parse failed in match_text_to_criteria: {je}. Raw: {content[:200]}")
+            # As a fallback, attempt to extract a JSON substring
+            start = content.find("[")
+            end = content.rfind("]")
+            if start != -1 and end != -1 and end > start:
+                try:
+                    parsed = json.loads(content[start:end+1])
+                    return parsed
+                except Exception:
+                    logger.error("Fallback JSON extraction failed")
+            raise
+
 # Create a singleton instance
 _openai_service: Optional[OpenAIService] = None
 

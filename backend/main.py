@@ -30,7 +30,7 @@ app.add_middleware(
 # Should be refactored to separate file later on.
 class RubricScoreBase(BaseModel):
     name: str
-    created_at: datetime
+    created_at: datetime # change to set when created later
     updated_at: datetime
     
 class RubricScoreModel(RubricScoreBase):
@@ -69,10 +69,13 @@ class PortfolioModel(PortfolioBase):
     created_at: datetime
 
 class EvaluatedSkillBase(BaseModel):
-    skill_id: int
+    rubric_skill_id: int
     level_id: int
-    confidence: float
     matched_from: str
+    criteria_passing_description: str
+    criteria_id: int
+    confidence: float
+    valid_status: bool
 
 class EvaluatedSkillModel(EvaluatedSkillBase):
     id: int
@@ -322,14 +325,13 @@ async def extract_document(file: UploadFile = File(...)):
         text = extracted["text"]
         logger.info(f"Extracted text: {text[:100]}...")  # Log first 100 characters
         metadata = extracted["metadata"]
-        # classify
-        response = await openai_service.classify_text(text)
-        logger.info(f"Classification response: {response}")
-        
+        # Return full extracted text; classification will occur in evaluation step
+        response = text
+
         return JSONResponse(status_code=200, content={
                 "success": True,
                 "metadata": metadata,
-                "classification": response
+                "text": response
             })
         
     except ValueError as e:
@@ -345,11 +347,103 @@ async def extract_document(file: UploadFile = File(...)):
         
 @app.post("/portfolio/evaluate")
 async def evaluate_and_save(
-    classification: dict,  # {"skills": [...], "categories": [...], "summary": "..."}
+    text: str,  # full extracted text from portfolio import
     rubric_id: int,
-    db: db_dependency
+    db: db_dependency,
+    filename: str | None = None,
 ):
-    # Match extracted skills to rubric
-    # Save evaluated_skills table
-    # No need for original text
-    pass
+    """
+    Classify the provided `text` using OpenAI service, match extracted skills
+    to rubric criteria, and persist EvaluatedSkill rows linked to a new
+    Portfolio record.
+    """
+    try:
+        if not text:
+            raise HTTPException(status_code=400, detail="text is required for evaluation")
+
+        openai_service = get_openai_service()
+
+        # load rubric criteria for matching (must happen before calling match)
+        criteria_rows = db.query(models.Criteria).join(
+            models.RubricSkill, models.Criteria.rubric_skill_id == models.RubricSkill.id
+        ).filter(models.RubricSkill.rubric_id == rubric_id).all()
+
+        # Prepare criteria payload to send to OpenAI matching call
+        criteria_payload = [
+            {
+                "criteria_id": c.id,
+                "rubric_skill_id": c.rubric_skill_id,
+                "level_id": c.level_id,
+                "description": c.description,
+            }
+            for c in criteria_rows if c.description
+        ]
+
+        # Use OpenAI to match text directly to rubric criteria and produce
+        # both a classification and structured matches (skill/level/evidence).
+        match_result = await openai_service.match_text_to_criteria(text=text, classification={}, criteria=criteria_payload)
+
+        if isinstance(match_result, dict):
+            classification = match_result.get("classification") or {"skills": [], "categories": [], "summary": ""}
+            matches = match_result.get("matches") or []
+        else:
+            # backward compatibility: treat as matches list
+            classification = {"skills": [], "categories": [], "summary": ""}
+            matches = match_result
+
+        # create a Portfolio record to attach evaluated skills
+        db_portfolio = models.Portfolio(
+            filename=filename or "text_portfolio",
+            classification_json=classification,
+            created_at=datetime.utcnow()
+        )
+        db.add(db_portfolio)
+        db.commit()
+        db.refresh(db_portfolio)
+
+        # matches already obtained from match_result; nothing to do here
+
+        saved_evals = []
+        # Persist matches returned by the OpenAI service
+        for m in matches:
+            crit_id = m.get("criteria_id")
+            crit = next((c for c in criteria_rows if c.id == crit_id), None)
+            if not crit:
+                continue
+
+            eval_row = models.EvaluatedSkill(
+                portfolio_id=db_portfolio.id,
+                rubric_skill_id=crit.rubric_skill_id,
+                level_id=crit.level_id,
+                criteria_passing_description=m.get("matched_text") or crit.description,
+                criteria_id=crit.id,
+                confidence=float(m.get("confidence", 0.0)),
+                matched_from=m.get("matched_from") or m.get("matched_from") or "openai",
+                created_at=datetime.utcnow()
+            )
+            db.add(eval_row)
+            db.commit()
+            db.refresh(eval_row)
+
+            saved_evals.append({
+                "id": eval_row.id,
+                "rubric_skill_id": eval_row.rubric_skill_id,
+                "level_id": eval_row.level_id,
+                "confidence": eval_row.confidence,
+                "matched_from": eval_row.matched_from,
+                "criteria_passing_description": eval_row.criteria_passing_description
+            })
+
+        return JSONResponse(status_code=200, content={
+            "success": True,
+            "portfolio_id": db_portfolio.id,
+            "classification": classification,
+            "evaluations": saved_evals
+        })
+
+    except ValueError as e:
+        logger.error(f"Validation error: {str(e)}")
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error during evaluation: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to evaluate and save: {str(e)}")
