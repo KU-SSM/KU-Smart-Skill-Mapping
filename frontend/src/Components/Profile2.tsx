@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect } from 'react';
 import './Profile.css';
 import './RubricScore.css';
-import { AiOutlineClose, AiOutlineInfoCircle } from 'react-icons/ai';
+import { AiOutlineClose, AiOutlineInfoCircle, AiOutlinePlus } from 'react-icons/ai';
 import { FaBriefcase } from 'react-icons/fa';
 import { importPortfolio } from '../services/portfolioApi';
 import { getRubricScores, getRubricScore, RubricScoreDetail } from '../services/rubricScoreApi';
@@ -9,6 +9,7 @@ import { getRubricScores, getRubricScore, RubricScoreDetail } from '../services/
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const BriefcaseIcon = FaBriefcase as React.ComponentType;
 const InfoIcon = AiOutlineInfoCircle as React.ComponentType;
+const PlusIcon = AiOutlinePlus as React.ComponentType;
 
 interface Skill {
   skillArea: string;
@@ -34,6 +35,7 @@ const Profile2: React.FC = () => {
   // Skills selection for evaluation results - 3 separate lists
   const [aiSkills, setAiSkills] = useState<Skill[]>([]);
   const [studentSkills, setStudentSkills] = useState<Skill[]>([]);
+  const [studentExtraSkills, setStudentExtraSkills] = useState<Skill[]>([]);
   const [teacherSkills, setTeacherSkills] = useState<Skill[]>([]);
   const [searchAi, setSearchAi] = useState<string>('');
   const [searchStudent, setSearchStudent] = useState<string>('');
@@ -43,6 +45,9 @@ const Profile2: React.FC = () => {
   const [teacherEvaluations, setTeacherEvaluations] = useState<{ [skillArea: string]: string }>({});
   const [aiEvaluations, setAiEvaluations] = useState<{ [skillArea: string]: string }>({});
   const [studentEvaluations, setStudentEvaluations] = useState<{ [skillArea: string]: string }>({});
+  const [isStudentEditMode, setIsStudentEditMode] = useState<boolean>(false);
+  const [originalStudentSkills, setOriginalStudentSkills] = useState<Skill[]>([]);
+  const [originalStudentEvaluations, setOriginalStudentEvaluations] = useState<{ [skillArea: string]: string }>({});
 
   // Load rubric scores on mount
   useEffect(() => {
@@ -82,6 +87,7 @@ const Profile2: React.FC = () => {
         // All three panels show the same skill areas
         setAiSkills(skillsFromRubric);
         setStudentSkills(skillsFromRubric);
+        setStudentExtraSkills([]);
         setTeacherSkills(skillsFromRubric);
         
         // Initialize evaluations with random values for teacher and AI (as strings for input fields)
@@ -222,14 +228,15 @@ const Profile2: React.FC = () => {
   }, [aiSkills, searchAi]);
 
   const filteredStudentSkills = useMemo(() => {
+    const combined = [...studentSkills, ...studentExtraSkills];
     if (!searchStudent.trim()) {
-      return studentSkills;
+      return combined;
     }
     const query = searchStudent.toLowerCase();
-    return studentSkills.filter(skill =>
+    return combined.filter(skill =>
       skill.skillArea.toLowerCase().includes(query)
     );
-  }, [studentSkills, searchStudent]);
+  }, [studentSkills, studentExtraSkills, searchStudent]);
 
   const filteredTeacherSkills = useMemo(() => {
     if (!searchTeacher.trim()) {
@@ -243,6 +250,79 @@ const Profile2: React.FC = () => {
 
   const isConfirmDisabled =
     !selectedRubricId || selectedRubricId === confirmedRubricId;
+
+  const handleEnterStudentEditMode = () => {
+    setOriginalStudentSkills(studentSkills.map((s) => ({ ...s })));
+    setOriginalStudentEvaluations({ ...studentEvaluations });
+    setIsStudentEditMode(true);
+  };
+
+  const handleSaveStudentEdits = () => {
+    // Save current edits as the new baseline, stay in edit mode
+    setOriginalStudentSkills(studentSkills.map((s) => ({ ...s })));
+    setOriginalStudentEvaluations({ ...studentEvaluations });
+  };
+
+  const handleCancelStudentEdits = () => {
+    setStudentSkills(originalStudentSkills.map((s) => ({ ...s })));
+    setStudentEvaluations({ ...originalStudentEvaluations });
+    setIsStudentEditMode(false);
+  };
+
+  const handleDoneStudentEditing = () => {
+    setIsStudentEditMode(false);
+  };
+
+  const handleAddStudentSkill = () => {
+    const base = 'New Skill';
+    const existing = new Set(
+      [...studentSkills, ...studentExtraSkills].map((s) => s.skillArea)
+    );
+    let nextName = base;
+    let i = 2;
+    while (existing.has(nextName)) {
+      nextName = `${base} ${i}`;
+      i += 1;
+    }
+
+    setStudentExtraSkills((prev) => [...prev, { skillArea: nextName }]);
+    setStudentEvaluations((prev) => ({ ...prev, [nextName]: '' }));
+  };
+
+  const handleDeleteStudentCustomSkill = (skillArea: string) => {
+    setStudentExtraSkills((prev) => prev.filter((s) => s.skillArea !== skillArea));
+    setStudentEvaluations((prev) => {
+      const next = { ...prev };
+      delete next[skillArea];
+      return next;
+    });
+  };
+
+  const handleRenameStudentCustomSkill = (oldSkillArea: string, nextSkillAreaRaw: string) => {
+    const nextSkillArea = nextSkillAreaRaw.trim();
+    if (!nextSkillArea || nextSkillArea === oldSkillArea) return;
+
+    const existing = new Set(
+      [...studentSkills, ...studentExtraSkills].map((s) => s.skillArea)
+    );
+    existing.delete(oldSkillArea);
+
+    if (existing.has(nextSkillArea)) {
+      alert('That skill name already exists.');
+      return;
+    }
+
+    setStudentExtraSkills((prev) =>
+      prev.map((s) => (s.skillArea === oldSkillArea ? { ...s, skillArea: nextSkillArea } : s))
+    );
+    setStudentEvaluations((prev) => {
+      const next = { ...prev };
+      const oldVal = next[oldSkillArea] ?? '';
+      delete next[oldSkillArea];
+      next[nextSkillArea] = oldVal;
+      return next;
+    });
+  };
 
   return (
     <div className="profile-wrapper">
@@ -437,38 +517,101 @@ const Profile2: React.FC = () => {
                   </div>
                   <div className="skills-list">
                     {filteredStudentSkills.map((skill, index) => (
-                      <div key={index} className="skill-item profile2-skill-item">
-                        <span className="skill-name">
-                          {skill.skillArea}
-                        </span>
+                      <div key={index} className="skill-item profile2-skill-item profile2-skill-item-deletable">
+                        {isStudentEditMode &&
+                          studentExtraSkills.some((s) => s.skillArea === skill.skillArea) && (
+                            <button
+                              type="button"
+                              className="profile2-skill-delete-button"
+                              title="Remove skill"
+                              aria-label="Remove skill"
+                              onClick={() => handleDeleteStudentCustomSkill(skill.skillArea)}
+                            >
+                              {React.createElement(CloseIcon)}
+                            </button>
+                          )}
+                        {isStudentEditMode &&
+                        studentExtraSkills.some((s) => s.skillArea === skill.skillArea) ? (
+                          <input
+                            type="text"
+                            className="profile2-custom-skill-name-input"
+                            defaultValue={skill.skillArea}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                (e.currentTarget as HTMLInputElement).blur();
+                              } else if (e.key === 'Escape') {
+                                e.currentTarget.value = skill.skillArea;
+                                (e.currentTarget as HTMLInputElement).blur();
+                              }
+                            }}
+                            onBlur={(e) => handleRenameStudentCustomSkill(skill.skillArea, e.target.value)}
+                          />
+                        ) : (
+                          <span className="skill-name">{skill.skillArea}</span>
+                        )}
                         <input
                           type="text"
                           className="profile2-score-input student-score-input"
                           value={studentEvaluations[skill.skillArea] || ''}
-                          onChange={(e) => {
-                            const value = e.target.value;
-                            // Only allow numbers
-                            if (value === '' || /^\d+$/.test(value)) {
-                              setStudentEvaluations(prev => ({
-                                ...prev,
-                                [skill.skillArea]: value
-                              }));
-                            }
-                          }}
-                          onBlur={(e) => {
-                            // Ensure valid number on blur
-                            const value = e.target.value;
-                            if (value && (!/^\d+$/.test(value) || parseInt(value) < 1)) {
-                              setStudentEvaluations(prev => ({
-                                ...prev,
-                                [skill.skillArea]: ''
-                              }));
-                            }
-                          }}
+                          readOnly={!isStudentEditMode}
+                          onChange={
+                            !isStudentEditMode
+                              ? undefined
+                              : (e) => {
+                                  const value = e.target.value;
+                                  if (value === '' || /^\d+$/.test(value)) {
+                                    setStudentEvaluations(prev => ({
+                                      ...prev,
+                                      [skill.skillArea]: value
+                                    }));
+                                  }
+                                }
+                          }
+                          onBlur={
+                            !isStudentEditMode
+                              ? undefined
+                              : (e) => {
+                                  const value = e.target.value;
+                                  if (value && (!/^\d+$/.test(value) || parseInt(value) < 1)) {
+                                    setStudentEvaluations(prev => ({
+                                      ...prev,
+                                      [skill.skillArea]: ''
+                                    }));
+                                  }
+                                }
+                          }
                           placeholder="Score"
                         />
                       </div>
                     ))}
+                    {isStudentEditMode && (
+                      <div
+                        className="rubric-score-add-box"
+                        onClick={handleAddStudentSkill}
+                        title="Add Skill"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleAddStudentSkill();
+                          }
+                        }}
+                      >
+                        <span className="rubric-score-add-box-spacer"></span>
+                        <button
+                          className="rubric-score-add-box-button"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddStudentSkill();
+                          }}
+                          title="Add Skill"
+                        >
+                          {React.createElement(PlusIcon)}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <div className="skills-panel profile2-panel">
@@ -500,7 +643,7 @@ const Profile2: React.FC = () => {
                         </span>
                         <input
                           type="text"
-                          className="profile2-score-input teacher-score-input profile2-teacher-dashed"
+                          className="profile2-score-input teacher-score-input"
                           value={teacherEvaluations[skill.skillArea] || ''}
                           readOnly
                           placeholder="—"
@@ -511,7 +654,42 @@ const Profile2: React.FC = () => {
                 </div>
               </div>
 
-              {/* (Removed evaluation list box as requested) */}
+              <div className="profile3-submit-button-container">
+                {!isStudentEditMode ? (
+                  <button
+                    className="profile2-request-evaluation-button"
+                    type="button"
+                    onClick={handleEnterStudentEditMode}
+                    disabled={!confirmedRubricId || !selectedRubricData}
+                  >
+                    Edit
+                  </button>
+                ) : (
+                  <>
+                    <button
+                      className="profile2-request-evaluation-button"
+                      type="button"
+                      onClick={handleCancelStudentEdits}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      className="profile2-request-evaluation-button"
+                      type="button"
+                      onClick={handleSaveStudentEdits}
+                    >
+                      Save
+                    </button>
+                    <button
+                      className="profile2-request-evaluation-button"
+                      type="button"
+                      onClick={handleDoneStudentEditing}
+                    >
+                      Done Editing
+                    </button>
+                  </>
+                )}
+              </div>
             </>
           ) : (
             <div className="evaluation-content">

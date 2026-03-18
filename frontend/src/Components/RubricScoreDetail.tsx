@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AiOutlineDelete, AiOutlineArrowLeft } from 'react-icons/ai';
+import { AiOutlineDelete, AiOutlineArrowLeft, AiOutlineHistory } from 'react-icons/ai';
 import { FiSave, FiX } from 'react-icons/fi';
 import RubricScoreTable from './RubricScoreTable';
 import { getRubricScore, updateRubricScore, deleteRubricScore } from '../services/rubricScoreApi';
@@ -8,12 +8,22 @@ import './RubricScore.css';
 
 const DeleteIcon = AiOutlineDelete as React.ComponentType;
 const BackIcon = AiOutlineArrowLeft as React.ComponentType;
+const HistoryIcon = AiOutlineHistory as React.ComponentType;
 const SaveIcon = FiSave as React.ComponentType;
 const CancelIcon = FiX as React.ComponentType;
 
 interface TableData {
   skillArea: string;
   values: string[];
+}
+
+interface FormerRubricVersion {
+  version: string;
+  createdAt: string;
+  expiresAt: string;
+  title: string;
+  headers: string[];
+  rows: TableData[];
 }
 
 const RubricScoreDetail: React.FC = () => {
@@ -38,12 +48,51 @@ const RubricScoreDetail: React.FC = () => {
   const [showExpirationModal, setShowExpirationModal] = useState<boolean>(false);
   const [expirationDate, setExpirationDate] = useState<string>('');
   const [expirationTime, setExpirationTime] = useState<string>('23:59:59');
+  const [isFormerRubricsOpen, setIsFormerRubricsOpen] = useState<boolean>(false);
+  const [selectedFormerVersion, setSelectedFormerVersion] = useState<FormerRubricVersion | null>(null);
 
   const getDefaultExpirationDate = () => {
     const d = new Date();
     d.setDate(d.getDate() + 3);
     return d.toISOString().slice(0, 10);
   };
+
+  const formerRubricVersions = useMemo<FormerRubricVersion[]>(() => {
+    // Mock data (no backend yet)
+    const now = new Date();
+    const iso = (d: Date) => d.toISOString().replace('T', ' ').slice(0, 19);
+    const d1 = new Date(now);
+    d1.setDate(d1.getDate() + 2);
+    d1.setHours(23, 59, 59, 0);
+    const d2 = new Date(now);
+    d2.setDate(d2.getDate() + 10);
+    d2.setHours(23, 59, 59, 0);
+    return [
+      {
+        version: 'v1',
+        title: `${title || 'Rubric'} (v1)`,
+        createdAt: iso(new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000)),
+        expiresAt: iso(d1),
+        headers: ['Level 1', 'Level 2', 'Level 3'],
+        rows: [
+          { skillArea: 'Communication', values: ['Basic', 'Good', 'Excellent'] },
+          { skillArea: 'Teamwork', values: ['Basic', 'Good', 'Excellent'] },
+        ],
+      },
+      {
+        version: 'v2',
+        title: `${title || 'Rubric'} (v2)`,
+        createdAt: iso(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)),
+        expiresAt: iso(d2),
+        headers: ['Level 1', 'Level 2', 'Level 3', 'Level 4'],
+        rows: [
+          { skillArea: 'Communication', values: ['Basic', 'Good', 'Great', 'Exceptional'] },
+          { skillArea: 'Teamwork', values: ['Basic', 'Good', 'Great', 'Exceptional'] },
+          { skillArea: 'Problem Solving', values: ['Basic', 'Good', 'Great', 'Exceptional'] },
+        ],
+      },
+    ];
+  }, [title]);
 
   useEffect(() => {
     const loadRubricScore = async () => {
@@ -138,6 +187,20 @@ const RubricScoreDetail: React.FC = () => {
 
   const handleConfirmExpirationAndSave = () => {
     performSave();
+  };
+
+  const handleOpenFormerRubrics = () => {
+    setIsFormerRubricsOpen(true);
+    setSelectedFormerVersion(null);
+  };
+
+  const handleCloseFormerRubrics = () => {
+    setIsFormerRubricsOpen(false);
+    setSelectedFormerVersion(null);
+  };
+
+  const handleOpenFormerVersion = (item: FormerRubricVersion) => {
+    setSelectedFormerVersion(item);
   };
 
   const handleBack = () => {
@@ -272,6 +335,14 @@ const RubricScoreDetail: React.FC = () => {
               {title}
             </h1>
           )}
+          <button
+            className="rubric-history-button"
+            onClick={handleOpenFormerRubrics}
+            title="View former rubric versions (expiring)"
+            type="button"
+          >
+            {React.createElement(HistoryIcon)}
+          </button>
           <button 
             className="delete-rubric-button" 
             onClick={handleDelete}
@@ -366,6 +437,111 @@ const RubricScoreDetail: React.FC = () => {
                 {isSaving ? 'Saving...' : 'Set and Save'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {isFormerRubricsOpen && (
+        <div className="rubric-modal-overlay" onClick={handleCloseFormerRubrics}>
+          <div className="rubric-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="rubric-modal-header">
+              <h2 className="rubric-modal-title">
+                {selectedFormerVersion ? 'Former rubric detail' : 'Former rubric versions'}
+              </h2>
+              <button
+                type="button"
+                className="rubric-modal-close"
+                onClick={handleCloseFormerRubrics}
+                aria-label="Close"
+                title="Close"
+              >
+                {React.createElement(CancelIcon)}
+              </button>
+            </div>
+            {selectedFormerVersion ? (
+              <>
+                <div className="rubric-history-detail-meta">
+                  <div>Name: {selectedFormerVersion.version}</div>
+                  <div>Created: {selectedFormerVersion.createdAt}</div>
+                  <div>Expires: {selectedFormerVersion.expiresAt}</div>
+                </div>
+                <RubricScoreTable
+                  headers={selectedFormerVersion.headers}
+                  rows={selectedFormerVersion.rows}
+                  onHeadersChange={() => {}}
+                  onRowsChange={() => {}}
+                  readOnly={true}
+                />
+                <div className="rubric-modal-actions">
+                  <button
+                    type="button"
+                    className="rubric-modal-button secondary"
+                    onClick={() => setSelectedFormerVersion(null)}
+                  >
+                    Back to versions
+                  </button>
+                  <button
+                    type="button"
+                    className="rubric-modal-button secondary"
+                    onClick={() => {
+                      // Placeholder: will be wired when backend supports expiration editing
+                      alert('Edit expiration date will be available when backend supports versioning.');
+                    }}
+                    title="Edit expiration date (not implemented yet)"
+                  >
+                    Edit expiration date
+                  </button>
+                  <button
+                    type="button"
+                    className="rubric-modal-button"
+                    onClick={() => {
+                      // Placeholder: restore will be wired to backend later
+                      alert('Restore will be available when backend supports versioning.');
+                    }}
+                    title="Restore this former version (not implemented yet)"
+                  >
+                    Restore
+                  </button>
+                  <button
+                    type="button"
+                    className="rubric-modal-button"
+                    onClick={handleCloseFormerRubrics}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="rubric-history-list">
+                  {formerRubricVersions.map((item) => (
+                    <button
+                      key={item.version}
+                      type="button"
+                      className="rubric-history-item rubric-history-item-button"
+                      onClick={() => handleOpenFormerVersion(item)}
+                    >
+                      <div className="rubric-history-left">
+                        <div className="rubric-history-version">{item.version}</div>
+                        <div className="rubric-history-meta">Created: {item.createdAt}</div>
+                      </div>
+                      <div className="rubric-history-right">
+                        <div className="rubric-history-exp">Expires: {item.expiresAt}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div className="rubric-modal-actions">
+                  <button
+                    type="button"
+                    className="rubric-modal-button"
+                    onClick={handleCloseFormerRubrics}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

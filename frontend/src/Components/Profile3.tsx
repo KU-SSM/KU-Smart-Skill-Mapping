@@ -1,7 +1,10 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Profile.css';
 import './RubricScore.css';
+import { AiOutlineClose } from 'react-icons/ai';
+
+const CloseIcon = AiOutlineClose as React.ComponentType;
 
 interface StudentRequest {
   id: string;
@@ -17,6 +20,7 @@ interface StudentRequest {
 
 const Profile3: React.FC = () => {
   const navigate = useNavigate();
+  const [searchStudentName, setSearchStudentName] = useState<string>('');
 
   // Mock student requests data - replace with API call later
   const [studentRequests] = useState<StudentRequest[]>([
@@ -57,6 +61,14 @@ const Profile3: React.FC = () => {
     });
   };
 
+  const filteredRequests = useMemo(() => {
+    const q = searchStudentName.trim().toLowerCase();
+    if (!q) return studentRequests;
+    return studentRequests.filter((req) =>
+      req.studentName.toLowerCase().includes(q)
+    );
+  }, [studentRequests, searchStudentName]);
+
   return (
     <div className="profile-wrapper">
       {/* Student Evaluation Requests Section */}
@@ -64,13 +76,38 @@ const Profile3: React.FC = () => {
         <div className="portfolio-section">
           <h2 className="portfolio-section-title">Student Evaluation Requests</h2>
 
-          {studentRequests.length === 0 ? (
+          <div className="rubric-score-search-container" style={{ marginBottom: '16px' }}>
+            <input
+              type="text"
+              className="rubric-score-search-input"
+              placeholder="Search student name"
+              value={searchStudentName}
+              onChange={(e) => setSearchStudentName(e.target.value)}
+            />
+            {searchStudentName && (
+              <button
+                className="rubric-score-clear-search"
+                onClick={() => setSearchStudentName('')}
+                type="button"
+                aria-label="Clear search"
+                title="Clear"
+              >
+                {React.createElement(CloseIcon)}
+              </button>
+            )}
+          </div>
+
+          {filteredRequests.length === 0 ? (
             <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
-              <p>No student evaluation requests available.</p>
+              <p>
+                {studentRequests.length === 0
+                  ? 'No student evaluation requests available.'
+                  : 'No matching students found.'}
+              </p>
             </div>
           ) : (
             <div className="student-requests-list">
-              {studentRequests.map((request) => (
+              {filteredRequests.map((request) => (
                 <div
                   key={request.id}
                   className={`student-request-card ${request.status === 'completed' ? 'completed' : ''}`}
