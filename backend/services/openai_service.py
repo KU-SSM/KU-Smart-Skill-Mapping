@@ -27,6 +27,7 @@ class OpenAIService:
     def __init__(self):
         """Initialize OpenAI client with API key from environment variables."""
         api_key = os.getenv("OPENAI_API_KEY")
+        logger.info("OPNAI_API_KEY loaded from environment: " + ("Yes" if api_key else "No"))
         if not api_key:
             raise ValueError("OPENAI_API_KEY not found in environment variables. Please set it in your .env file.")
         

@@ -99,7 +99,7 @@ class Portfolio(Base):
     
     evaluated_skills = relationship("EvaluatedSkill", back_populates="portfolio", cascade="all,delete-orphan")
 
-class EvaluatedSkill(Base):
+class AIEvaluatedSkill(Base):
     __tablename__ = 'evaluated_skill'
     
     id = Column(Integer, primary_key=True, index=True)
@@ -112,7 +112,22 @@ class EvaluatedSkill(Base):
     matched_from = Column(String)  # original extracted skill name
     created_at = Column(DateTime)
     valid_status = Column(Boolean, default=True) # valid, outdated, expired, when the rubric skill or level is updated, we will set the validStatus to outdated, when the portfolio is updated with new rubric skill and level, we will set the validStatus to valid, this is to keep track of the validity of the evaluated skill.
-    
     portfolio = relationship("Portfolio", back_populates="evaluated_skills")
     rubric_skill = relationship("RubricSkill")
     level = relationship("Level")
+
+class StudentEvaluatedSkill(Base):
+    __tablename__ = 'student_evaluated_skill'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    skill = Column(String) # store the skill name which is evaluated by student, since the student may not be able to determine the rubric skill and level, we only store the skill name, and we will use the skill name to match the rubric skill and level for evaluation, this is to keep track of the student's self-evaluation.
+    Level = Column(Integer) 
+    user_id = Column(Integer) # store the user id of the student, for future reference and analysis, since the student may update their self-evaluation in the future, we need to keep track of the user's self-evaluation for each skill.
+
+class TeacherEvaluatedSkill(Base):
+    __tablename__ = 'teacher_evaluated_skill'
+    
+    id = Column(Integer, primary_key=True, index=True)
+    skill = Column(String) # store the skill name which is evaluated by teacher, since the teacher may not be able to determine the rubric skill and level, we only store the skill name, and we will use the skill name to match the rubric skill and level for evaluation, this is to keep track of the teacher's evaluation.
+    Level = Column(Integer)
+    user_id = Column(Integer) # store the user id of the teacher, for future reference and analysis, since the teacher may update their evaluation in the future, we need to keep track of the teacher's evaluation for each skill.
