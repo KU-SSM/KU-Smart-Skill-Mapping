@@ -3,10 +3,12 @@ uvicorn
 sqlalchemy
 openai
 python-multipart
-python-dotenv
 pypdf
 pdfplumber
 pdf2image
 pytesseract
 Pillow
 python-dotenv
+# Database drivers and migrations
+psycopg2-binary
+alembic
