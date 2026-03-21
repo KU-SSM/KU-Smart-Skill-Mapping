@@ -1,6 +1,8 @@
 from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 import os
+from pathlib import Path
+from dotenv import load_dotenv
 from alembic import context
 
 from backend.database import Base, engine
@@ -13,6 +15,14 @@ config = context.config
 # This line sets up loggers basically.
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Load repo root .env explicitly so Alembic uses the same DATABASE_URL
+# regardless of current working directory when running alembic commands.
+root = Path(__file__).resolve().parents[1]
+load_dotenv(root / ".env")
+db_url = os.getenv("DATABASE_URL")
+if db_url:
+    config.set_main_option("sqlalchemy.url", db_url)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
