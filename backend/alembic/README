@@ -1,1 +1,52 @@
-Generic single-database configuration.
+Alembic setup and usage
+========================
+
+This document explains how to configure and use Alembic for this project from first-time setup through creating and applying migrations.
+
+
+
+- Confirm `DATABASE_URL` is set in the repo root `.env` (this repo uses the root `.env` as the single source of truth). Example:
+
+```
+DATABASE_URL=postgresql+psycopg2://postgres:<password>@localhost:5432/KUSSM_DB
+```
+
+Configuration notes (already applied)
+------------------------------------
+- `env.py` is configured to load the repository root `.env` explicitly and will set Alembic's `sqlalchemy.url` from `DATABASE_URL` at runtime. This means you do not need to edit `alembic.ini` to point to your database.
+
+
+
+Create the initial migration (autogenerate)
+----------------------------------------
+From the `backend/` folder run:
+
+```powershell
+cd backend
+alembic revision --autogenerate -m "init"
+```
+
+- Review the generated migration file in `backend/alembic/versions/` and confirm it matches the models in `backend/models.py`.
+
+Apply migrations (upgrade to head)
+---------------------------------
+From `backend/` run:
+
+```powershell
+alembic upgrade head
+```
+
+Other useful Alembic commands
+-----------------------------
+- Create a new empty revision: `alembic revision -m "add something" --empty`
+- Show current DB revision: `alembic current`
+- Stamp the DB with a specific revision (mark without running): `alembic stamp <rev>`
+- Downgrade one revision: `alembic downgrade -1`
+
+Notes & best practices
+----------------------
+- Keep `DATABASE_URL` as the single source of truth in the repo `.env` or environment variables; `env.py` will pick it up.
+- Always review autogenerate diffs before applying; autogenerate can miss complex schema changes.
+- Pin Alembic and DB driver versions in `requirements.txt` for consistent CI/dev behavior.
+
+If you want, I can now create the initial autogenerate revision and run `alembic upgrade head` for you. Reply: "create and apply" to proceed, or "just show commands" to run them yourself.

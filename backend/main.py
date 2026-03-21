@@ -2,13 +2,13 @@ from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.responses import JSONResponse
 from typing import Annotated, List
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
 from database import SessionLocal, engine
 import models
 from fastapi.middleware.cors import CORSMiddleware
 from services.openai_service import get_openai_service
 import logging
 from datetime import datetime
+from schemas import *
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -26,62 +26,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"]
 )
-    
-# Should be refactored to separate file later on.
-class RubricScoreBase(BaseModel):
-    name: str
-    created_at: datetime # change to set when created later
-    updated_at: datetime
-    
-class RubricScoreModel(RubricScoreBase):
-    id: int
-    
-class RubricSkillBase(BaseModel):
-    rubric_id: int
-    display_order: int
-    name: str
 
-class RubricSkillModel(RubricSkillBase):
-    id: int
-    
-class LevelBase(BaseModel):
-    rubric_id: int
-    rank: int
-    description: str
-
-class LevelModel(LevelBase):
-    id: int
-
-class CriteriaBase(BaseModel):
-    rubric_skill_id: int
-    level_id: int
-    description: str
-
-class CriteriaModel(CriteriaBase):
-    id: int
-
-class PortfolioBase(BaseModel):
-    filename: str
-    classification_json: dict
-
-class PortfolioModel(PortfolioBase):
-    id: int
-    created_at: datetime
-
-class EvaluatedSkillBase(BaseModel):
-    rubric_skill_id: int
-    level_id: int
-    matched_from: str
-    criteria_passing_description: str
-    criteria_id: int
-    confidence: float
-    valid_status: bool
-
-class EvaluatedSkillModel(EvaluatedSkillBase):
-    id: int
-    portfolio_id: int
-    created_at: datetime
-    
 def get_db():
     db = SessionLocal()
     try:
@@ -349,13 +294,14 @@ async def extract_document(file: UploadFile = File(...)):
 async def evaluate_and_save(
     text: str,  # full extracted text from portfolio import
     rubric_id: int,
+    user_id: int,
     db: db_dependency,
     filename: str | None = None,
 ):
     """
     Classify the provided `text` using OpenAI service, match extracted skills
     to rubric criteria, and persist EvaluatedSkill rows linked to a new
-    Portfolio record.
+    Portfolio + SkillEvaluation record.
     """
     try:
         if not text:
@@ -401,7 +347,27 @@ async def evaluate_and_save(
         db.commit()
         db.refresh(db_portfolio)
 
-        # matches already obtained from match_result; nothing to do here
+        # track which rubric version was used for this evaluation
+        rubric_history = models.RubricScoreHistory(
+            created_at=datetime.utcnow(),
+            status="valid",
+            rubric_score_id=rubric_id,
+        )
+        db.add(rubric_history)
+        db.commit()
+        db.refresh(rubric_history)
+
+        # page-level evaluation container
+        skill_evaluation = models.SkillEvaluation(
+            rubric_score_history_id=rubric_history.id,
+            portfolio_id=db_portfolio.id,
+            user_id=user_id,
+            created_at=datetime.utcnow(),
+            status="draft",
+        )
+        db.add(skill_evaluation)
+        db.commit()
+        db.refresh(skill_evaluation)
 
         saved_evals = []
         # Persist matches returned by the OpenAI service
@@ -411,15 +377,16 @@ async def evaluate_and_save(
             if not crit:
                 continue
 
-            eval_row = models.EvaluatedSkill(
+            skill_name = crit.rubric_skill.name if crit.rubric_skill else "unknown"
+            level_rank = crit.level.rank if crit.level else 0
+
+            eval_row = models.AIEvaluatedSkill(
+                skill_evaluation_id=skill_evaluation.id,
+                rubric_score_history_id=rubric_history.id,
                 portfolio_id=db_portfolio.id,
-                rubric_skill_id=crit.rubric_skill_id,
-                level_id=crit.level_id,
                 criteria_passing_description=m.get("matched_text") or crit.description,
-                criteria_id=crit.id,
-                confidence=float(m.get("confidence", 0.0)),
-                matched_from=m.get("matched_from") or m.get("matched_from") or "openai",
-                created_at=datetime.utcnow()
+                skill_name=skill_name,
+                level_rank=level_rank,
             )
             db.add(eval_row)
             db.commit()
@@ -427,16 +394,18 @@ async def evaluate_and_save(
 
             saved_evals.append({
                 "id": eval_row.id,
-                "rubric_skill_id": eval_row.rubric_skill_id,
-                "level_id": eval_row.level_id,
-                "confidence": eval_row.confidence,
-                "matched_from": eval_row.matched_from,
+                "skill_evaluation_id": eval_row.skill_evaluation_id,
+                "rubric_score_history_id": eval_row.rubric_score_history_id,
+                "skill_name": eval_row.skill_name,
+                "level_rank": eval_row.level_rank,
                 "criteria_passing_description": eval_row.criteria_passing_description
             })
 
         return JSONResponse(status_code=200, content={
             "success": True,
             "portfolio_id": db_portfolio.id,
+            "skill_evaluation_id": skill_evaluation.id,
+            "rubric_score_history_id": rubric_history.id,
             "classification": classification,
             "evaluations": saved_evals
         })
