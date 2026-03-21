@@ -290,8 +290,8 @@ async def extract_document(file: UploadFile = File(...)):
             detail=f"Failed to extract text from PDF: {str(e)}"
         )
         
-@app.post("/portfolio/evaluate")
-async def evaluate_and_save(
+@app.post("/portfolio/ai_evaluate")
+async def ai_evaluate(
     text: str,  # full extracted text from portfolio import
     rubric_id: int,
     user_id: int,
@@ -300,8 +300,7 @@ async def evaluate_and_save(
 ):
     """
     Classify the provided `text` using OpenAI service, match extracted skills
-    to rubric criteria, and persist EvaluatedSkill rows linked to a new
-    Portfolio + SkillEvaluation record.
+    to rubric criteria, and persist AIEvaluatedSkill to be added in SkillEvaluation.
     """
     try:
         if not text:
@@ -416,3 +415,63 @@ async def evaluate_and_save(
     except Exception as e:
         logger.error(f"Error during evaluation: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to evaluate and save: {str(e)}")
+
+
+@app.post("/skill_evaluation/")
+async def create_skill_evaluation(
+    rubric_score_history_id: int,
+    portfolio_id: int,
+    user_id: int,
+    evaluated_ai_ids: List[int] | None = None,
+    db: db_dependency = Depends(get_db)
+):
+    """
+    Create a SkillEvaluation aggregate (required: rubric_score_history_id) and
+    optionally attach existing AI-evaluated skill rows to it.
+    """
+    try:
+        # validate rubric history
+        rubric_history = db.query(models.RubricScoreHistory).filter(models.RubricScoreHistory.id == rubric_score_history_id).first()
+        if not rubric_history:
+            raise HTTPException(status_code=400, detail=f"rubric_score_history_id {rubric_score_history_id} not found")
+
+        # validate portfolio
+        portfolio = db.query(models.Portfolio).filter(models.Portfolio.id == portfolio_id).first()
+        if not portfolio:
+            raise HTTPException(status_code=400, detail=f"portfolio_id {portfolio_id} not found")
+
+        # create SkillEvaluation
+        skill_eval = models.SkillEvaluation(
+            rubric_score_history_id=rubric_score_history_id,
+            portfolio_id=portfolio_id,
+            user_id=user_id,
+            created_at=datetime.utcnow(),
+            status="draft",
+        )
+        db.add(skill_eval)
+        db.commit()
+        db.refresh(skill_eval)
+
+        attached = []
+        if evaluated_ai_ids:
+            for aid in evaluated_ai_ids:
+                ai_row = db.query(models.AIEvaluatedSkill).filter(models.AIEvaluatedSkill.id == aid, models.AIEvaluatedSkill.portfolio_id == portfolio_id).first()
+                if not ai_row:
+                    continue
+                ai_row.skill_evaluation_id = skill_eval.id
+                db.add(ai_row)
+                db.commit()
+                db.refresh(ai_row)
+                attached.append(ai_row.id)
+
+        return JSONResponse(status_code=201, content={
+            "success": True,
+            "skill_evaluation_id": skill_eval.id,
+            "attached_ai_ids": attached
+        })
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error creating SkillEvaluation: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
