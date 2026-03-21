@@ -41,12 +41,12 @@ export const SideBarData: SidebarItem[] = [
         icon: BsPersonLinesFill
     },
     {
-        title: "Your Profile (Student)",
+        title: "Evaluation (Student)",
         link:"/profile2",
         icon: BsPersonLinesFill
     },
     {
-        title: "Your Profile (Teacher)",
+        title: "Evaluation (Teacher)",
         link:"/profile3",
         icon: BsPersonLinesFill
     },

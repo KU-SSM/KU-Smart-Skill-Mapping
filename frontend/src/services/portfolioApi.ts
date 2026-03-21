@@ -1,4 +1,5 @@
 import api from '../api/index';
+import { getApiErrorDetail } from '../utils/apiErrors';
 
 export interface PortfolioFile {
   name: string;
@@ -17,6 +18,24 @@ export interface PortfolioImportPayload {
 export interface PortfolioImportResponse {
   success: boolean;
   message?: string;
+  text?: string;
+  metadata?: any;
+}
+
+export interface PortfolioEvaluateItem {
+  id: number;
+  rubric_skill_id: number;
+  level_id: number;
+  confidence: number;
+  matched_from: string;
+  criteria_passing_description: string;
+}
+
+export interface PortfolioEvaluateResponse {
+  success: boolean;
+  portfolio_id: number;
+  classification: any;
+  evaluations: PortfolioEvaluateItem[];
 }
 
 export const importPortfolio = async (
@@ -72,9 +91,45 @@ export const importPortfolio = async (
     return {
       success: true,
       message: data.message,
+      text: data.text,
+      metadata: data.metadata,
     };
   } catch (error) {
     console.error('Error importing portfolio:', error);
     throw error;
+  }
+};
+
+export const evaluatePortfolio = async (
+  text: string,
+  rubricId: string,
+  filename?: string
+): Promise<PortfolioEvaluateResponse> => {
+  const rubric_id = Number(rubricId);
+  if (!Number.isFinite(rubric_id) || rubric_id <= 0 || !Number.isInteger(rubric_id)) {
+    throw new Error(`Invalid rubric id: ${rubricId}`);
+  }
+
+  try {
+    // Backend expects query params (FastAPI). Do not send a JSON body (null + application/json
+    // is unnecessary); use request() with no `data` so axios omits the body.
+    const response = await api.request<PortfolioEvaluateResponse>({
+      method: 'POST',
+      url: 'portfolio/evaluate',
+      params: {
+        text,
+        rubric_id,
+        ...(filename ? { filename } : {}),
+      },
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error evaluating portfolio:', error);
+    const detail = getApiErrorDetail(error);
+    const hint =
+      encodeURIComponent(text).length > 8000
+        ? ' Long portfolio text is sent in the URL; if this persists, the server may be rejecting oversized query strings (needs a body-based API).'
+        : '';
+    throw new Error(detail + hint);
   }
 };

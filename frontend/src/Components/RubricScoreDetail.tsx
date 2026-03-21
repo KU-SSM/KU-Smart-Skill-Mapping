@@ -44,12 +44,12 @@ const RubricScoreDetail: React.FC = () => {
   const [originalHeaders, setOriginalHeaders] = useState<string[]>([]);
   const [originalRows, setOriginalRows] = useState<TableData[]>([]);
 
-  // Expiration modal for previous version (shown when saving after first version)
-  const [showExpirationModal, setShowExpirationModal] = useState<boolean>(false);
   const [expirationDate, setExpirationDate] = useState<string>('');
   const [expirationTime, setExpirationTime] = useState<string>('23:59:59');
   const [isFormerRubricsOpen, setIsFormerRubricsOpen] = useState<boolean>(false);
   const [selectedFormerVersion, setSelectedFormerVersion] = useState<FormerRubricVersion | null>(null);
+  const [savedFormerRubricVersions, setSavedFormerRubricVersions] = useState<FormerRubricVersion[]>([]);
+  const [showFormerExpirationModal, setShowFormerExpirationModal] = useState<boolean>(false);
 
   const getDefaultExpirationDate = () => {
     const d = new Date();
@@ -57,7 +57,41 @@ const RubricScoreDetail: React.FC = () => {
     return d.toISOString().slice(0, 10);
   };
 
-  const formerRubricVersions = useMemo<FormerRubricVersion[]>(() => {
+  const historyStorageKey = useMemo(() => {
+    if (!id) return null;
+    return `former_rubric_versions_${id}`;
+  }, [id]);
+
+  // Load persisted former rubric versions (frontend-only mock).
+  useEffect(() => {
+    if (!historyStorageKey) {
+      setSavedFormerRubricVersions([]);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(historyStorageKey);
+      if (!raw) {
+        setSavedFormerRubricVersions([]);
+        return;
+      }
+      const parsed = JSON.parse(raw) as FormerRubricVersion[];
+      setSavedFormerRubricVersions(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setSavedFormerRubricVersions([]);
+    }
+  }, [historyStorageKey]);
+
+  // Persist whenever former versions change.
+  useEffect(() => {
+    if (!historyStorageKey) return;
+    try {
+      localStorage.setItem(historyStorageKey, JSON.stringify(savedFormerRubricVersions));
+    } catch {
+      // Ignore quota/localStorage errors
+    }
+  }, [historyStorageKey, savedFormerRubricVersions]);
+
+  const mockFormerRubricVersions = useMemo<FormerRubricVersion[]>(() => {
     // Mock data (no backend yet)
     const now = new Date();
     const iso = (d: Date) => d.toISOString().replace('T', ' ').slice(0, 19);
@@ -93,6 +127,9 @@ const RubricScoreDetail: React.FC = () => {
       },
     ];
   }, [title]);
+
+  const formerRubricVersions =
+    savedFormerRubricVersions.length > 0 ? savedFormerRubricVersions : mockFormerRubricVersions;
 
   useEffect(() => {
     const loadRubricScore = async () => {
@@ -138,7 +175,7 @@ const RubricScoreDetail: React.FC = () => {
     loadRubricScore();
   }, [id]);
 
-  const performSave = async () => {
+  const performSave = async (saveExpirationDate?: string, saveExpirationTime?: string) => {
     if (!id) {
       console.error('Cannot save: No rubric ID');
       return;
@@ -159,6 +196,39 @@ const RubricScoreDetail: React.FC = () => {
       console.log('Successfully saved rubric score!');
       console.log('Returned data:', rubricData);
 
+      // Save former rubric history (frontend-only).
+      // If backend save fails, we won't reach this code because it's inside `try`.
+      const effectiveExpirationDate = saveExpirationDate ?? expirationDate;
+      const effectiveExpirationTime = saveExpirationTime ?? expirationTime;
+      const expiresAt = `${effectiveExpirationDate} ${effectiveExpirationTime}`.trim();
+      if (historyStorageKey && originalTitle && originalHeaders.length > 0 && originalRows.length > 0 && expiresAt) {
+        const snapshotBase = {
+          title: `${originalTitle} (snapshot)`,
+          createdAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
+          expiresAt,
+          headers: originalHeaders.map((h) => h),
+          rows: originalRows.map((r) => ({
+            skillArea: r.skillArea,
+            values: r.values.map((v) => v),
+          })),
+        };
+
+        setSavedFormerRubricVersions((prev) => {
+          const nextVersion = `v${prev.length + 1}`;
+          const nextSnapshot: FormerRubricVersion = {
+            version: nextVersion,
+            ...snapshotBase,
+          };
+          const next = [...prev, nextSnapshot];
+          try {
+            localStorage.setItem(historyStorageKey, JSON.stringify(next));
+          } catch {
+            // ignore
+          }
+          return next;
+        });
+      }
+
       setTitle(rubricData.title);
       setHeaders(rubricData.headers);
       setRows(rubricData.rows);
@@ -169,7 +239,6 @@ const RubricScoreDetail: React.FC = () => {
         values: row.values.map(v => v)
       })));
 
-      setShowExpirationModal(false);
     } catch (error: any) {
       console.error('Error saving rubric score:', error);
       const errorMessage = error?.message || 'Failed to save rubric score. Please check the console for details.';
@@ -180,13 +249,11 @@ const RubricScoreDetail: React.FC = () => {
   };
 
   const handleSaveChanges = () => {
-    setExpirationDate(getDefaultExpirationDate());
-    setExpirationTime('23:59:59');
-    setShowExpirationModal(true);
-  };
-
-  const handleConfirmExpirationAndSave = () => {
-    performSave();
+    const defaultExpirationDate = getDefaultExpirationDate();
+    const defaultExpirationTime = '23:59:59';
+    setExpirationDate(defaultExpirationDate);
+    setExpirationTime(defaultExpirationTime);
+    performSave(defaultExpirationDate, defaultExpirationTime);
   };
 
   const handleOpenFormerRubrics = () => {
@@ -197,10 +264,41 @@ const RubricScoreDetail: React.FC = () => {
   const handleCloseFormerRubrics = () => {
     setIsFormerRubricsOpen(false);
     setSelectedFormerVersion(null);
+    setShowFormerExpirationModal(false);
   };
 
   const handleOpenFormerVersion = (item: FormerRubricVersion) => {
     setSelectedFormerVersion(item);
+  };
+
+  const handleOpenFormerExpirationModal = () => {
+    if (!selectedFormerVersion) return;
+    const parts = (selectedFormerVersion.expiresAt || '').split(' ');
+    if (parts.length >= 2) {
+      setExpirationDate(parts[0] || '');
+      setExpirationTime(parts[1].slice(0, 8) || '23:59:59');
+    } else {
+      setExpirationDate(getDefaultExpirationDate());
+      setExpirationTime('23:59:59');
+    }
+    setShowFormerExpirationModal(true);
+  };
+
+  const handleConfirmFormerExpirationAndSaveMock = () => {
+    if (!selectedFormerVersion) return;
+    const nextExpiresAt = `${expirationDate} ${expirationTime}`.trim();
+    if (!nextExpiresAt) return;
+
+    setSavedFormerRubricVersions((prev) => {
+      const base = prev.length > 0 ? prev : mockFormerRubricVersions;
+      const updated = base.map((v) =>
+        v.version === selectedFormerVersion.version ? { ...v, expiresAt: nextExpiresAt } : v
+      );
+      return updated;
+    });
+
+    setSelectedFormerVersion((prev) => (prev ? { ...prev, expiresAt: nextExpiresAt } : prev));
+    setShowFormerExpirationModal(false);
   };
 
   const handleBack = () => {
@@ -385,62 +483,6 @@ const RubricScoreDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* Expiration modal for previous rubric version */}
-      {showExpirationModal && (
-        <div className="modal-overlay" onClick={() => !isSaving && setShowExpirationModal(false)}>
-          <div
-            className="modal-content"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="modal-title">Set expiration for previous version</h2>
-            <p style={{ margin: 0, fontSize: '14px', color: '#666' }}>
-              Set the date and time when the previous rubric score version will expire.
-            </p>
-            <div className="modal-form">
-              <div className="modal-field">
-                <label className="modal-label" htmlFor="expiration-date">Date</label>
-                <input
-                  id="expiration-date"
-                  type="date"
-                  className="modal-input"
-                  value={expirationDate}
-                  onChange={(e) => setExpirationDate(e.target.value)}
-                />
-              </div>
-              <div className="modal-field">
-                <label className="modal-label" htmlFor="expiration-time">Time</label>
-                <input
-                  id="expiration-time"
-                  type="time"
-                  step="1"
-                  className="modal-input"
-                  value={expirationTime}
-                  onChange={(e) => setExpirationTime(e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="modal-buttons">
-              <button
-                type="button"
-                className="modal-button modal-button-cancel"
-                onClick={() => !isSaving && setShowExpirationModal(false)}
-                disabled={isSaving}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                className="modal-button modal-button-apply"
-                onClick={handleConfirmExpirationAndSave}
-                disabled={isSaving}
-              >
-                {isSaving ? 'Saving...' : 'Set and Save'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {isFormerRubricsOpen && (
         <div className="rubric-modal-overlay" onClick={handleCloseFormerRubrics}>
           <div className="rubric-modal-content" onClick={(e) => e.stopPropagation()}>
@@ -483,24 +525,9 @@ const RubricScoreDetail: React.FC = () => {
                   <button
                     type="button"
                     className="rubric-modal-button secondary"
-                    onClick={() => {
-                      // Placeholder: will be wired when backend supports expiration editing
-                      alert('Edit expiration date will be available when backend supports versioning.');
-                    }}
-                    title="Edit expiration date (not implemented yet)"
+                    onClick={handleOpenFormerExpirationModal}
                   >
                     Edit expiration date
-                  </button>
-                  <button
-                    type="button"
-                    className="rubric-modal-button"
-                    onClick={() => {
-                      // Placeholder: restore will be wired to backend later
-                      alert('Restore will be available when backend supports versioning.');
-                    }}
-                    title="Restore this former version (not implemented yet)"
-                  >
-                    Restore
                   </button>
                   <button
                     type="button"
@@ -542,6 +569,58 @@ const RubricScoreDetail: React.FC = () => {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Edit expiration date for selected former version */}
+      {showFormerExpirationModal && selectedFormerVersion && (
+        <div className="modal-overlay rubric-expiration-overlay" onClick={() => setShowFormerExpirationModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2 className="modal-title">Edit expiration date</h2>
+            <div className="modal-form">
+              <div className="modal-field">
+                <label className="modal-label" htmlFor="former-expiration-date">
+                  Date
+                </label>
+                <input
+                  id="former-expiration-date"
+                  type="date"
+                  className="modal-input"
+                  value={expirationDate}
+                  onChange={(e) => setExpirationDate(e.target.value)}
+                />
+              </div>
+              <div className="modal-field">
+                <label className="modal-label" htmlFor="former-expiration-time">
+                  Time
+                </label>
+                <input
+                  id="former-expiration-time"
+                  type="time"
+                  step="1"
+                  className="modal-input"
+                  value={expirationTime}
+                  onChange={(e) => setExpirationTime(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="modal-buttons">
+              <button
+                type="button"
+                className="modal-button modal-button-cancel"
+                onClick={() => setShowFormerExpirationModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="modal-button modal-button-apply"
+                onClick={handleConfirmFormerExpirationAndSaveMock}
+              >
+                Set and Save
+              </button>
+            </div>
           </div>
         </div>
       )}

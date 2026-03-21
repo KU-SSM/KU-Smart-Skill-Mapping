@@ -1,10 +1,13 @@
-import React, { useState, useRef, useMemo, useEffect } from 'react';
+import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import './Profile.css';
 import './RubricScore.css';
 import { AiOutlineClose, AiOutlineInfoCircle, AiOutlinePlus } from 'react-icons/ai';
 import { FaBriefcase } from 'react-icons/fa';
-import { importPortfolio } from '../services/portfolioApi';
+import { evaluatePortfolio, importPortfolio } from '../services/portfolioApi';
 import { getRubricScores, getRubricScore, RubricScoreDetail } from '../services/rubricScoreApi';
+import RubricScoreTable from './RubricScoreTable';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import api from '../api/index';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const BriefcaseIcon = FaBriefcase as React.ComponentType;
@@ -15,7 +18,45 @@ interface Skill {
   skillArea: string;
 }
 
+interface TableData {
+  skillArea: string;
+  values: string[];
+}
+
+interface EvaluationMaps {
+  ai: { [skillArea: string]: string };
+  student: { [skillArea: string]: string };
+  teacher: { [skillArea: string]: string };
+}
+
+interface FormerRubricVersion {
+  version: string;
+  createdAt: string;
+  expiresAt: string;
+  title: string;
+  headers: string[];
+  rows: TableData[];
+  evaluations: EvaluationMaps;
+}
+
+interface BackendRubricSkill {
+  id: number;
+  rubric_id: number;
+  display_order: number;
+  name: string;
+}
+
+interface BackendLevel {
+  id: number;
+  rubric_id: number;
+  rank: number;
+  description: string | null;
+}
+
 const Profile2: React.FC = () => {
+  const { evaluationId } = useParams<{ evaluationId: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -31,6 +72,12 @@ const Profile2: React.FC = () => {
   const [rubricInfoData, setRubricInfoData] = useState<RubricScoreDetail | null>(null);
   const [isRubricInfoLoading, setIsRubricInfoLoading] = useState<boolean>(false);
   const [rubricInfoError, setRubricInfoError] = useState<string | null>(null);
+
+  // Mock: rubric history (restore/expiration UI only; no backend).
+  const historySeedRubricIdRef = useRef<string | null>(null);
+  const [isRubricHistoryOpen, setIsRubricHistoryOpen] = useState<boolean>(false);
+  const [formerRubricVersions, setFormerRubricVersions] = useState<FormerRubricVersion[]>([]);
+  const [selectedFormerVersion, setSelectedFormerVersion] = useState<FormerRubricVersion | null>(null);
 
   // Skills selection for evaluation results - 3 separate lists
   const [aiSkills, setAiSkills] = useState<Skill[]>([]);
@@ -48,6 +95,8 @@ const Profile2: React.FC = () => {
   const [isStudentEditMode, setIsStudentEditMode] = useState<boolean>(false);
   const [originalStudentSkills, setOriginalStudentSkills] = useState<Skill[]>([]);
   const [originalStudentEvaluations, setOriginalStudentEvaluations] = useState<{ [skillArea: string]: string }>({});
+  const [extractedPortfolioText, setExtractedPortfolioText] = useState<string>('');
+  const [isAiEvaluating, setIsAiEvaluating] = useState<boolean>(false);
 
   // Load rubric scores on mount
   useEffect(() => {
@@ -90,8 +139,7 @@ const Profile2: React.FC = () => {
         setStudentExtraSkills([]);
         setTeacherSkills(skillsFromRubric);
         
-        // Initialize evaluations with random values for teacher and AI (as strings for input fields)
-        const generateRandomLevel = () => Math.floor(Math.random() * 5) + 1;
+        // Initialize evaluations (AI and Teacher are blank until evaluated)
         const newTeacherValues: { [skillArea: string]: string } = {};
         const newAiValues: { [skillArea: string]: string } = {};
         const newStudentValues: { [skillArea: string]: string } = {};
@@ -99,8 +147,8 @@ const Profile2: React.FC = () => {
         // Use skill areas from rows
         rubricData.rows.forEach((row) => {
           const skillArea = row.skillArea;
-          newTeacherValues[skillArea] = String(generateRandomLevel());
-          newAiValues[skillArea] = String(generateRandomLevel()); // Always generate random AI score
+          newTeacherValues[skillArea] = '';
+          newAiValues[skillArea] = ''; // Set by backend AI evaluation after portfolio+rubric are selected
           newStudentValues[skillArea] = '';
         });
         
@@ -132,6 +180,156 @@ const Profile2: React.FC = () => {
 
     loadRubricData();
   }, [confirmedRubricId, uploadedFiles.length]);
+
+  /** Manual AI evaluation — avoids surprise API calls and re-runs on every state tick. */
+  const runAiEvaluation = useCallback(async () => {
+    if (!confirmedRubricId || !selectedRubricData || !extractedPortfolioText.trim()) return;
+
+    try {
+      setIsAiEvaluating(true);
+
+      const [skillsRes, levelsRes, evalRes] = await Promise.all([
+        api.get<BackendRubricSkill[]>(`rubric/${confirmedRubricId}/rubric_skills`),
+        api.get<BackendLevel[]>(`rubric/${confirmedRubricId}/levels`),
+        evaluatePortfolio(extractedPortfolioText, confirmedRubricId, uploadedFiles[0]?.name || 'portfolio.pdf'),
+      ]);
+
+      const sortedSkills = [...skillsRes.data].sort(
+        (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
+      );
+      // Map rubric_skill_id -> row.skillArea (UI key). Rows match sorted skills by position.
+      const rubricSkillIdToRowKey = new Map<number, string>();
+      sortedSkills.forEach((s, i) => {
+        const rowKey = selectedRubricData.rows[i]?.skillArea ?? s.name;
+        rubricSkillIdToRowKey.set(s.id, rowKey);
+      });
+      const levelIdToRank = new Map<number, number>(
+        levelsRes.data.map((l) => [l.id, l.rank])
+      );
+
+      const nextAiEvaluations: { [skillArea: string]: string } = {};
+      selectedRubricData.rows.forEach((row) => {
+        nextAiEvaluations[row.skillArea] = '';
+      });
+
+      evalRes.evaluations.forEach((item) => {
+        const rowKey = rubricSkillIdToRowKey.get(item.rubric_skill_id);
+        const levelRank = levelIdToRank.get(item.level_id);
+        if (!rowKey || !levelRank) return;
+        nextAiEvaluations[rowKey] = String(levelRank);
+      });
+
+      setAiEvaluations(nextAiEvaluations);
+    } catch (error: any) {
+      console.error('AI evaluation failed:', error);
+    } finally {
+      setIsAiEvaluating(false);
+    }
+  }, [confirmedRubricId, selectedRubricData, extractedPortfolioText, uploadedFiles]);
+
+  const canRunAiEvaluation =
+    !!confirmedRubricId &&
+    !!selectedRubricData &&
+    extractedPortfolioText.trim().length > 0 &&
+    !isAiEvaluating;
+
+  // If user restores from the rubric-version detail page, apply its payload (mock) after rubric data loads.
+  useEffect(() => {
+    const state = (location.state || {}) as any;
+    const payload = state?.restorePayload;
+    if (!payload) return;
+    if (isLoadingRubricData) return;
+
+    const rubricDetail = payload.rubricDetail as RubricScoreDetail;
+    const evaluations = payload.evaluations as EvaluationMaps;
+    if (!rubricDetail || !evaluations) return;
+
+    const restoredSkills: Skill[] = (rubricDetail.rows || []).map((row) => ({ skillArea: row.skillArea }));
+
+    setSelectedRubricData(rubricDetail);
+    setAiSkills(restoredSkills);
+    setStudentSkills(restoredSkills);
+    setStudentExtraSkills([]);
+    setTeacherSkills(restoredSkills);
+    setAiEvaluations({ ...evaluations.ai });
+    setStudentEvaluations({ ...evaluations.student });
+    setTeacherEvaluations({ ...evaluations.teacher });
+    setIsStudentEditMode(false);
+    setSelectedFormerVersion(null);
+    setIsRubricHistoryOpen(false);
+
+    // Clear payload so it doesn't re-apply on re-renders.
+    navigate(`/profile2/${evaluationId || '1'}`, { replace: true, state: {} });
+  }, [location.state, isLoadingRubricData, navigate, evaluationId]);
+
+  // Seed mock history versions once per rubric confirmation.
+  useEffect(() => {
+    if (!confirmedRubricId || !selectedRubricData) return;
+    if (historySeedRubricIdRef.current === confirmedRubricId) return;
+    historySeedRubricIdRef.current = confirmedRubricId;
+
+    const now = new Date();
+    const iso = (d: Date) => d.toISOString().replace('T', ' ').slice(0, 19);
+
+    const fullHeaders = selectedRubricData.headers;
+    const trimmedHeaders =
+      fullHeaders.length > 1 ? fullHeaders.slice(0, fullHeaders.length - 1) : fullHeaders;
+
+    const buildRows = (headersToUse: string[]): TableData[] =>
+      selectedRubricData.rows.map((r) => ({
+        skillArea: r.skillArea,
+        values: r.values.slice(0, headersToUse.length),
+      }));
+
+    const buildEvaluations = (headersToUse: string[]): EvaluationMaps => {
+      const maxLevel = Math.max(1, Math.min(5, headersToUse.length));
+      const generateRandomLevel = () => String(Math.floor(Math.random() * maxLevel) + 1);
+
+      const ai: { [skillArea: string]: string } = {};
+      const teacher: { [skillArea: string]: string } = {};
+      const student: { [skillArea: string]: string } = {};
+
+      selectedRubricData.rows.forEach((r) => {
+        ai[r.skillArea] = generateRandomLevel();
+        teacher[r.skillArea] = generateRandomLevel();
+        student[r.skillArea] = '';
+      });
+
+      return { ai, teacher, student };
+    };
+
+    const exp1 = new Date(now);
+    exp1.setDate(exp1.getDate() + 2);
+    exp1.setHours(23, 59, 59, 0);
+
+    const exp2 = new Date(now);
+    exp2.setDate(exp2.getDate() + 10);
+    exp2.setHours(23, 59, 59, 0);
+
+    const v1: FormerRubricVersion = {
+      version: 'v1',
+      title: `${selectedRubricData.title} (v1)`,
+      createdAt: '2026-02-28 10:27:23',
+      expiresAt: '2026-03-22 16:59:59',
+      headers: trimmedHeaders,
+      rows: buildRows(trimmedHeaders),
+      evaluations: buildEvaluations(trimmedHeaders),
+    };
+
+    const v2: FormerRubricVersion = {
+      version: 'v2',
+      title: `${selectedRubricData.title} (v2)`,
+      createdAt: iso(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)),
+      expiresAt: iso(exp2),
+      headers: fullHeaders,
+      rows: buildRows(fullHeaders),
+      evaluations: buildEvaluations(fullHeaders),
+    };
+
+    setFormerRubricVersions([v1, v2]);
+    setSelectedFormerVersion(null);
+    setIsRubricHistoryOpen(false);
+  }, [confirmedRubricId, selectedRubricData]);
 
   const handleUploadClick = () => {
     fileInputRef.current?.click();
@@ -166,8 +364,18 @@ const Profile2: React.FC = () => {
         [file]
       );
       console.log('Portfolio import successful:', result);
+      setExtractedPortfolioText(result.text || '');
+      // New portfolio text invalidates previous AI scores until user runs evaluation again.
+      setAiEvaluations((prev) => {
+        const cleared: { [skillArea: string]: string } = {};
+        Object.keys(prev).forEach((k) => {
+          cleared[k] = '';
+        });
+        return cleared;
+      });
     } catch (error: any) {
       console.error('Error importing portfolio:', error);
+      setExtractedPortfolioText('');
     }
   };
 
@@ -216,6 +424,12 @@ const Profile2: React.FC = () => {
     setIsRubricInfoOpen(false);
   };
 
+  const handleCloseRubricHistory = () => {
+    setIsRubricHistoryOpen(false);
+    setSelectedFormerVersion(null);
+  };
+
+
   // Filter skills for each panel
   const filteredAiSkills = useMemo(() => {
     if (!searchAi.trim()) {
@@ -250,6 +464,8 @@ const Profile2: React.FC = () => {
 
   const isConfirmDisabled =
     !selectedRubricId || selectedRubricId === confirmedRubricId;
+  const hasSelectedPortfolio = uploadedFiles.length > 0;
+  const hasSelectedRubric = !!confirmedRubricId;
 
   const handleEnterStudentEditMode = () => {
     setOriginalStudentSkills(studentSkills.map((s) => ({ ...s })));
@@ -435,25 +651,57 @@ const Profile2: React.FC = () => {
                 </span>
               )}
             </h2>
-            <button
-              className="profile2-request-evaluation-button"
-              type="button"
-              disabled={!confirmedRubricId || !selectedRubricData}
-              onClick={() => {
-                // Handle request teacher evaluation (placeholder)
-                console.log('Request Teacher Evaluation clicked');
-              }}
-            >
-              Request Teacher Evaluation
-            </button>
+            <div className="evaluation-header-actions">
+              <button
+                className="profile2-ai-evaluate-button"
+                type="button"
+                disabled={!canRunAiEvaluation}
+                title={
+                  !extractedPortfolioText.trim()
+                    ? 'Upload and import a portfolio first'
+                    : !confirmedRubricId || !selectedRubricData
+                      ? 'Confirm a rubric first'
+                      : 'Run AI evaluation on your portfolio with the selected rubric'
+                }
+                onClick={() => runAiEvaluation()}
+              >
+                {isAiEvaluating ? 'Evaluating…' : 'Evaluate with AI'}
+              </button>
+              <button
+                className="profile2-request-evaluation-button"
+                type="button"
+                disabled={!confirmedRubricId || !selectedRubricData}
+                onClick={() => {
+                  // Handle request teacher evaluation (placeholder)
+                  console.log('Request Teacher Evaluation clicked');
+                }}
+              >
+                Request Teacher Evaluation
+              </button>
+
+            </div>
           </div>
           
           {isLoadingRubricData ? (
             <div className="evaluation-content">
               <p className="evaluation-message">Loading rubric data...</p>
             </div>
+          ) : !hasSelectedPortfolio || !hasSelectedRubric ? (
+            <div className="evaluation-content">
+              <p className="evaluation-message">
+                Please upload/select a portfolio and confirm a rubric score first.
+              </p>
+              <p className="evaluation-submessage">
+                Evaluation results will appear after both selections are completed.
+              </p>
+            </div>
           ) : selectedRubricData && selectedRubricData.rows.length > 0 ? (
             <>
+              {isAiEvaluating && (
+                <div className="evaluation-content">
+                  <p className="evaluation-submessage">AI is evaluating the selected portfolio...</p>
+                </div>
+              )}
               {/* Skills Selection Panels - 3 boxes in a row */}
               <div className="skills-panels-container profile2-three-panels">
                 <div className="skills-panel profile2-panel">
@@ -772,6 +1020,103 @@ const Profile2: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Rubric history popup (mock UI) */}
+      {isRubricHistoryOpen && (
+        <div className="rubric-modal-overlay" onClick={handleCloseRubricHistory}>
+          <div className="rubric-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="rubric-modal-header">
+              <h2 className="rubric-modal-title">
+                {selectedFormerVersion ? 'Former rubric detail' : 'Former rubric versions'}
+              </h2>
+              <button
+                type="button"
+                className="rubric-modal-close"
+                onClick={handleCloseRubricHistory}
+                aria-label="Close"
+                title="Close"
+              >
+                {React.createElement(CloseIcon)}
+              </button>
+            </div>
+
+            {selectedFormerVersion ? (
+              <>
+                <div className="rubric-history-detail-meta">
+                  <div>Name: {selectedFormerVersion.title}</div>
+                  <div>Created: {selectedFormerVersion.createdAt}</div>
+                  <div>Expires: {selectedFormerVersion.expiresAt}</div>
+                </div>
+
+                <RubricScoreTable
+                  headers={selectedFormerVersion.headers}
+                  rows={selectedFormerVersion.rows}
+                  onHeadersChange={() => {}}
+                  onRowsChange={() => {}}
+                  readOnly={true}
+                />
+
+                <div className="rubric-modal-actions">
+                  <button
+                    type="button"
+                    className="rubric-modal-button secondary"
+                    onClick={() => setSelectedFormerVersion(null)}
+                  >
+                    Back to versions
+                  </button>
+                  <button
+                    type="button"
+                    className="rubric-modal-button"
+                    onClick={handleCloseRubricHistory}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="rubric-history-list">
+                  {formerRubricVersions.map((item) => (
+                    <button
+                      key={item.version}
+                      type="button"
+                      className="rubric-history-item rubric-history-item-button"
+                      onClick={() => {
+                        if (!confirmedRubricId) return;
+                        navigate('/rubric_version_detail', {
+                          state: {
+                            portfolioUsedFileName: uploadedFiles[0]?.name || 'portfolio.pdf',
+                            rubricId: confirmedRubricId,
+                            rubricVersion: item,
+                          },
+                        });
+                      }}
+                    >
+                      <div className="rubric-history-left">
+                        <div className="rubric-history-version">{item.version}</div>
+                        <div className="rubric-history-meta">Created: {item.createdAt}</div>
+                      </div>
+                      <div className="rubric-history-right">
+                        <div className="rubric-history-exp">Expires: {item.expiresAt}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div className="rubric-modal-actions">
+                  <button
+                    type="button"
+                    className="rubric-modal-button"
+                    onClick={handleCloseRubricHistory}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

@@ -285,6 +285,11 @@
   margin-top: 6px;
 }
 
+/* Ensure expiration popup appears above rubric history popup */
+.rubric-expiration-overlay {
+  z-index: 1400 !important;
+}
+
 .rubric-modal-button {
   padding: 10px 16px;
   border: none;

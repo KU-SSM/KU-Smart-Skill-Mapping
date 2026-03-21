@@ -15,6 +15,13 @@ api.interceptors.request.use((config) => {
     if (config.data instanceof FormData) {
         delete config.headers['Content-Type'];
     }
+    // POST with no body: avoid sending Content-Type: application/json (can confuse some servers)
+    if (
+        config.method?.toLowerCase() === 'post' &&
+        (config.data === undefined || config.data === null)
+    ) {
+        delete config.headers['Content-Type'];
+    }
     return config;
 }, (error) => {
     return Promise.reject(error);

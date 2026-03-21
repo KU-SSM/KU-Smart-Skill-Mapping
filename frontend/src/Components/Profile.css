@@ -1290,6 +1290,14 @@
   gap: 20px;
 }
 
+.evaluation-header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
 .profile2-request-evaluation-button {
   padding: 10px 20px;
   border: 1px solid rgba(178, 187, 30, 0.8);
@@ -1316,6 +1324,40 @@
   transform: translateY(0);
 }
 
+/* Manual AI evaluation — outlined to pair with solid “Request Teacher Evaluation” */
+.profile2-ai-evaluate-button {
+  padding: 10px 20px;
+  border: 2px solid rgba(178, 187, 30, 1);
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: rgba(120, 128, 20, 1);
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.profile2-ai-evaluate-button:hover:not(:disabled) {
+  background-color: rgba(178, 187, 30, 0.08);
+  border-color: rgba(150, 158, 25, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.profile2-ai-evaluate-button:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.profile2-ai-evaluate-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 @media (max-width: 968px) {
   .profile2-three-panels {
     grid-template-columns: 1fr;
@@ -1336,8 +1378,16 @@
     align-items: flex-start;
     gap: 12px;
   }
+
+  .evaluation-header-actions {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-start;
+  }
   
-  .profile2-request-evaluation-button {
+  .profile2-request-evaluation-button,
+  .profile2-ai-evaluate-button {
     width: 100%;
   }
 }

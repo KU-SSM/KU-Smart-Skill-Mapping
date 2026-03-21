@@ -5,6 +5,7 @@ import './RubricScore.css';
 import { FaFilePdf, FaArrowLeft } from 'react-icons/fa';
 import { AiOutlineClose, AiOutlineInfoCircle, AiOutlinePlus } from 'react-icons/ai';
 import { getRubricScores, getRubricScore, RubricScoreDetail } from '../services/rubricScoreApi';
+import RubricScoreTable from './RubricScoreTable';
 
 const PdfIcon = FaFilePdf as React.ComponentType;
 const ArrowLeftIcon = FaArrowLeft as React.ComponentType;
@@ -26,6 +27,20 @@ interface StudentRequest {
   rubricTitle: string;
   requestedAt: string;
   status: 'pending' | 'completed';
+}
+
+interface TableData {
+  skillArea: string;
+  values: string[];
+}
+
+interface FormerRubricVersion {
+  version: string;
+  createdAt: string;
+  expiresAt: string;
+  title: string;
+  headers: string[];
+  rows: TableData[];
 }
 
 const Profile3Detail: React.FC = () => {
@@ -79,11 +94,20 @@ const Profile3Detail: React.FC = () => {
   const [searchStudent, setSearchStudent] = useState<string>('');
   const [searchTeacher, setSearchTeacher] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isRubricHistoryOpen, setIsRubricHistoryOpen] = useState<boolean>(false);
+  const [selectedFormerVersion, setSelectedFormerVersion] = useState<FormerRubricVersion | null>(null);
 
   // Get selected request
   const selectedRequest = useMemo(() => {
     return studentRequests.find(req => req.id === requestId) || null;
   }, [studentRequests, requestId]);
+
+  // Auto-select rubric from the student request.
+  useEffect(() => {
+    if (!selectedRequest?.rubricId) return;
+    setSelectedRubricId(selectedRequest.rubricId);
+    setConfirmedRubricId(selectedRequest.rubricId);
+  }, [selectedRequest]);
 
   // Load rubric list on mount
   useEffect(() => {
@@ -159,6 +183,47 @@ const Profile3Detail: React.FC = () => {
     );
   }, [rubricScores, searchQuery]);
 
+  const formerRubricVersions = useMemo<FormerRubricVersion[]>(() => {
+    if (!selectedRubricData) return [];
+    const now = new Date();
+    const iso = (d: Date) => d.toISOString().replace('T', ' ').slice(0, 19);
+    const d1 = new Date(now);
+    d1.setDate(d1.getDate() + 2);
+    d1.setHours(23, 59, 59, 0);
+    const d2 = new Date(now);
+    d2.setDate(d2.getDate() + 10);
+    d2.setHours(23, 59, 59, 0);
+
+    const fullHeaders = selectedRubricData.headers;
+    const trimmedHeaders =
+      fullHeaders.length > 1 ? fullHeaders.slice(0, fullHeaders.length - 1) : fullHeaders;
+
+    const buildRows = (headersToUse: string[]): TableData[] =>
+      selectedRubricData.rows.map((r) => ({
+        skillArea: r.skillArea,
+        values: r.values.slice(0, headersToUse.length),
+      }));
+
+    return [
+      {
+        version: 'v1',
+        title: `${selectedRubricData.title} (v1)`,
+        createdAt: iso(new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000)),
+        expiresAt: iso(d1),
+        headers: trimmedHeaders,
+        rows: buildRows(trimmedHeaders),
+      },
+      {
+        version: 'v2',
+        title: `${selectedRubricData.title} (v2)`,
+        createdAt: iso(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)),
+        expiresAt: iso(d2),
+        headers: fullHeaders,
+        rows: buildRows(fullHeaders),
+      },
+    ];
+  }, [selectedRubricData]);
+
   const handleRubricSelect = (rubricId: string) => {
     setSelectedRubricId(rubricId);
   };
@@ -187,6 +252,11 @@ const Profile3Detail: React.FC = () => {
 
   const handleCloseRubricInfo = () => {
     setIsRubricInfoOpen(false);
+  };
+
+  const handleCloseRubricHistory = () => {
+    setIsRubricHistoryOpen(false);
+    setSelectedFormerVersion(null);
   };
 
   const handleEditRubricFromInfo = () => {
@@ -412,80 +482,20 @@ const Profile3Detail: React.FC = () => {
         </div>
       </div>
 
-      {/* Choose Rubric Score for this request */}
-      <div className="rubric-score-container">
-        <h2 className="portfolio-section-title" style={{ marginBottom: '20px' }}>Choose Rubric Score</h2>
-        <div className="rubric-score-search-container">
-          <input
-            type="text"
-            className="rubric-score-search-input"
-            placeholder="Search rubric score"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button
-              className="rubric-score-clear-search"
-              onClick={() => setSearchQuery('')}
-            >
-              {React.createElement(CloseIcon)}
-            </button>
-          )}
-        </div>
-        <div className="rubric-score-bars-container">
-          {isLoadingRubrics ? (
-            <div style={{ padding: '20px', textAlign: 'center' }}>Loading rubrics...</div>
-          ) : (
-            filteredRubricScores.map((rubric) => (
-              <div
-                key={rubric.id}
-                className={`rubric-score-bar profile2-rubric-bar ${selectedRubricId === rubric.id ? 'selected' : ''}`}
-                onClick={() => handleRubricSelect(rubric.id)}
-                style={{
-                  backgroundColor: selectedRubricId === rubric.id ? 'rgba(178, 187, 30, 0.8)' : '#ffffff',
-                  cursor: 'pointer',
-                  position: 'relative',
-                }}
-              >
-                <span className="rubric-score-bar-title">{rubric.title}</span>
-                <button
-                  className="profile2-view-details-button"
-                  title="View rubric details"
-                  type="button"
-                  aria-label="More information"
-                  onClick={(e) => handleOpenRubricInfo(e, rubric.id)}
-                >
-                  <span className="profile2-view-details-icon">
-                    {React.createElement(InfoIcon)}
-                  </span>
-                </button>
-              </div>
-            ))
-          )}
-        </div>
-        <div className="rubric-score-actions">
-          <button
-            type="button"
-            className="profile2-confirm-rubric-button"
-            onClick={handleConfirmRubric}
-            disabled={!selectedRubricId || selectedRubricId === confirmedRubricId}
-          >
-            Confirm Selection
-          </button>
-        </div>
-      </div>
-
       {/* Evaluation Results Section - AI, Student, Teacher (only Teacher editable) */}
       <div className="evaluation-container">
         <div className="evaluation-section">
-          <h2 className="evaluation-section-title">
-            Evaluation Results
-            {selectedRubricData && (
-              <span style={{ fontSize: '18px', fontWeight: 'normal', marginLeft: '10px', color: '#666' }}>
-                - {selectedRubricData.title}
-              </span>
-            )}
-          </h2>
+          <div className="evaluation-header-container">
+            <h2 className="evaluation-section-title">
+              Evaluation Results
+              {selectedRubricData && (
+                <span style={{ fontSize: '18px', fontWeight: 'normal', marginLeft: '10px', color: '#666' }}>
+                  - {selectedRubricData.title}
+                </span>
+              )}
+            </h2>
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }} />
+          </div>
 
           {isLoadingRubric ? (
             <div className="evaluation-content">
@@ -801,6 +811,102 @@ const Profile3Detail: React.FC = () => {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Rubric history popup (mock UI) */}
+      {isRubricHistoryOpen && (
+        <div className="rubric-modal-overlay" onClick={handleCloseRubricHistory}>
+          <div className="rubric-modal-content" onClick={(e) => e.stopPropagation()}>
+            <div className="rubric-modal-header">
+              <h2 className="rubric-modal-title">
+                {selectedFormerVersion ? 'Former rubric detail' : 'Former rubric versions'}
+              </h2>
+              <button
+                type="button"
+                className="rubric-modal-close"
+                onClick={handleCloseRubricHistory}
+                aria-label="Close"
+                title="Close"
+              >
+                {React.createElement(CloseIcon)}
+              </button>
+            </div>
+
+            {selectedFormerVersion ? (
+              <>
+                <div className="rubric-history-detail-meta">
+                  <div>Name: {selectedFormerVersion.title}</div>
+                  <div>Created: {selectedFormerVersion.createdAt}</div>
+                  <div>Expires: {selectedFormerVersion.expiresAt}</div>
+                </div>
+
+                <RubricScoreTable
+                  headers={selectedFormerVersion.headers}
+                  rows={selectedFormerVersion.rows}
+                  onHeadersChange={() => {}}
+                  onRowsChange={() => {}}
+                  readOnly={true}
+                />
+
+                <div className="rubric-modal-actions">
+                  <button
+                    type="button"
+                    className="rubric-modal-button secondary"
+                    onClick={() => setSelectedFormerVersion(null)}
+                  >
+                    Back to versions
+                  </button>
+                  <button
+                    type="button"
+                    className="rubric-modal-button"
+                    onClick={handleCloseRubricHistory}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="rubric-history-list">
+                  {formerRubricVersions.map((item) => (
+                    <button
+                      key={item.version}
+                      type="button"
+                      className="rubric-history-item rubric-history-item-button"
+                      onClick={() => {
+                        if (!confirmedRubricId) return;
+                        navigate('/rubric_version_detail', {
+                          state: {
+                            portfolioUsedFileName: selectedRequest?.portfolioFileName || 'portfolio.pdf',
+                            rubricId: confirmedRubricId,
+                            rubricVersion: item,
+                          },
+                        });
+                      }}
+                    >
+                      <div className="rubric-history-left">
+                        <div className="rubric-history-version">{item.version}</div>
+                        <div className="rubric-history-meta">Created: {item.createdAt}</div>
+                      </div>
+                      <div className="rubric-history-right">
+                        <div className="rubric-history-exp">Expires: {item.expiresAt}</div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+                <div className="rubric-modal-actions">
+                  <button
+                    type="button"
+                    className="rubric-modal-button"
+                    onClick={handleCloseRubricHistory}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

@@ -204,7 +204,8 @@ const RubricScoreDetailStudent: React.FC = () => {
                       key={item.version}
                       type="button"
                       className="rubric-history-item rubric-history-item-button"
-                      onClick={() => setSelectedFormerVersion(item)}
+                      onClick={() => {}}
+                      disabled
                     >
                       <div className="rubric-history-left">
                         <div className="rubric-history-version">{item.version}</div>
