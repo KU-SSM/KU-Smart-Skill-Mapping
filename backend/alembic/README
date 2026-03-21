@@ -23,7 +23,7 @@ From the `backend/` folder run:
 
 ```powershell
 cd backend
--m alembic revision --autogenerate -m "init"
+alembic revision --autogenerate -m "init"
 ```
 
 - Review the generated migration file in `backend/alembic/versions/` and confirm it matches the models in `backend/models.py`.
@@ -33,7 +33,7 @@ Apply migrations (upgrade to head)
 From `backend/` run:
 
 ```powershell
--m alembic upgrade head
+alembic upgrade head
 ```
 
 Other useful Alembic commands

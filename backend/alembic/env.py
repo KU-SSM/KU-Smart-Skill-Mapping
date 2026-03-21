@@ -5,7 +5,16 @@ from pathlib import Path
 from dotenv import load_dotenv
 from alembic import context
 
-from backend.database import Base, engine
+try:
+    from backend.database import Base
+except ModuleNotFoundError:
+    from database import Base
+
+# Import models so table metadata is registered on Base before autogenerate.
+try:
+    from backend import models  # noqa: F401
+except ModuleNotFoundError:
+    import models  # noqa: F401
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
