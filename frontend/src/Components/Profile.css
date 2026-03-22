@@ -1733,8 +1733,8 @@
 
 .profile3-back-button-container {
   display: flex;
-  justify-content: flex-start;
-  align-items: flex-start;
+  justify-content: space-between;
+  align-items: center;
   margin: 0 auto;
   padding: 0;
   width: 100%;

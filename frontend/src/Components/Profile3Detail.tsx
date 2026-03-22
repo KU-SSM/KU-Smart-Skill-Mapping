@@ -738,6 +738,14 @@ const Profile3Detail: React.FC = () => {
           </span>
           <span>Back to Requests</span>
         </button>
+        <button
+          className="profile2-request-evaluation-button"
+          type="button"
+          onClick={handleSubmitEvaluation}
+          disabled={isSubmitting || isTeacherEditMode}
+        >
+          {isSubmitting ? 'Submitting...' : 'Submit Evaluation'}
+        </button>
       </div>
 
       {/* Rubric info modal - view only */}
