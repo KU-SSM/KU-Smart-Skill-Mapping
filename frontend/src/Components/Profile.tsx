@@ -3,6 +3,7 @@ import './Profile.css';
 import { AiOutlineArrowRight, AiOutlineClose } from 'react-icons/ai';
 import { FaBriefcase } from 'react-icons/fa';
 import { importPortfolio } from '../services/portfolioApi';
+import { useAppRole } from '../context/AppRoleContext';
 
 const ArrowIcon = AiOutlineArrowRight as React.ComponentType;
 const CloseIcon = AiOutlineClose as React.ComponentType;
@@ -20,6 +21,7 @@ interface Portfolio {
 }
 
 const Profile: React.FC = () => {
+  const { isStudent, isTeacher } = useAppRole();
   const [activeTab, setActiveTab] = useState<'hard' | 'soft'>('hard');
   const [searchLeft, setSearchLeft] = useState('');
   const [searchRight, setSearchRight] = useState('');
@@ -354,12 +356,26 @@ const Profile: React.FC = () => {
       return storedValue !== undefined ? storedValue : '-';
     });
     
-    return [
+    const rows = [
       { evaluator: 'Teacher', levels: teacherLevels },
       { evaluator: 'AI', levels: aiLevels },
       { evaluator: 'Student (You)', levels: studentLevels },
     ];
-  }, [activeSelectedSkills, activeTab, studentEvaluations, teacherEvaluations, aiEvaluations, hasPortfolioFiles]);
+    return rows.filter((row) => {
+      if (isStudent && row.evaluator === 'Teacher') return false;
+      if (isTeacher && row.evaluator === 'Student (You)') return false;
+      return true;
+    });
+  }, [
+    activeSelectedSkills,
+    activeTab,
+    studentEvaluations,
+    teacherEvaluations,
+    aiEvaluations,
+    hasPortfolioFiles,
+    isStudent,
+    isTeacher,
+  ]);
 
   return (
     <div className="profile-wrapper">

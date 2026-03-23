@@ -1,10 +1,11 @@
 .skill-map-wrapper {
   width: 100%;
   display: flex;
-  justify-content: center;
-  align-items: flex-start;
+  flex-direction: column;
+  align-items: center;
   box-sizing: border-box;
   padding: 0;
+  gap: 28px;
 }
 
 .skill-map-container {
@@ -34,8 +35,32 @@
   font-size: 40px;
   font-weight: 600;
   color: #333;
-  margin: 0 0 30px 0;
+  margin: 0 0 12px 0;
   text-align: left;
+}
+
+.skill-map-subtitle {
+  font-family: 'Roboto', sans-serif;
+  font-size: 15px;
+  color: #555;
+  line-height: 1.5;
+  margin: 0 0 24px 0;
+  max-width: 720px;
+}
+
+.skill-map-chart-empty {
+  min-height: 320px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 32px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 15px;
+  color: #666;
+  background: #f8f9f6;
+  border-radius: 12px;
+  border: 1px dashed #cfd4c4;
 }
 
 .radar-chart-wrapper {
@@ -48,13 +73,414 @@
 
 .skill-map-sidebar {
   flex: 1;
-  max-width: 350px;
+  max-width: 380px;
   display: flex;
   flex-direction: column;
   gap: 25px;
   flex-shrink: 0;
   align-items: stretch;
   width: 100%;
+  min-height: 0;
+  align-self: stretch;
+}
+
+.skill-map-panel {
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 20px 30px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  box-sizing: border-box;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+.skill-map-hint {
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  color: #666;
+  line-height: 1.45;
+  margin: 0;
+}
+
+/* Evaluation picker: label + displayed name + open modal button */
+.skill-map-eval-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skill-map-eval-label {
+  font-family: 'Roboto', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: #777;
+}
+
+.skill-map-eval-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.skill-map-eval-name {
+  flex: 1;
+  min-width: 0;
+  font-family: 'Roboto', sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  color: #333;
+  padding: 10px 12px;
+  background: #fafbf8;
+  border: 1px solid #e8eadf;
+  border-radius: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.skill-map-eval-choose-btn {
+  flex-shrink: 0;
+  padding: 10px 14px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background: #fff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: #333;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+  box-sizing: border-box;
+}
+
+.skill-map-eval-choose-btn:hover {
+  background: #f5f5f5;
+  border-color: rgba(178, 187, 30, 0.8);
+  color: rgba(140, 150, 20, 1);
+}
+
+.skill-map-eval-choose-btn:focus-visible {
+  outline: 2px solid rgba(178, 187, 30, 0.5);
+  outline-offset: 2px;
+}
+
+/* Modal: select evaluation */
+.skill-map-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.skill-map-modal {
+  width: 100%;
+  max-width: 440px;
+  max-height: min(85vh, 560px);
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.skill-map-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.skill-map-modal-title {
+  margin: 0;
+  font-family: 'Roboto', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.skill-map-modal-close {
+  border: none;
+  background: transparent;
+  font-size: 26px;
+  line-height: 1;
+  color: #888;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 6px;
+}
+
+.skill-map-modal-close:hover {
+  background: #f0f0f0;
+  color: #333;
+}
+
+.skill-map-modal-search {
+  padding: 12px 20px 8px;
+}
+
+.skill-map-modal-search-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #333;
+  box-sizing: border-box;
+}
+
+.skill-map-modal-search-input:focus {
+  outline: 2px solid rgba(178, 187, 30, 0.45);
+  outline-offset: 1px;
+  border-color: rgba(178, 187, 30, 0.6);
+}
+
+.skill-map-modal-list {
+  list-style: none;
+  margin: 0;
+  padding: 8px 12px 12px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 120px;
+}
+
+.skill-map-modal-empty {
+  padding: 24px 16px;
+  text-align: center;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #888;
+}
+
+.skill-map-modal-item {
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  margin-bottom: 6px;
+  border: 1px solid #e8eadf;
+  border-radius: 8px;
+  background: #fafbf8;
+  cursor: pointer;
+  font-family: 'Roboto', sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.skill-map-modal-item:hover {
+  border-color: rgba(178, 187, 30, 0.45);
+  background: #f5f6f0;
+}
+
+.skill-map-modal-item-selected {
+  border-color: rgba(178, 187, 30, 0.85);
+  background: #f4f5e8;
+  box-shadow: 0 0 0 1px rgba(178, 187, 30, 0.25);
+}
+
+.skill-map-modal-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+}
+
+.skill-map-modal-item-hint {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.35;
+}
+
+.skill-map-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 20px 18px;
+  border-top: 1px solid #eee;
+  background: #fafafa;
+}
+
+.skill-map-modal-btn {
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  box-sizing: border-box;
+}
+
+.skill-map-modal-btn-secondary {
+  background: #fff;
+  border-color: #ddd;
+  color: #444;
+}
+
+.skill-map-modal-btn-secondary:hover {
+  background: #f5f5f5;
+}
+
+.skill-map-modal-btn-primary {
+  background: rgba(178, 187, 30, 1);
+  border-color: rgba(160, 170, 25, 1);
+  color: #1a1a1a;
+}
+
+.skill-map-modal-btn-primary:hover {
+  filter: brightness(0.97);
+}
+
+/* Full-width rubric score session (mock) */
+.skill-map-rubric-session {
+  width: 100%;
+  max-width: 1400px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 24px 28px 28px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
+}
+
+.skill-map-rubric-session-head {
+  margin-bottom: 20px;
+}
+
+.skill-map-rubric-session-head .skill-map-title {
+  margin-bottom: 0;
+}
+
+.skill-map-rubric-session-title-name {
+  font-size: 24px;
+  font-weight: 500;
+  color: #4a4a4a;
+  line-height: 1.3;
+}
+
+.skill-map-rubric-table-scroll {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid #e8eadf;
+  border-radius: 10px;
+  background: #fafbf8;
+}
+
+.skill-map-rubric-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  color: #333;
+  min-width: 720px;
+}
+
+.skill-map-rubric-table th,
+.skill-map-rubric-table td {
+  border: 1px solid #e0e4d8;
+  padding: 10px 12px;
+  text-align: left;
+  vertical-align: top;
+  line-height: 1.4;
+}
+
+.skill-map-rubric-table thead th {
+  background: #f0f2ea;
+  font-weight: 600;
+  color: #2d2d2d;
+}
+
+.skill-map-rubric-th-skill {
+  min-width: 140px;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.04);
+}
+
+.skill-map-rubric-row-skill {
+  background: #f8f9f4;
+  font-weight: 600;
+  color: #333;
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.04);
+}
+
+.skill-map-rubric-th-level {
+  min-width: 120px;
+}
+
+.skill-map-rubric-cell {
+  background: #fff;
+  color: #444;
+}
+
+.skill-map-toggles {
+  border: 1px solid #e8eadf;
+  border-radius: 8px;
+  padding: 14px 16px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: #fafbf8;
+}
+
+.skill-map-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.skill-map-toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+  user-select: none;
+}
+
+.skill-map-toggle-row input {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.skill-map-toggle-swatch {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 1px solid rgba(0, 0, 0, 0.12);
 }
 
 .job-selector-box {

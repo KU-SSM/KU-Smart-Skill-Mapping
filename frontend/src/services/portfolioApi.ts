@@ -1,4 +1,5 @@
-import { API_BASE_URL } from '../api/index';
+import api from '../api/index';
+import { getApiErrorDetail } from '../utils/apiErrors';
 
 export interface PortfolioFile {
   name: string;
@@ -17,6 +18,28 @@ export interface PortfolioImportPayload {
 export interface PortfolioImportResponse {
   success: boolean;
   message?: string;
+  text?: string;
+  metadata?: any;
+}
+
+export interface PortfolioEvaluateItem {
+  id: number;
+  rubric_skill_id?: number;
+  level_id?: number;
+  confidence?: number;
+  matched_from?: string;
+  criteria_passing_description?: string;
+  skill_name?: string;
+  level_rank?: number;
+}
+
+export interface PortfolioEvaluateResponse {
+  success: boolean;
+  portfolio_id: number;
+  skill_evaluation_id?: number;
+  rubric_score_history_id?: number;
+  classification: any;
+  evaluations: PortfolioEvaluateItem[];
 }
 
 export const importPortfolio = async (
@@ -62,39 +85,53 @@ export const importPortfolio = async (
     console.log('  File Type:', firstFile.type);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-    const response = await fetch(`${API_BASE_URL}/portfolio/import`, {
-      method: 'POST',
-      body: formData,
-    });
+    const response = await api.post('portfolio/import', formData);
 
     console.log('Response Status:', response.status, response.statusText);
-    
-    if (!response.ok) {
-      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-      try {
-        const errorData = await response.json();
-        console.log('Error Response Data:', errorData);
-        errorMessage = errorData.detail || errorData.message || errorMessage;
-      } catch (e) {
-        const text = await response.text();
-        console.log('Error Response Text:', text);
-        if (text) {
-          errorMessage = text;
-        }
-      }
-      throw new Error(errorMessage);
-    }
-
-    const data = await response.json();
+    const data = response.data;
     console.log('Success Response Data:', data);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     return {
       success: true,
       message: data.message,
+      text: data.text,
+      metadata: data.metadata,
     };
   } catch (error) {
     console.error('Error importing portfolio:', error);
     throw error;
+  }
+};
+
+export const evaluatePortfolio = async (
+  text: string,
+  rubricId: string,
+  filename?: string,
+  userId?: number,
+  skillEvaluationId?: number
+): Promise<PortfolioEvaluateResponse> => {
+  const rubric_id = Number(rubricId);
+  if (!Number.isFinite(rubric_id) || rubric_id <= 0 || !Number.isInteger(rubric_id)) {
+    throw new Error(`Invalid rubric id: ${rubricId}`);
+  }
+  if (!Number.isFinite(userId) || (userId as number) <= 0 || !Number.isInteger(userId)) {
+    throw new Error(`Invalid user id: ${String(userId)}`);
+  }
+
+  try {
+    // Use JSON body endpoint to avoid oversized query-string failures for long portfolio text.
+    const response = await api.post<PortfolioEvaluateResponse>('ai_evaluation/run', {
+      text,
+      rubric_id,
+      user_id: userId,
+      ...(filename ? { filename } : {}),
+      ...(typeof skillEvaluationId === 'number' ? { skill_evaluation_id: skillEvaluationId } : {}),
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error evaluating portfolio:', error);
+    const detail = getApiErrorDetail(error);
+    throw new Error(detail);
   }
 };
