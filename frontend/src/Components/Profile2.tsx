@@ -191,6 +191,7 @@ const Profile2: React.FC = () => {
   const [isSavingEvaluation, setIsSavingEvaluation] = useState<boolean>(false);
   const [portfolioDisplayName, setPortfolioDisplayName] = useState<string>('');
   const [originalPortfolioDisplayName, setOriginalPortfolioDisplayName] = useState<string>('');
+  const [originalConfirmedRubricId, setOriginalConfirmedRubricId] = useState<string | null>(null);
   const [pendingHydratedScores, setPendingHydratedScores] = useState<EvaluationMaps | null>(null);
   const [hasAppliedHydratedScores, setHasAppliedHydratedScores] = useState<boolean>(false);
   const hasTeacherSubmittedScores = useMemo(
@@ -222,6 +223,7 @@ const Profile2: React.FC = () => {
       setSavedSkillEvaluationId(null);
       setSkillEvaluationStatus('draft');
       setOriginalPortfolioDisplayName('');
+      setOriginalConfirmedRubricId(null);
       setHasAppliedHydratedScores(false);
     }
   }, [evaluationId]);
@@ -259,6 +261,7 @@ const Profile2: React.FC = () => {
         const rubricId = String(rh.data.rubric_score_id);
         setSelectedRubricId(rubricId);
         setConfirmedRubricId(rubricId);
+        setOriginalConfirmedRubricId(rubricId);
         setHasAppliedHydratedScores(false);
         setSavedSkillEvaluationId(se.data.id);
         setSkillEvaluationStatus(se.data.status || 'draft');
@@ -742,10 +745,32 @@ const Profile2: React.FC = () => {
 
   const handleSaveEvaluationToBackend = useCallback(async () => {
     if (!confirmedRubricId) return;
-    const skillEvaluationIdToSave = savedSkillEvaluationId;
-    if (!(typeof skillEvaluationIdToSave === 'number' && skillEvaluationIdToSave > 0)) return;
     try {
       setIsSavingEvaluation(true);
+      let skillEvaluationIdToSave = savedSkillEvaluationId;
+
+      // Initial create path: allow Save to create an evaluation record even when student scores are blank.
+      if (!(typeof skillEvaluationIdToSave === 'number' && skillEvaluationIdToSave > 0)) {
+        if (!extractedPortfolioText.trim()) {
+          alert('Please upload and import a portfolio first.');
+          return;
+        }
+        const resolvedUserId = await resolveValidUserId();
+        const evalRes = await evaluatePortfolio(
+          extractedPortfolioText,
+          confirmedRubricId,
+          uploadedFiles[0]?.name || portfolioDisplayName || 'portfolio.pdf',
+          resolvedUserId
+        );
+        if (
+          typeof evalRes.skill_evaluation_id === 'number' &&
+          Number.isInteger(evalRes.skill_evaluation_id) &&
+          evalRes.skill_evaluation_id > 0
+        ) {
+          skillEvaluationIdToSave = evalRes.skill_evaluation_id;
+          setSavedSkillEvaluationId(evalRes.skill_evaluation_id);
+        }
+      }
 
       if (typeof skillEvaluationIdToSave === 'number' && skillEvaluationIdToSave > 0) {
         const committedAiEvaluations = draftAiEvaluations
@@ -764,6 +789,7 @@ const Profile2: React.FC = () => {
         setOriginalStudentEvaluations({ ...studentEvaluations });
         setOriginalAiEvaluations(committedAiEvaluations);
         setOriginalPortfolioDisplayName(uploadedFiles[0]?.name || portfolioDisplayName || '');
+        setOriginalConfirmedRubricId(confirmedRubricId);
         setDraftAiEvaluations(null);
         navigate('/profile2', {
           state: { addedSkillEvaluationId: String(skillEvaluationIdToSave), refreshAt: Date.now() },
@@ -781,6 +807,7 @@ const Profile2: React.FC = () => {
     confirmedRubricId,
     uploadedFiles,
     portfolioDisplayName,
+    extractedPortfolioText,
     selectedRubricData,
     savedSkillEvaluationId,
     persistStudentEvaluations,
@@ -789,6 +816,7 @@ const Profile2: React.FC = () => {
     studentEvaluations,
     aiEvaluations,
     draftAiEvaluations,
+    resolveValidUserId,
     navigate,
   ]);
 
@@ -1059,12 +1087,19 @@ const Profile2: React.FC = () => {
     !!portfolioDisplayName ||
     (typeof savedSkillEvaluationId === 'number' && savedSkillEvaluationId > 0);
   const hasSelectedRubric = !!confirmedRubricId;
-  const canSaveEvaluation =
-    !!confirmedRubricId &&
-    !!selectedRubricData &&
-    !isSavingEvaluation &&
-    (typeof savedSkillEvaluationId === 'number' && savedSkillEvaluationId > 0) &&
-    !isStudentEvaluationLocked;
+  const canSaveEvaluation = (() => {
+    if (!confirmedRubricId || !selectedRubricData || isSavingEvaluation || isStudentEvaluationLocked) {
+      return false;
+    }
+    const hasSavedEvaluationId =
+      typeof savedSkillEvaluationId === 'number' && savedSkillEvaluationId > 0;
+    if (!hasSavedEvaluationId) {
+      return true;
+    }
+    const hasRubricChange =
+      !!originalConfirmedRubricId && confirmedRubricId !== originalConfirmedRubricId;
+    return hasUnsavedEvaluationChanges || hasRubricChange;
+  })();
 
   const canRequestTeacherEvaluation = useMemo(() => {
     if (isStudentEvaluationLocked) return false;
