@@ -9,12 +9,10 @@ import {
   Legend,
 } from 'recharts';
 import './SkillMap.css';
-import {
-  MOCK_SKILL_EVALUATIONS,
-  getMockEvaluationById,
-  maxRankForRows,
-  type SkillMapRadarRow,
-} from '../services/skillMapMockData';
+import api from '../api/index';
+import { getSkillEvaluationsByUser, type SkillEvaluationRecord } from '../services/skillEvaluationApi';
+import { getCurrentUserId } from '../utils/currentUser';
+import { useAppRole } from '../context/AppRoleContext';
 
 const PolarAngleAxisComponent = PolarAngleAxis as React.ComponentType<any>;
 const PolarRadiusAxisComponent = PolarRadiusAxis as React.ComponentType<any>;
@@ -27,21 +25,136 @@ const PARTY_CONFIG = {
 
 type PartyKey = keyof typeof PARTY_CONFIG;
 
+interface SkillMapRadarRow {
+  skill: string;
+  student: number;
+  ai: number;
+  teacher: number;
+}
+
+interface RubricTableData {
+  skillArea: string;
+  values: string[];
+}
+
+interface RubricScoreSession {
+  title: string;
+  headers: string[];
+  rows: RubricTableData[];
+}
+
+interface SkillMapEvaluation {
+  id: string;
+  title: string;
+  rubricHint: string;
+  rows: SkillMapRadarRow[];
+  rubricScore: RubricScoreSession;
+}
+
+interface SkillEvaluationFullResponse {
+  id: number;
+  rubric_score_history_id: number;
+  portfolio_id: number;
+  user_id: number;
+  created_at?: string;
+  status: string;
+  ai_evaluated_skills: { skill_name: string; level_rank: number }[];
+  student_evaluated_skills: { skill_name: string; level_rank: number }[];
+  teacher_evaluated_skills: { skill_name: string; level_rank: number }[];
+}
+
+interface RubricHistoryResponse {
+  id: number;
+  rubric_score_id: number;
+}
+
+interface RubricResponse {
+  id: number;
+  name: string;
+}
+
+interface RubricSkillHistoryResponse {
+  id: number;
+  rubric_history_id: number;
+  name: string;
+  display_order?: number | null;
+}
+
+interface LevelHistoryResponse {
+  id: number;
+  rubric_history_id: number;
+  rank?: number | null;
+  description?: string | null;
+}
+
+interface CriteriaHistoryResponse {
+  id: number;
+  rubric_skill_history_id: number;
+  level_history_id: number;
+  description?: string | null;
+}
+
+interface BackendRubricSkill {
+  id: number;
+  rubric_id: number;
+  display_order: number;
+  name: string;
+}
+
+interface BackendLevel {
+  id: number;
+  rubric_id: number;
+  rank: number;
+  description: string | null;
+}
+
+interface BackendCriteria {
+  id: number;
+  rubric_skill_id: number;
+  level_id: number;
+  description: string;
+}
+
+const toPositiveInt = (value: unknown): number => {
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+};
+
+const scoreMapFromRows = (rows: { skill_name: string; level_rank: number }[]) => {
+  const out: Record<string, number> = {};
+  rows.forEach((row) => {
+    if (!row.skill_name || !row.skill_name.trim()) return;
+    out[row.skill_name] = toPositiveInt(row.level_rank);
+  });
+  return out;
+};
+
+const maxRankForRows = (rows: SkillMapRadarRow[]): number => {
+  let m = 5;
+  for (const r of rows) {
+    m = Math.max(m, r.student, r.ai, r.teacher);
+  }
+  return m;
+};
+
 const SkillMap: React.FC = () => {
-  const defaultEvalId = MOCK_SKILL_EVALUATIONS[0]?.id ?? '';
-  const [selectedEvalId, setSelectedEvalId] = useState<string>(defaultEvalId);
+  const { isTeacher } = useAppRole();
+  const [completedEvaluations, setCompletedEvaluations] = useState<SkillEvaluationRecord[]>([]);
+  const [evaluationCache, setEvaluationCache] = useState<Record<string, SkillMapEvaluation>>({});
+  const [rubricTitleByHistoryId, setRubricTitleByHistoryId] = useState<Record<number, string>>({});
+  const [selectedEvalId, setSelectedEvalId] = useState<string>('');
+  const [isLoadingEvaluations, setIsLoadingEvaluations] = useState<boolean>(true);
+  const [isLoadingSelected, setIsLoadingSelected] = useState<boolean>(false);
+
   const [showStudent, setShowStudent] = useState(true);
   const [showAi, setShowAi] = useState(true);
   const [showTeacher, setShowTeacher] = useState(true);
 
   const [evalModalOpen, setEvalModalOpen] = useState(false);
   const [modalSearch, setModalSearch] = useState('');
-  const [pendingEvalId, setPendingEvalId] = useState<string>(defaultEvalId);
+  const [pendingEvalId, setPendingEvalId] = useState<string>('');
 
-  const evaluation = useMemo(
-    () => getMockEvaluationById(selectedEvalId),
-    [selectedEvalId]
-  );
+  const evaluation = useMemo(() => evaluationCache[selectedEvalId], [evaluationCache, selectedEvalId]);
 
   const chartData: SkillMapRadarRow[] = useMemo(
     () => evaluation?.rows ?? [],
@@ -52,14 +165,179 @@ const SkillMap: React.FC = () => {
 
   const filteredModalEvaluations = useMemo(() => {
     const q = modalSearch.trim().toLowerCase();
-    if (!q) return MOCK_SKILL_EVALUATIONS;
-    return MOCK_SKILL_EVALUATIONS.filter(
+    if (!q) return completedEvaluations;
+    return completedEvaluations.filter(
       (ev) =>
-        ev.title.toLowerCase().includes(q) ||
-        ev.rubricHint.toLowerCase().includes(q) ||
-        ev.id.toLowerCase().includes(q)
+        (rubricTitleByHistoryId[ev.rubric_score_history_id] || '').toLowerCase().includes(q) ||
+        `Evaluation #${ev.id}`.toLowerCase().includes(q) ||
+        String(ev.id).toLowerCase().includes(q)
     );
-  }, [modalSearch]);
+  }, [modalSearch, completedEvaluations, rubricTitleByHistoryId]);
+
+  useEffect(() => {
+    const loadCompletedEvaluations = async () => {
+      try {
+        setIsLoadingEvaluations(true);
+        const rows = await getSkillEvaluationsByUser(getCurrentUserId());
+        const completed = rows.filter((row) => row.status === 'completed' || row.status === 'approved');
+        setCompletedEvaluations(completed);
+        const uniqueHistoryIds = Array.from(
+          new Set(completed.map((row) => row.rubric_score_history_id))
+        );
+        const resolvedPairs = await Promise.all(
+          uniqueHistoryIds.map(async (historyId) => {
+            try {
+              const historyRes = await api.get<RubricHistoryResponse>(`rubric_score_history/${historyId}`);
+              const rubricRes = await api.get<RubricResponse>(`rubric/${historyRes.data.rubric_score_id}`);
+              return [historyId, rubricRes.data.name || `Rubric #${historyRes.data.rubric_score_id}`] as const;
+            } catch {
+              return [historyId, `History #${historyId}`] as const;
+            }
+          })
+        );
+        setRubricTitleByHistoryId(
+          resolvedPairs.reduce<Record<number, string>>((acc, [historyId, title]) => {
+            acc[historyId] = title;
+            return acc;
+          }, {})
+        );
+        // Start with unfilled selection; user explicitly chooses evaluation.
+        setSelectedEvalId('');
+        setPendingEvalId('');
+      } catch (error) {
+        console.error('Failed to load completed evaluations for skill map:', error);
+        setCompletedEvaluations([]);
+        setSelectedEvalId('');
+        setPendingEvalId('');
+      } finally {
+        setIsLoadingEvaluations(false);
+      }
+    };
+    void loadCompletedEvaluations();
+  }, []);
+
+  useEffect(() => {
+    const loadSelectedEvaluation = async () => {
+      if (!selectedEvalId) return;
+      if (evaluationCache[selectedEvalId]) return;
+
+      const evalIdNum = Number(selectedEvalId);
+      if (!Number.isInteger(evalIdNum) || evalIdNum <= 0) return;
+
+      try {
+        setIsLoadingSelected(true);
+        const fullRes = await api.get<SkillEvaluationFullResponse>(`skill_evaluation/${evalIdNum}/full`);
+        const full = fullRes.data;
+
+        const [historyRes, skillHistoryRes, levelHistoryRes, criteriaHistoryRes] = await Promise.all([
+          api.get<RubricHistoryResponse>(`rubric_score_history/${full.rubric_score_history_id}`),
+          api.get<RubricSkillHistoryResponse[]>(
+            `rubric_score_history/${full.rubric_score_history_id}/rubric_skills`
+          ),
+          api.get<LevelHistoryResponse[]>(
+            `rubric_score_history/${full.rubric_score_history_id}/levels`
+          ),
+          api.get<CriteriaHistoryResponse[]>(
+            `rubric_score_history/${full.rubric_score_history_id}/criteria`
+          ),
+        ]);
+
+        const rubricId = historyRes.data.rubric_score_id;
+        let rubricTitle = `Rubric #${rubricId}`;
+        try {
+          const rubricRes = await api.get<RubricResponse>(`rubric/${rubricId}`);
+          rubricTitle = rubricRes.data.name || rubricTitle;
+        } catch {
+          // keep fallback title
+        }
+
+        let skills: { id: number; name: string; display_order?: number | null }[] = [];
+        let levels: { id: number; rank?: number | null; description?: string | null }[] = [];
+        let headers: string[] = [];
+        let criteriaBySkillId = new Map<number, Map<number, string>>();
+
+        const hasHistorySnapshot =
+          skillHistoryRes.data.length > 0 && levelHistoryRes.data.length > 0;
+
+        if (hasHistorySnapshot) {
+          skills = [...skillHistoryRes.data].sort(
+            (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
+          );
+          levels = [...levelHistoryRes.data].sort(
+            (a, b) => (a.rank ?? 0) - (b.rank ?? 0)
+          );
+          headers = levels.map((l) =>
+            l.description && l.description.trim() ? l.description : `Level ${l.rank ?? 0}`
+          );
+          criteriaHistoryRes.data.forEach((c) => {
+            if (!criteriaBySkillId.has(c.rubric_skill_history_id)) {
+              criteriaBySkillId.set(c.rubric_skill_history_id, new Map<number, string>());
+            }
+            const perSkill = criteriaBySkillId.get(c.rubric_skill_history_id)!;
+            perSkill.set(c.level_history_id, c.description ?? '');
+          });
+        } else {
+          // Fallback for older data where only RubricScoreHistory exists without nested snapshot rows.
+          const [rubricSkillsRes, rubricLevelsRes, rubricCriteriaRes] = await Promise.all([
+            api.get<BackendRubricSkill[]>(`rubric/${rubricId}/rubric_skills`),
+            api.get<BackendLevel[]>(`rubric/${rubricId}/levels`),
+            api.get<BackendCriteria[]>(`rubric/${rubricId}/criteria`),
+          ]);
+          skills = [...rubricSkillsRes.data].sort(
+            (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
+          );
+          levels = [...rubricLevelsRes.data].sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
+          headers = levels.map((l) =>
+            l.description && l.description.trim() ? l.description : `Level ${l.rank ?? 0}`
+          );
+          rubricCriteriaRes.data.forEach((c) => {
+            if (!criteriaBySkillId.has(c.rubric_skill_id)) {
+              criteriaBySkillId.set(c.rubric_skill_id, new Map<number, string>());
+            }
+            const perSkill = criteriaBySkillId.get(c.rubric_skill_id)!;
+            perSkill.set(c.level_id, c.description ?? '');
+          });
+        }
+
+        const studentScoreMap = scoreMapFromRows(full.student_evaluated_skills || []);
+        const aiScoreMap = scoreMapFromRows(full.ai_evaluated_skills || []);
+        const teacherScoreMap = scoreMapFromRows(full.teacher_evaluated_skills || []);
+
+        const radarRows: SkillMapRadarRow[] = skills.map((s) => ({
+          skill: s.name,
+          student: studentScoreMap[s.name] ?? 0,
+          ai: aiScoreMap[s.name] ?? 0,
+          teacher: teacherScoreMap[s.name] ?? 0,
+        }));
+
+        const rubricRows: RubricTableData[] = skills.map((s) => {
+          const perSkill = criteriaBySkillId.get(s.id) || new Map<number, string>();
+          const values = levels.map((lv) => perSkill.get(lv.id) ?? '—');
+          return { skillArea: s.name, values };
+        });
+
+        const mapped: SkillMapEvaluation = {
+          id: selectedEvalId,
+          title: rubricTitle || `Evaluation #${full.id}`,
+          rubricHint: rubricTitle,
+          rows: radarRows,
+          rubricScore: {
+            title: rubricTitle,
+            headers,
+            rows: rubricRows,
+          },
+        };
+
+        setEvaluationCache((prev) => ({ ...prev, [selectedEvalId]: mapped }));
+      } catch (error) {
+        console.error('Failed to load selected completed evaluation:', error);
+      } finally {
+        setIsLoadingSelected(false);
+      }
+    };
+
+    void loadSelectedEvaluation();
+  }, [selectedEvalId, evaluationCache]);
 
   const openEvalModal = () => {
     setPendingEvalId(selectedEvalId);
@@ -73,6 +351,7 @@ const SkillMap: React.FC = () => {
   };
 
   const applyEvalSelection = () => {
+    if (!pendingEvalId) return;
     setSelectedEvalId(pendingEvalId);
     setEvalModalOpen(false);
     setModalSearch('');
@@ -89,6 +368,18 @@ const SkillMap: React.FC = () => {
 
   const anyPartyVisible = showStudent || showAi || showTeacher;
 
+  if (isTeacher) {
+    return (
+      <div className="skill-map-wrapper">
+        <div className="skill-map-container">
+          <div className="skill-map-chart-empty" style={{ width: '100%', padding: '48px 24px' }}>
+            Skill Map is available for students only.
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="skill-map-wrapper">
       <div className="skill-map-container">
@@ -98,6 +389,14 @@ const SkillMap: React.FC = () => {
             {!anyPartyVisible ? (
               <div className="skill-map-chart-empty">
                 Turn on at least one party below to see the radar chart.
+              </div>
+            ) : isLoadingEvaluations || isLoadingSelected ? (
+              <div className="skill-map-chart-empty">Loading completed evaluation...</div>
+            ) : !selectedEvalId ? (
+              <div className="skill-map-chart-empty">
+                {completedEvaluations.length === 0
+                  ? 'No completed evaluations found.'
+                  : 'Please choose a completed evaluation.'}
               </div>
             ) : chartData.length === 0 ? (
               <div className="skill-map-chart-empty">No skills for this evaluation.</div>
@@ -314,16 +613,17 @@ const SkillMap: React.FC = () => {
                     <button
                       type="button"
                       role="option"
-                      aria-selected={pendingEvalId === ev.id}
+                      aria-selected={pendingEvalId === String(ev.id)}
                       className={
-                        pendingEvalId === ev.id
+                        pendingEvalId === String(ev.id)
                           ? 'skill-map-modal-item skill-map-modal-item-selected'
                           : 'skill-map-modal-item'
                       }
-                      onClick={() => setPendingEvalId(ev.id)}
+                      onClick={() => setPendingEvalId(String(ev.id))}
                     >
-                      <span className="skill-map-modal-item-title">{ev.title}</span>
-                      <span className="skill-map-modal-item-hint">{ev.rubricHint}</span>
+                      <span className="skill-map-modal-item-title">
+                        {rubricTitleByHistoryId[ev.rubric_score_history_id] || `Evaluation #${ev.id}`}
+                      </span>
                     </button>
                   </li>
                 ))
@@ -341,6 +641,7 @@ const SkillMap: React.FC = () => {
                 type="button"
                 className="skill-map-modal-btn skill-map-modal-btn-primary"
                 onClick={applyEvalSelection}
+                disabled={!pendingEvalId}
               >
                 Apply
               </button>

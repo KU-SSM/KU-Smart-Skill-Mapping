@@ -24,16 +24,20 @@ export interface PortfolioImportResponse {
 
 export interface PortfolioEvaluateItem {
   id: number;
-  rubric_skill_id: number;
-  level_id: number;
-  confidence: number;
-  matched_from: string;
-  criteria_passing_description: string;
+  rubric_skill_id?: number;
+  level_id?: number;
+  confidence?: number;
+  matched_from?: string;
+  criteria_passing_description?: string;
+  skill_name?: string;
+  level_rank?: number;
 }
 
 export interface PortfolioEvaluateResponse {
   success: boolean;
   portfolio_id: number;
+  skill_evaluation_id?: number;
+  rubric_score_history_id?: number;
   classification: any;
   evaluations: PortfolioEvaluateItem[];
 }
@@ -103,33 +107,31 @@ export const importPortfolio = async (
 export const evaluatePortfolio = async (
   text: string,
   rubricId: string,
-  filename?: string
+  filename?: string,
+  userId?: number,
+  skillEvaluationId?: number
 ): Promise<PortfolioEvaluateResponse> => {
   const rubric_id = Number(rubricId);
   if (!Number.isFinite(rubric_id) || rubric_id <= 0 || !Number.isInteger(rubric_id)) {
     throw new Error(`Invalid rubric id: ${rubricId}`);
   }
+  if (!Number.isFinite(userId) || (userId as number) <= 0 || !Number.isInteger(userId)) {
+    throw new Error(`Invalid user id: ${String(userId)}`);
+  }
 
   try {
-    // Backend expects query params (FastAPI). Do not send a JSON body (null + application/json
-    // is unnecessary); use request() with no `data` so axios omits the body.
-    const response = await api.request<PortfolioEvaluateResponse>({
-      method: 'POST',
-      url: 'portfolio/evaluate',
-      params: {
-        text,
-        rubric_id,
-        ...(filename ? { filename } : {}),
-      },
+    // Use JSON body endpoint to avoid oversized query-string failures for long portfolio text.
+    const response = await api.post<PortfolioEvaluateResponse>('ai_evaluation/run', {
+      text,
+      rubric_id,
+      user_id: userId,
+      ...(filename ? { filename } : {}),
+      ...(typeof skillEvaluationId === 'number' ? { skill_evaluation_id: skillEvaluationId } : {}),
     });
     return response.data;
   } catch (error) {
     console.error('Error evaluating portfolio:', error);
     const detail = getApiErrorDetail(error);
-    const hint =
-      encodeURIComponent(text).length > 8000
-        ? ' Long portfolio text is sent in the URL; if this persists, the server may be rejecting oversized query strings (needs a body-based API).'
-        : '';
-    throw new Error(detail + hint);
+    throw new Error(detail);
   }
 };

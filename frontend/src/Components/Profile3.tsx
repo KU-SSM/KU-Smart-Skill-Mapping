@@ -1,50 +1,153 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import './Profile.css';
 import './RubricScore.css';
 import { AiOutlineClose } from 'react-icons/ai';
+import api from '../api/index';
+import { getSkillEvaluations, type SkillEvaluationRecord } from '../services/skillEvaluationApi';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 
 interface StudentRequest {
   id: string;
   studentName: string;
-  studentId: string;
   portfolioFileName: string;
-  portfolioFileUrl?: string;
-  rubricId: string;
   rubricTitle: string;
   requestedAt: string;
   status: 'pending' | 'completed';
 }
 
+interface RubricHistoryResponse {
+  id: number;
+  rubric_score_id: number;
+}
+
+interface RubricResponse {
+  id: number;
+  name: string;
+}
+
 const Profile3: React.FC = () => {
   const navigate = useNavigate();
   const [searchStudentName, setSearchStudentName] = useState<string>('');
+  const [studentRequests, setStudentRequests] = useState<StudentRequest[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const studentNameByUserIdRef = useRef<Map<number, string>>(new Map());
+  const rubricTitleByHistoryIdRef = useRef<Map<number, string>>(new Map());
 
-  // Mock student requests data - replace with API call later
-  const [studentRequests] = useState<StudentRequest[]>([
-    {
-      id: '1',
-      studentName: 'John Doe',
-      studentId: 'STU001',
-      portfolioFileName: 'portfolio_john_doe.pdf',
-      rubricId: '2',
-      rubricTitle: 'Software Development Skills',
-      requestedAt: '2024-01-15T10:30:00Z',
+  const mapBackendRequest = useCallback(async (ev: SkillEvaluationRecord): Promise<StudentRequest | null> => {
+    if (ev.status !== 'pending') {
+      return null;
+    }
+
+    let studentName =
+      studentNameByUserIdRef.current.get(ev.user_id) || `Student #${ev.user_id}`;
+    let rubricTitle =
+      rubricTitleByHistoryIdRef.current.get(ev.rubric_score_history_id) ||
+      `History #${ev.rubric_score_history_id}`;
+    const portfolioFileName = `Portfolio #${ev.portfolio_id}`;
+
+    if (!studentNameByUserIdRef.current.has(ev.user_id)) {
+      try {
+        const userRes = await api.get<{ id: number; name?: string }>(`user/${ev.user_id}`);
+        const resolvedName = userRes.data.name || studentName;
+        studentNameByUserIdRef.current.set(ev.user_id, resolvedName);
+        studentName = resolvedName;
+      } catch {
+        // keep fallback
+      }
+    }
+
+    if (!rubricTitleByHistoryIdRef.current.has(ev.rubric_score_history_id)) {
+      try {
+        const rh = await api.get<RubricHistoryResponse>(`rubric_score_history/${ev.rubric_score_history_id}`);
+        const rubricRes = await api.get<RubricResponse>(`rubric/${rh.data.rubric_score_id}`);
+        const resolvedTitle = rubricRes.data.name || rubricTitle;
+        rubricTitleByHistoryIdRef.current.set(ev.rubric_score_history_id, resolvedTitle);
+        rubricTitle = resolvedTitle;
+      } catch {
+        // keep fallback
+      }
+    }
+
+    return {
+      id: String(ev.id),
+      studentName,
+      portfolioFileName,
+      rubricTitle,
+      requestedAt: ev.created_at || '',
       status: 'pending',
-    },
-    {
-      id: '2',
-      studentName: 'Jane Smith',
-      studentId: 'STU002',
-      portfolioFileName: 'portfolio_jane_smith.pdf',
-      rubricId: '1',
-      rubricTitle: 'Test Rubric',
-      requestedAt: '2024-01-16T14:20:00Z',
-      status: 'pending',
-    },
-  ]);
+    };
+  }, []);
+
+  const loadRequests = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const rows = await getSkillEvaluations();
+
+      const pendingRows = rows.filter((row) => row.status === 'pending');
+      const userIdsToFetch = Array.from(
+        new Set(
+          pendingRows
+            .map((row) => row.user_id)
+            .filter((id) => !studentNameByUserIdRef.current.has(id))
+        )
+      );
+      const historyIdsToFetch = Array.from(
+        new Set(
+          pendingRows
+            .map((row) => row.rubric_score_history_id)
+            .filter((id) => !rubricTitleByHistoryIdRef.current.has(id))
+        )
+      );
+
+      await Promise.all([
+        Promise.all(
+          userIdsToFetch.map(async (userId) => {
+            try {
+              const userRes = await api.get<{ id: number; name?: string }>(`user/${userId}`);
+              studentNameByUserIdRef.current.set(
+                userId,
+                userRes.data.name || `Student #${userId}`
+              );
+            } catch {
+              // keep fallback
+            }
+          })
+        ),
+        Promise.all(
+          historyIdsToFetch.map(async (historyId) => {
+            try {
+              const rh = await api.get<RubricHistoryResponse>(`rubric_score_history/${historyId}`);
+              const rubricRes = await api.get<RubricResponse>(`rubric/${rh.data.rubric_score_id}`);
+              rubricTitleByHistoryIdRef.current.set(
+                historyId,
+                rubricRes.data.name || `History #${historyId}`
+              );
+            } catch {
+              // keep fallback
+            }
+          })
+        ),
+      ]);
+
+      const mapped = await Promise.all(rows.map((row) => mapBackendRequest(row)));
+      setStudentRequests(
+        mapped
+          .filter((item): item is StudentRequest => item !== null)
+          .sort((a, b) => Number(b.id) - Number(a.id))
+      );
+    } catch (error) {
+      console.error('Error loading student evaluation requests:', error);
+      setStudentRequests([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [mapBackendRequest]);
+
+  useEffect(() => {
+    void loadRequests();
+  }, [loadRequests]);
 
   const handleCardClick = (requestId: string) => {
     navigate(`/profile3/${requestId}`);
@@ -98,7 +201,9 @@ const Profile3: React.FC = () => {
           {filteredRequests.length === 0 ? (
             <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
               <p>
-                {studentRequests.length === 0
+                {isLoading
+                  ? 'Loading student evaluation requests...'
+                  : studentRequests.length === 0
                   ? 'No student evaluation requests available.'
                   : 'No matching students found.'}
               </p>

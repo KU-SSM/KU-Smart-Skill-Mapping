@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './Profile.css';
 import './RubricScore.css';
@@ -7,6 +7,9 @@ import { AiOutlineClose, AiOutlineInfoCircle, AiOutlinePlus } from 'react-icons/
 import { getRubricScores, getRubricScore, RubricScoreDetail } from '../services/rubricScoreApi';
 import RubricScoreTable from './RubricScoreTable';
 import { useAppRole } from '../context/AppRoleContext';
+import api from '../api/index';
+import { updateSkillEvaluation } from '../services/skillEvaluationApi';
+import { getApiErrorDetail } from '../utils/apiErrors';
 
 const PdfIcon = FaFilePdf as React.ComponentType;
 const ArrowLeftIcon = FaArrowLeft as React.ComponentType;
@@ -30,6 +33,23 @@ interface StudentRequest {
   status: 'pending' | 'completed';
 }
 
+interface SkillEvaluationFullResponse {
+  id: number;
+  rubric_score_history_id: number;
+  portfolio_id: number;
+  user_id: number;
+  created_at?: string;
+  status: string;
+  ai_evaluated_skills: { skill_name: string; level_rank: number }[];
+  student_evaluated_skills: { skill_name: string; level_rank: number }[];
+  teacher_evaluated_skills: { id: number; skill_name: string; level_rank: number }[];
+}
+
+interface RubricHistoryResponse {
+  id: number;
+  rubric_score_id: number;
+}
+
 interface TableData {
   skillArea: string;
   values: string[];
@@ -49,31 +69,10 @@ const Profile3Detail: React.FC = () => {
   const navigate = useNavigate();
   const { isStudent, isTeacher } = useAppRole();
   /* Student: AI + self-eval; Teacher: AI + teacher scores (each role hides the other column). */
-  const evaluationPanelsGridClass = 'profile2-two-panels';
+  const evaluationPanelsGridClass = isTeacher ? 'profile2-three-panels' : 'profile2-two-panels';
 
-  // Mock student requests data - replace with API call later
-  const [studentRequests] = useState<StudentRequest[]>([
-    {
-      id: '1',
-      studentName: 'John Doe',
-      studentId: 'STU001',
-      portfolioFileName: 'portfolio_john_doe.pdf',
-      rubricId: '2',
-      rubricTitle: 'Software Development Skills',
-      requestedAt: '2024-01-15T10:30:00Z',
-      status: 'pending'
-    },
-    {
-      id: '2',
-      studentName: 'Jane Smith',
-      studentId: 'STU002',
-      portfolioFileName: 'portfolio_jane_smith.pdf',
-      rubricId: '1',
-      rubricTitle: 'Test Rubric',
-      requestedAt: '2024-01-16T14:20:00Z',
-      status: 'pending'
-    }
-  ]);
+  const [selectedRequest, setSelectedRequest] = useState<StudentRequest | null>(null);
+  const [requestNotFound, setRequestNotFound] = useState<boolean>(false);
 
   // Rubric selection and data
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -91,27 +90,73 @@ const Profile3Detail: React.FC = () => {
   const [aiEvaluations, setAiEvaluations] = useState<{ [skillArea: string]: string }>({});
   const [studentEvaluations, setStudentEvaluations] = useState<{ [skillArea: string]: string }>({});
   const [teacherExtraSkills, setTeacherExtraSkills] = useState<Skill[]>([]);
-  const [isTeacherEditMode, setIsTeacherEditMode] = useState<boolean>(false);
   const [originalTeacherScores, setOriginalTeacherScores] = useState<{ [skillArea: string]: string }>({});
   const [originalTeacherExtraSkills, setOriginalTeacherExtraSkills] = useState<Skill[]>([]);
   const [searchAi, setSearchAi] = useState<string>('');
   const [searchStudent, setSearchStudent] = useState<string>('');
   const [searchTeacher, setSearchTeacher] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isSavingEvaluation, setIsSavingEvaluation] = useState<boolean>(false);
   const [isRubricHistoryOpen, setIsRubricHistoryOpen] = useState<boolean>(false);
   const [selectedFormerVersion, setSelectedFormerVersion] = useState<FormerRubricVersion | null>(null);
 
-  // Get selected request
-  const selectedRequest = useMemo(() => {
-    return studentRequests.find(req => req.id === requestId) || null;
-  }, [studentRequests, requestId]);
+  const toScoreMap = useCallback((rows: { skill_name: string; level_rank: number }[]) => {
+    const out: { [skillArea: string]: string } = {};
+    rows.forEach((row) => {
+      if (!row.skill_name) return;
+      out[row.skill_name] = String(row.level_rank ?? '');
+    });
+    return out;
+  }, []);
 
-  // Auto-select rubric from the student request.
   useEffect(() => {
-    if (!selectedRequest?.rubricId) return;
-    setSelectedRubricId(selectedRequest.rubricId);
-    setConfirmedRubricId(selectedRequest.rubricId);
-  }, [selectedRequest]);
+    const parsedId = Number(requestId);
+    if (!Number.isInteger(parsedId) || parsedId <= 0) {
+      setRequestNotFound(true);
+      return;
+    }
+
+    const loadRequest = async () => {
+      try {
+        setRequestNotFound(false);
+        const full = await api.get<SkillEvaluationFullResponse>(`skill_evaluation/${parsedId}/full`);
+        const ev = full.data;
+
+        const rh = await api.get<RubricHistoryResponse>(`rubric_score_history/${ev.rubric_score_history_id}`);
+        const rubricRes = await api.get<{ id: number; name?: string }>(`rubric/${rh.data.rubric_score_id}`);
+        const userRes = await api.get<{ id: number; name?: string }>(`user/${ev.user_id}`);
+
+        const rubricId = String(rh.data.rubric_score_id);
+        const studentName = userRes.data.name || `Student #${ev.user_id}`;
+        const rubricTitle = rubricRes.data.name || `Rubric #${rubricId}`;
+
+        setSelectedRequest({
+          id: String(ev.id),
+          studentName,
+          studentId: String(ev.user_id),
+          portfolioFileName: `Portfolio #${ev.portfolio_id}`,
+          rubricId,
+          rubricTitle,
+          requestedAt: ev.created_at || '',
+          status: ev.status === 'pending' ? 'pending' : 'completed',
+        });
+        setSelectedRubricId(rubricId);
+        setConfirmedRubricId(rubricId);
+        setAiEvaluations(toScoreMap(ev.ai_evaluated_skills || []));
+        setStudentEvaluations(toScoreMap(ev.student_evaluated_skills || []));
+        const hydratedTeacherScores = toScoreMap(ev.teacher_evaluated_skills || []);
+        setTeacherScores(hydratedTeacherScores);
+        setOriginalTeacherScores(hydratedTeacherScores);
+        setTeacherExtraSkills([]);
+        setOriginalTeacherExtraSkills([]);
+      } catch (error) {
+        console.error('Failed to load evaluation request:', error);
+        setRequestNotFound(true);
+      }
+    };
+
+    void loadRequest();
+  }, [requestId, toScoreMap]);
 
   // Load rubric list on mount
   useEffect(() => {
@@ -135,11 +180,7 @@ const Profile3Detail: React.FC = () => {
     const loadRubricData = async () => {
       if (!confirmedRubricId) {
         setSelectedRubricData(null);
-        setTeacherScores({});
-        setAiEvaluations({});
-        setStudentEvaluations({});
         setTeacherExtraSkills([]);
-        setIsTeacherEditMode(false);
         return;
       }
 
@@ -147,30 +188,11 @@ const Profile3Detail: React.FC = () => {
         setIsLoadingRubric(true);
         const rubricData = await getRubricScore(confirmedRubricId);
         setSelectedRubricData(rubricData);
-
-        const generateRandomLevel = () => Math.floor(Math.random() * 5) + 1;
-        const newTeacher: { [skillArea: string]: string } = {};
-        const newAi: { [skillArea: string]: string } = {};
-        const newStudent: { [skillArea: string]: string } = {};
-        rubricData.rows.forEach((row) => {
-          const skillArea = row.skillArea;
-          newTeacher[skillArea] = '';
-          newAi[skillArea] = String(generateRandomLevel());
-          newStudent[skillArea] = ''; // placeholder until student data is available
-        });
-        setTeacherScores(newTeacher);
-        setAiEvaluations(newAi);
-        setStudentEvaluations(newStudent);
         setTeacherExtraSkills([]);
-        setIsTeacherEditMode(false);
       } catch (error) {
         console.error('Error loading rubric data:', error);
         setSelectedRubricData(null);
-        setTeacherScores({});
-        setAiEvaluations({});
-        setStudentEvaluations({});
         setTeacherExtraSkills([]);
-        setIsTeacherEditMode(false);
       } finally {
         setIsLoadingRubric(false);
       }
@@ -345,28 +367,6 @@ const Profile3Detail: React.FC = () => {
     });
   };
 
-  const handleEnterTeacherEditMode = () => {
-    setOriginalTeacherScores({ ...teacherScores });
-    setOriginalTeacherExtraSkills(teacherExtraSkills.map((s) => ({ ...s })));
-    setIsTeacherEditMode(true);
-  };
-
-  const handleSaveTeacherEdits = () => {
-    // Save current edits as the new baseline, stay in edit mode
-    setOriginalTeacherScores({ ...teacherScores });
-    setOriginalTeacherExtraSkills(teacherExtraSkills.map((s) => ({ ...s })));
-  };
-
-  const handleCancelTeacherEdits = () => {
-    setTeacherScores({ ...originalTeacherScores });
-    setTeacherExtraSkills(originalTeacherExtraSkills.map((s) => ({ ...s })));
-    setIsTeacherEditMode(false);
-  };
-
-  const handleDoneTeacherEditing = () => {
-    setIsTeacherEditMode(false);
-  };
-
   const handleScoreChange = (skillArea: string, value: string) => {
     // Only allow numbers
     if (value === '' || /^\d+$/.test(value)) {
@@ -376,6 +376,72 @@ const Profile3Detail: React.FC = () => {
       }));
     }
   };
+
+  const hasUnsavedTeacherChanges = useMemo(() => {
+    const serializeScoreMap = (scores: { [skillArea: string]: string }) =>
+      JSON.stringify(
+        Object.keys(scores)
+          .sort()
+          .map((k) => [k, scores[k] ?? ''])
+      );
+    const serializeSkillNames = (skillsList: Skill[]) =>
+      JSON.stringify(
+        [...skillsList.map((s) => s.skillArea)]
+          .filter((name) => name.trim() !== '')
+          .sort()
+      );
+
+    const hasTeacherScoreChange =
+      serializeScoreMap(teacherScores) !== serializeScoreMap(originalTeacherScores);
+    const hasTeacherSkillChange =
+      serializeSkillNames(teacherExtraSkills) !==
+      serializeSkillNames(originalTeacherExtraSkills);
+
+    return hasTeacherScoreChange || hasTeacherSkillChange;
+  }, [teacherScores, originalTeacherScores, teacherExtraSkills, originalTeacherExtraSkills]);
+
+  const persistTeacherEvaluations = useCallback(async (skillEvaluationId: number) => {
+    const existingTeacherRows = await api.get<{ id: number }[]>(
+      `skill_evaluation/${skillEvaluationId}/teacher_evaluated_skills`
+    );
+    await Promise.all(
+      existingTeacherRows.data.map((row) => api.delete(`teacher_evaluated_skill/${row.id}`))
+    );
+
+    const payloads = Object.entries(teacherScores)
+      .map(([skillArea, score]) => ({ skillArea: skillArea.trim(), score: score.trim() }))
+      .filter(
+        ({ skillArea, score }) =>
+          skillArea !== '' && /^\d+$/.test(score) && Number(score) > 0
+      );
+
+    await Promise.all(
+      payloads.map(({ skillArea, score }) =>
+        api.post('teacher_evaluated_skill/', {
+          skill_evaluation_id: skillEvaluationId,
+          skill_name: skillArea,
+          level_rank: Number(score),
+        })
+      )
+    );
+  }, [teacherScores]);
+
+  const handleSaveTeacherEvaluation = useCallback(async () => {
+    if (!selectedRequest) return;
+    try {
+      setIsSavingEvaluation(true);
+      const skillEvaluationId = Number(selectedRequest.id);
+      await persistTeacherEvaluations(skillEvaluationId);
+      setOriginalTeacherScores({ ...teacherScores });
+      setOriginalTeacherExtraSkills(teacherExtraSkills.map((s) => ({ ...s })));
+      alert('Teacher evaluation saved.');
+    } catch (error) {
+      console.error('Failed to save teacher evaluation:', error);
+      alert(`Failed to save evaluation: ${getApiErrorDetail(error)}`);
+    } finally {
+      setIsSavingEvaluation(false);
+    }
+  }, [selectedRequest, persistTeacherEvaluations, teacherScores, teacherExtraSkills]);
 
   const handleSubmitEvaluation = async () => {
     if (!selectedRequest || !selectedRubricData) return;
@@ -389,23 +455,15 @@ const Profile3Detail: React.FC = () => {
 
     try {
       setIsSubmitting(true);
-      // TODO: Replace with actual API call
-      console.log('Submitting evaluation:', {
-        requestId: selectedRequest.id,
-        studentId: selectedRequest.studentId,
-        scores: teacherScores
-      });
+      const skillEvaluationId = Number(selectedRequest.id);
+      await persistTeacherEvaluations(skillEvaluationId);
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      alert('Evaluation submitted successfully!');
-      
-      // Navigate back to list
+      await updateSkillEvaluation(skillEvaluationId, { status: 'completed' });
+      alert('Evaluation submitted successfully and marked as completed.');
       navigate('/profile3');
     } catch (error) {
       console.error('Error submitting evaluation:', error);
-      alert('Failed to submit evaluation. Please try again.');
+      alert(`Failed to submit evaluation: ${getApiErrorDetail(error)}`);
     } finally {
       setIsSubmitting(false);
     }
@@ -422,7 +480,21 @@ const Profile3Detail: React.FC = () => {
     });
   };
 
-  if (!selectedRequest) {
+  if (!selectedRequest && !requestNotFound) {
+    return (
+      <div className="profile-wrapper">
+        <div className="portfolio-container">
+          <div className="portfolio-section">
+            <div style={{ padding: '40px', textAlign: 'center', color: '#666' }}>
+              <p>Loading student request...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!selectedRequest || requestNotFound) {
     return (
       <div className="profile-wrapper">
         <div className="portfolio-container">
@@ -499,7 +571,22 @@ const Profile3Detail: React.FC = () => {
                 </span>
               )}
             </h2>
-            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }} />
+            <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              {!isStudent && (
+                <button
+                  className={`profile2-request-evaluation-button ${
+                    hasUnsavedTeacherChanges
+                      ? 'profile2-save-evaluation-button-active'
+                      : 'profile2-save-evaluation-button-idle'
+                  }`}
+                  type="button"
+                  disabled={!hasUnsavedTeacherChanges || isSavingEvaluation || isSubmitting}
+                  onClick={() => void handleSaveTeacherEvaluation()}
+                >
+                  {isSavingEvaluation ? 'Saving...' : 'Save Evaluation'}
+                </button>
+              )}
+            </div>
           </div>
 
           {isLoadingRubric ? (
@@ -551,7 +638,6 @@ const Profile3Detail: React.FC = () => {
                       ))}
                     </div>
                   </div>
-                  {!isTeacher && (
                   <div className="skills-panel profile2-panel">
                     <h2 className="panel-title">Student</h2>
                     <div className="search-container">
@@ -583,7 +669,6 @@ const Profile3Detail: React.FC = () => {
                       ))}
                     </div>
                   </div>
-                  )}
                   {!isStudent && (
                   <div className="skills-panel profile2-panel">
                     <h2 className="panel-title">Teacher</h2>
@@ -604,8 +689,7 @@ const Profile3Detail: React.FC = () => {
                     <div className="skills-list">
                       {filteredTeacherSkills.map((skill, index) => (
                         <div key={index} className="skill-item profile2-skill-item profile2-skill-item-deletable">
-                          {isTeacherEditMode &&
-                            teacherExtraSkills.some((s) => s.skillArea === skill.skillArea) && (
+                          {teacherExtraSkills.some((s) => s.skillArea === skill.skillArea) && (
                               <button
                                 type="button"
                                 className="profile2-skill-delete-button"
@@ -616,8 +700,7 @@ const Profile3Detail: React.FC = () => {
                                 {React.createElement(CloseIcon)}
                               </button>
                             )}
-                          {isTeacherEditMode &&
-                          teacherExtraSkills.some((s) => s.skillArea === skill.skillArea) ? (
+                          {teacherExtraSkills.some((s) => s.skillArea === skill.skillArea) ? (
                             <input
                               type="text"
                               className="profile2-custom-skill-name-input"
@@ -639,100 +722,51 @@ const Profile3Detail: React.FC = () => {
                             type="text"
                             className="profile2-score-input teacher-score-input"
                             value={teacherScores[skill.skillArea] || ''}
-                            readOnly={!isTeacherEditMode}
-                            onChange={
-                              !isTeacherEditMode
-                                ? undefined
-                                : (e) => handleScoreChange(skill.skillArea, e.target.value)
-                            }
-                            onBlur={
-                              !isTeacherEditMode
-                                ? undefined
-                                : (e) => {
-                                    const value = e.target.value;
-                                    if (value && (!/^\d+$/.test(value) || parseInt(value) < 1)) {
-                                      setTeacherScores(prev => ({
-                                        ...prev,
-                                        [skill.skillArea]: ''
-                                      }));
-                                    }
-                                  }
-                            }
+                            readOnly={false}
+                            onChange={(e) => handleScoreChange(skill.skillArea, e.target.value)}
+                            onBlur={(e) => {
+                              const value = e.target.value;
+                              if (value && (!/^\d+$/.test(value) || parseInt(value) < 1)) {
+                                setTeacherScores(prev => ({
+                                  ...prev,
+                                  [skill.skillArea]: ''
+                                }));
+                              }
+                            }}
                             placeholder="Score"
                           />
                         </div>
                       ))}
-                      {isTeacherEditMode && (
-                        <div
-                          className="rubric-score-add-box"
-                          onClick={handleAddTeacherSkill}
-                          title="Add Skill"
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              handleAddTeacherSkill();
-                            }
+                      <div
+                        className="rubric-score-add-box"
+                        onClick={handleAddTeacherSkill}
+                        title="Add Skill"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            handleAddTeacherSkill();
+                          }
+                        }}
+                      >
+                        <span className="rubric-score-add-box-spacer"></span>
+                        <button
+                          className="rubric-score-add-box-button"
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleAddTeacherSkill();
                           }}
+                          title="Add Skill"
                         >
-                          <span className="rubric-score-add-box-spacer"></span>
-                          <button
-                            className="rubric-score-add-box-button"
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAddTeacherSkill();
-                            }}
-                            title="Add Skill"
-                          >
-                            {React.createElement(PlusIcon)}
-                          </button>
-                        </div>
-                      )}
+                          {React.createElement(PlusIcon)}
+                        </button>
+                      </div>
                     </div>
                   </div>
                   )}
               </div>
-
-                {!isStudent && (
-                <div className="profile3-submit-button-container">
-                  {!isTeacherEditMode ? (
-                    <button
-                      className="profile2-request-evaluation-button"
-                      type="button"
-                      onClick={handleEnterTeacherEditMode}
-                      disabled={!selectedRubricData}
-                    >
-                      Edit
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        className="profile2-request-evaluation-button"
-                        type="button"
-                        onClick={handleCancelTeacherEdits}
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        className="profile2-request-evaluation-button"
-                        type="button"
-                        onClick={handleSaveTeacherEdits}
-                      >
-                        Save
-                      </button>
-                      <button
-                        className="profile2-request-evaluation-button"
-                        type="button"
-                        onClick={handleDoneTeacherEditing}
-                      >
-                        Done Editing
-                      </button>
-                    </>
-                  )}
-                </div>
-                )}
               </>
             )}
         </div>
@@ -754,7 +788,7 @@ const Profile3Detail: React.FC = () => {
           className="profile2-request-evaluation-button"
           type="button"
           onClick={handleSubmitEvaluation}
-          disabled={isSubmitting || isTeacherEditMode}
+          disabled={isSubmitting || isSavingEvaluation}
         >
           {isSubmitting ? 'Submitting...' : 'Submit Evaluation'}
         </button>

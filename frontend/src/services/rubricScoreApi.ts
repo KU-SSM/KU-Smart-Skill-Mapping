@@ -102,19 +102,15 @@ const transformBackendToFrontend = (
   rubric: BackendRubric,
   skills: BackendRubricSkill[],
   levels: BackendLevel[],
-  criteria: BackendCriteria[],
-  savedHeaders?: string[],
-  savedSkillAreas?: string[]
+  criteria: BackendCriteria[]
 ): RubricScoreDetail => {
   const sortedLevels = [...levels].sort((a, b) => a.rank - b.rank);
   const sortedSkills = [...skills].sort((a, b) => a.display_order - b.display_order);
 
-  // Use saved headers if available, otherwise use level descriptions from backend
+  // Use level descriptions from backend
   // Handle None/null descriptions from backend gracefully
   let headers: string[];
-  if (savedHeaders && savedHeaders.length === sortedLevels.length) {
-    headers = [...savedHeaders];
-  } else if (sortedLevels.length > 0) {
+  if (sortedLevels.length > 0) {
     headers = sortedLevels.map((level) => {
       // Handle None/null/undefined descriptions
       const desc = level.description;
@@ -137,9 +133,7 @@ const transformBackendToFrontend = (
         })
       : []; // Empty array if no levels
     return {
-      skillArea: savedSkillAreas && savedSkillAreas[index] !== undefined
-        ? savedSkillAreas[index]
-        : (skill.name || ''),
+      skillArea: skill.name || '',
       values,
     };
   });
@@ -179,27 +173,9 @@ export const getRubricScore = async (id: string): Promise<RubricScoreDetail> => 
       console.warn('No levels found for this rubric. Continuing with skills only.');
     }
     
-    // Try to get saved headers and skillAreas from localStorage (metadata not stored in backend)
-    let savedHeaders: string[] | undefined;
-    let savedSkillAreas: string[] | undefined;
-    try {
-      const savedDataStr = localStorage.getItem(`rubric_metadata_${id}`);
-      if (savedDataStr) {
-        const savedData = JSON.parse(savedDataStr);
-        const age = Date.now() - savedData.timestamp;
-        // Use saved metadata if it's recent (within 30 days)
-        if (age < 30 * 24 * 60 * 60 * 1000) {
-          savedHeaders = savedData.headers;
-          savedSkillAreas = savedData.skillAreas;
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to load metadata from localStorage:', error);
-    }
-    
-    // Transform backend data to frontend format, including saved metadata
+    // Transform backend data to frontend format
     // This will work even with empty levels - rows will be created from skills
-    return transformBackendToFrontend(rubric, skills, levels, criteria, savedHeaders, savedSkillAreas);
+    return transformBackendToFrontend(rubric, skills, levels, criteria);
   } catch (error: any) {
     console.error('Error fetching rubric score:', error);
     const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to fetch rubric score';
@@ -345,53 +321,25 @@ export const updateRubricScore = async (
       // Continue even if name update fails
     }
 
-    // Delete existing skills and levels to avoid duplicates
-    // First, get existing skills for this rubric
-    const deletionPromises: Promise<void>[] = [];
-    
-    try {
-      const skillsResponse = await api.get<BackendRubricSkill[]>(`rubric/${rubricId}/rubric_skills`);
-      const existingSkills = skillsResponse.data;
-      
-      // Delete each skill (this will cascade delete associated criteria)
-      for (const skill of existingSkills) {
-        const deletePromise = api.delete(`rubric_skill/${skill.id}`)
-          .then(() => {
-            // Successfully deleted
-          })
-          .catch(() => {
-            // Silently handle deletion errors
-          });
-        deletionPromises.push(deletePromise);
-      }
-    } catch (error) {
-      // Continue even if fetch fails
-    }
+    // Strictly replace rubric internals to avoid duplicates on revisit.
+    const [skillsResponse, levelsResponse, criteriaResponse] = await Promise.all([
+      api.get<BackendRubricSkill[]>(`rubric/${rubricId}/rubric_skills`),
+      api.get<BackendLevel[]>(`rubric/${rubricId}/levels`),
+      api.get<BackendCriteria[]>(`rubric/${rubricId}/criteria`),
+    ]);
+    const existingSkills = skillsResponse.data;
+    const existingLevels = levelsResponse.data;
+    const existingCriteria = criteriaResponse.data;
 
-    // Get existing levels using the new endpoint
-    try {
-      const levelsResponse = await api.get<BackendLevel[]>(`rubric/${rubricId}/levels`);
-      const existingLevels = levelsResponse.data;
-      // Delete each level (this will cascade delete associated criteria)
-      for (const level of existingLevels) {
-        const deletePromise = api.delete(`level/${level.id}`)
-          .then(() => {
-            // Successfully deleted
-          })
-          .catch(() => {
-            // Silently handle deletion errors
-          });
-        deletionPromises.push(deletePromise);
-      }
-    } catch (error) {
-      // Continue even if fetch fails
+    // Delete criteria first, then skills/levels.
+    for (const c of existingCriteria) {
+      await api.delete(`criteria/${c.id}`);
     }
-
-    // Wait for all deletions to complete before creating new entries
-    if (deletionPromises.length > 0) {
-      await Promise.all(deletionPromises);
-      // Small delay to ensure database consistency
-      await new Promise(resolve => setTimeout(resolve, 100));
+    for (const s of existingSkills) {
+      await api.delete(`rubric_skill/${s.id}`);
+    }
+    for (const l of existingLevels) {
+      await api.delete(`level/${l.id}`);
     }
 
     const createdSkills: BackendRubricSkill[] = [];
@@ -465,83 +413,21 @@ export const updateRubricScore = async (
           const criteria = criteriaResponse.data;
           createdCriteria.push(criteria);
         } catch (error: any) {
-          // Check if it's a unique constraint violation (duplicate entry)
-          if (error.response?.status !== 400 && error.response?.status !== 409) {
-            // Only log non-duplicate errors
-            console.error(`Failed to create criteria for skill ${skill.id}, level ${createdLevels[j].id}:`, error.response?.data || error.message);
-          }
-          // Continue even if one criteria fails, so other cells can still be saved
+          console.error(
+            `Failed to create criteria for skill ${skill.id}, level ${createdLevels[j].id}:`,
+            error.response?.data || error.message
+          );
+          throw new Error(
+            `Failed to create criteria for skill ${skill.id}, level ${createdLevels[j].id}: ${
+              error.response?.data?.detail || error.message || 'Unknown error'
+            }`
+          );
         }
       }
     }
 
-    // Use the newly created data directly instead of fetching (to avoid getting old duplicates)
-    if (createdSkills.length === 0 && createdLevels.length === 0) {
-      return {
-        id: id,
-        title: rubricScore.title,
-        headers: rubricScore.headers,
-        rows: rubricScore.rows,
-      };
-    }
-    
-    // Build the response using the newly created data, but preserve headers and skillArea from input
-    const sortedLevels = [...createdLevels].sort((a, b) => a.rank - b.rank);
-    const sortedSkills = [...createdSkills].sort((a, b) => a.display_order - b.display_order);
-
-    // Preserve the headers from input (backend doesn't store header names, only levels)
-    const headers = rubricScore.headers.length >= sortedLevels.length
-      ? [...rubricScore.headers].slice(0, sortedLevels.length)
-      : [...rubricScore.headers, ...Array(sortedLevels.length - rubricScore.headers.length).fill('')];
-
-    // Preserve rows with skillArea and values from input
-    const rows: TableData[] = sortedSkills.map((skill, skillIndex) => {
-      const skillCriteria = createdCriteria.filter((c) => c.rubric_skill_id === skill.id);
-      const values = sortedLevels.map((level, levelIndex) => {
-        const criterion = skillCriteria.find((c) => c.level_id === level.id);
-        // Use criterion description if exists, otherwise preserve from input
-        if (criterion) {
-          return criterion.description;
-        }
-        // Fallback to input value if available
-        const inputRow = rubricScore.rows[skillIndex];
-        if (inputRow && inputRow.values[levelIndex] !== undefined) {
-          return inputRow.values[levelIndex];
-        }
-        return '';
-      });
-      
-      // Preserve skillArea from input
-      const inputRow = rubricScore.rows[skillIndex];
-      return {
-        skillArea: inputRow ? inputRow.skillArea : '',
-        values,
-      };
-    });
-
-    const result = {
-      id: id,
-      title: rubricScore.title,
-      headers,
-      rows,
-    };
-    
-    // Store headers and skillArea in localStorage since they're not stored in backend
-    // The actual data (levels, skills, criteria) is now stored in backend and can be fetched
-    try {
-      const savedData = {
-        rubricId: id,
-        title: rubricScore.title,
-        headers: result.headers,
-        skillAreas: result.rows.map(row => row.skillArea),
-        timestamp: Date.now(),
-      };
-      localStorage.setItem(`rubric_metadata_${id}`, JSON.stringify(savedData));
-    } catch (error) {
-      // Silently handle localStorage errors
-    }
-    
-    return result;
+    // Return canonical backend state after save.
+    return await getRubricScore(id);
   } catch (error: any) {
     console.error('Error updating rubric score:', error);
     const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to update rubric score';

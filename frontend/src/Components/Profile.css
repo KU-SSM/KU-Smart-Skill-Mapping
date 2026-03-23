@@ -1422,6 +1422,14 @@
   transform: translateY(0);
 }
 
+.profile2-save-evaluation-button-idle {
+  filter: saturate(0.7);
+}
+
+.profile2-save-evaluation-button-active {
+  box-shadow: 0 0 0 3px rgba(178, 187, 30, 0.22);
+}
+
 /* Manual AI evaluation — outlined to pair with solid “Request Teacher Evaluation” */
 .profile2-ai-evaluate-button {
   padding: 10px 20px;

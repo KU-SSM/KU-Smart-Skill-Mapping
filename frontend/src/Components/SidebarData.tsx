@@ -5,7 +5,7 @@ import { VscGraph, VscBook } from 'react-icons/vsc'
 import { BsPersonLinesFill } from 'react-icons/bs'
 import { LuChartLine } from 'react-icons/lu'
 import { MdHome } from 'react-icons/md'
-import { FaCertificate, FaBriefcase } from 'react-icons/fa'
+import { FaCertificate } from 'react-icons/fa'
 import { AiOutlineCheckSquare } from 'react-icons/ai'
 
 /** Who sees this link until real auth exists. Default: everyone. `none` = hidden for all. */
@@ -61,7 +61,8 @@ export const SideBarData: SidebarItem[] = [
     {
         title: "Skill Map",
         link:"/skill_map",
-        icon: AiIcons.AiOutlineRadarChart
+        icon: AiIcons.AiOutlineRadarChart,
+        audience: 'student',
     },
     {
         title: "Certificate",

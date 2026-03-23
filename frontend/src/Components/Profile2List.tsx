@@ -1,8 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import './Profile.css';
 import './RubricScore.css';
 import { AiOutlineClose, AiOutlineDelete, AiOutlinePlus } from 'react-icons/ai';
+import { getCurrentUserId } from '../utils/currentUser';
+import api from '../api/index';
+import {
+  deleteSkillEvaluation,
+  getSkillEvaluationsByUser,
+  type SkillEvaluationRecord,
+} from '../services/skillEvaluationApi';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const DeleteIcon = AiOutlineDelete as React.ComponentType;
@@ -14,26 +21,138 @@ interface StudentEvaluationItem {
   rubricTitle: string;
   portfolioFileName: string;
   requestedAt: string;
-  status: 'pending' | 'completed';
-  /** New card from "+" — rubric/portfolio/date not chosen yet (dashed UI). */
-  detailsUnset?: boolean;
+  status: 'drafted' | 'pending' | 'completed';
 }
+
+interface RubricHistoryResponse {
+  id: number;
+  rubric_score_id: number;
+}
+
+interface RubricResponse {
+  id: number;
+  name: string;
+}
+
+interface EvaluationDisplayMeta {
+  rubricId: string;
+  rubricTitle: string;
+  portfolioFileName: string;
+}
+
+const evaluationMetaKey = (evaluationId: string) => `evaluation_display_meta_${evaluationId}`;
+
+const readEvaluationMeta = (evaluationId: string): EvaluationDisplayMeta | null => {
+  try {
+    const raw = localStorage.getItem(evaluationMetaKey(evaluationId));
+    if (!raw) return null;
+    return JSON.parse(raw) as EvaluationDisplayMeta;
+  } catch {
+    return null;
+  }
+};
 
 const Profile2List: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchTitle, setSearchTitle] = useState<string>('');
-
-  // Mock data (replace with API later)
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isDeletingIds, setIsDeletingIds] = useState<Set<string>>(new Set());
   const [evaluations, setEvaluations] = useState<StudentEvaluationItem[]>([]);
+  const rubricTitleByHistoryIdRef = useRef<Map<number, string>>(new Map());
+
+  const mapBackendEvaluation = async (ev: SkillEvaluationRecord): Promise<StudentEvaluationItem> => {
+    const id = String(ev.id);
+    const meta = readEvaluationMeta(id);
+    let rubricTitle = meta?.rubricTitle || `History #${ev.rubric_score_history_id}`;
+
+    // Fallback to backend rubric name when local meta is missing (cached by history id).
+    if (!meta?.rubricTitle && !rubricTitleByHistoryIdRef.current.has(ev.rubric_score_history_id)) {
+      try {
+        const rh = await api.get<RubricHistoryResponse>(`rubric_score_history/${ev.rubric_score_history_id}`);
+        const rubric = await api.get<RubricResponse>(`rubric/${rh.data.rubric_score_id}`);
+        rubricTitleByHistoryIdRef.current.set(
+          ev.rubric_score_history_id,
+          rubric.data.name || rubricTitle
+        );
+      } catch {
+        // keep fallback title
+      }
+    }
+    rubricTitle =
+      rubricTitleByHistoryIdRef.current.get(ev.rubric_score_history_id) || rubricTitle;
+
+    const mappedStatus: StudentEvaluationItem['status'] =
+      ev.status === 'completed' || ev.status === 'approved'
+        ? 'completed'
+        : ev.status === 'pending'
+          ? 'pending'
+          : 'drafted';
+
+    return {
+      id,
+      title: rubricTitle || `Evaluation #${ev.id}`,
+      rubricTitle,
+      portfolioFileName: meta?.portfolioFileName || `Portfolio #${ev.portfolio_id}`,
+      // Draft means teacher request has not been sent yet.
+      requestedAt: mappedStatus === 'drafted' ? '' : (ev.created_at || ''),
+      status: mappedStatus,
+    };
+  };
+
+  const loadEvaluations = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      const userId = getCurrentUserId();
+      const rows = await getSkillEvaluationsByUser(userId);
+
+      // Pre-fetch rubric titles once per history id (avoids repeated calls for each row).
+      const idsNeedingRubric = Array.from(
+        new Set(
+          rows
+            .filter((row) => !rubricTitleByHistoryIdRef.current.has(row.rubric_score_history_id))
+            .map((row) => row.rubric_score_history_id)
+        )
+      );
+      await Promise.all(
+        idsNeedingRubric.map(async (historyId) => {
+          try {
+            const rh = await api.get<RubricHistoryResponse>(`rubric_score_history/${historyId}`);
+            const rubric = await api.get<RubricResponse>(`rubric/${rh.data.rubric_score_id}`);
+            rubricTitleByHistoryIdRef.current.set(
+              historyId,
+              rubric.data.name || `History #${historyId}`
+            );
+          } catch {
+            // keep fallback title
+          }
+        })
+      );
+
+      const enriched = await Promise.all(rows.map((row) => mapBackendEvaluation(row)));
+      setEvaluations(enriched);
+    } catch (error) {
+      console.error('Error loading evaluations:', error);
+      setEvaluations([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const state = location.state as { removeEvaluationId?: string } | null;
-    const id = state?.removeEvaluationId;
-    if (!id) return;
-    setEvaluations((prev) => prev.filter((item) => item.id !== id));
+    void loadEvaluations();
+  }, [loadEvaluations]);
+
+  useEffect(() => {
+    const state = (location.state || {}) as {
+      addedSkillEvaluationId?: string;
+      refreshAt?: number;
+      removeEvaluationId?: string;
+    };
+    if (!state.addedSkillEvaluationId && !state.refreshAt && !state.removeEvaluationId) return;
+    void loadEvaluations();
     navigate('/profile2', { replace: true, state: {} });
-  }, [location.state, navigate]);
+  }, [location.state, navigate, loadEvaluations]);
 
   const filteredEvaluations = useMemo(() => {
     const q = searchTitle.trim().toLowerCase();
@@ -42,42 +161,50 @@ const Profile2List: React.FC = () => {
   }, [evaluations, searchTitle]);
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    // Backend datetime may be timezone-naive; treat it as UTC, then render in Thai time.
+    const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/.test(dateString);
+    const normalizedIso = hasTimezone ? dateString : `${dateString}Z`;
+    const date = new Date(normalizedIso);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit',
+      timeZone: 'Asia/Bangkok',
+      hour12: false,
     });
   };
 
   const handleAddEvaluationItem = () => {
-    const baseTitle = 'New Evaluation';
-    const existingTitles = new Set(evaluations.map((e) => e.title));
-    let nextTitle = baseTitle;
-    let i = 2;
-    while (existingTitles.has(nextTitle)) {
-      nextTitle = `${baseTitle} ${i}`;
-      i += 1;
-    }
-
-    const nextId = String(Date.now());
-    const nextItem: StudentEvaluationItem = {
-      id: nextId,
-      title: nextTitle,
-      rubricTitle: '',
-      portfolioFileName: '',
-      requestedAt: '',
-      status: 'pending',
-      detailsUnset: true,
-    };
-
-    setEvaluations((prev) => [nextItem, ...prev]);
+    navigate('/profile2/new');
   };
 
-  const handleDeleteEvaluationItem = (id: string) => {
-    setEvaluations((prev) => prev.filter((item) => item.id !== id));
+  const handleDeleteEvaluationItem = async (id: string) => {
+    if (isDeletingIds.has(id)) return;
+    try {
+      setIsDeletingIds((prev) => new Set(prev).add(id));
+      const numericId = Number(id);
+      if (Number.isInteger(numericId) && numericId > 0) {
+        await deleteSkillEvaluation(numericId);
+      }
+      try {
+        localStorage.removeItem(evaluationMetaKey(id));
+      } catch {
+        // ignore localStorage errors
+      }
+      setEvaluations((prev) => prev.filter((item) => item.id !== id));
+    } catch (error) {
+      console.error('Error deleting evaluation:', error);
+      alert('Failed to delete evaluation. Please try again.');
+    } finally {
+      setIsDeletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
   };
 
   return (
@@ -110,7 +237,9 @@ const Profile2List: React.FC = () => {
             {filteredEvaluations.length === 0 ? (
               <div className="profile2-yevaluation-empty">
                 <p>
-                  {evaluations.length === 0
+                  {isLoading
+                    ? 'Loading evaluations...'
+                    : evaluations.length === 0
                     ? 'No evaluations available.'
                     : 'No matching evaluations found.'}
                 </p>
@@ -142,7 +271,7 @@ const Profile2List: React.FC = () => {
                       }}
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteEvaluationItem(item.id);
+                        void handleDeleteEvaluationItem(item.id);
                       }}
                     >
                       {React.createElement(DeleteIcon)}
@@ -152,8 +281,16 @@ const Profile2List: React.FC = () => {
                         <h3 className="student-name">{item.title}</h3>
                       </div>
                       <div className="student-request-status">
-                        <span className={`status-badge ${item.status}`}>
-                          {item.status === 'pending' ? 'Pending' : 'Completed'}
+                        <span
+                          className={`status-badge ${
+                            item.status === 'completed' ? 'completed' : 'pending'
+                          }`}
+                        >
+                          {item.status === 'completed'
+                            ? 'Completed'
+                            : item.status === 'pending'
+                              ? 'Pending'
+                              : 'Drafted'}
                         </span>
                       </div>
                     </div>
@@ -161,37 +298,25 @@ const Profile2List: React.FC = () => {
                       <div className="request-detail-item">
                         <span className="detail-label">Rubric:</span>
                         <span
-                          className={
-                            item.detailsUnset
-                              ? 'detail-value profile2-eval-detail-dashed'
-                              : 'detail-value'
-                          }
+                          className="detail-value"
                         >
-                          {item.detailsUnset ? '—' : item.rubricTitle || '—'}
+                          {item.rubricTitle || '—'}
                         </span>
                       </div>
                       <div className="request-detail-item">
                         <span className="detail-label">Portfolio:</span>
                         <span
-                          className={
-                            item.detailsUnset
-                              ? 'detail-value profile2-eval-detail-dashed'
-                              : 'detail-value'
-                          }
+                          className="detail-value"
                         >
-                          {item.detailsUnset ? '—' : item.portfolioFileName || '—'}
+                          {item.portfolioFileName || '—'}
                         </span>
                       </div>
                       <div className="request-detail-item">
                         <span className="detail-label">Requested:</span>
                         <span
-                          className={
-                            item.detailsUnset
-                              ? 'detail-value profile2-eval-detail-dashed'
-                              : 'detail-value'
-                          }
+                          className="detail-value"
                         >
-                          {item.detailsUnset || !item.requestedAt
+                          {!item.requestedAt
                             ? '—'
                             : formatDate(item.requestedAt)}
                         </span>
