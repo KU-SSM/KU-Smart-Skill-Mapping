@@ -29,6 +29,53 @@
   letter-spacing: 0.5px;
 }
 
+.Navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.Navbar-role-switch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.Navbar-role-label {
+  font-family: 'Montserrat', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.95;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.Navbar-role-pill {
+  padding: 8px 14px;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  background: transparent;
+  color: #fff;
+  font-family: 'Montserrat', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.Navbar-role-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.Navbar-role-pill--active {
+  background: #fff;
+  color: rgba(178, 187, 30);
+  border-color: #fff;
+}
+
 .Navbar-auth {
   display: flex;
   align-items: center;

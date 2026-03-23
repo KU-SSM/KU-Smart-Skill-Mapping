@@ -44,6 +44,7 @@
 .rubric-score-title {
   font-family: 'Roboto', sans-serif;
   font-size: 40px;
+  font-weight: 600;
   margin: 0 0 20px 0;
   color: #333;
   text-align: left;
@@ -57,6 +58,7 @@
 .rubric-score-title-input {
   font-family: 'Roboto', sans-serif;
   font-size: 40px;
+  font-weight: 600;
   color: #333;
   text-align: left;
   flex: 1;
@@ -117,6 +119,200 @@
 .delete-rubric-button:disabled:hover {
   transform: none;
   box-shadow: none;
+}
+
+.rubric-history-button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #333;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  transition: all 0.2s ease;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.rubric-history-button:hover {
+  background-color: #f5f5f5;
+  border-color: rgba(178, 187, 30, 0.6);
+  color: rgba(178, 187, 30, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.rubric-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+
+.rubric-modal-content {
+  background-color: #ffffff;
+  border-radius: 10px;
+  padding: 20px;
+  width: 95%;
+  max-width: 640px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 80vh;
+  overflow: auto;
+}
+
+.rubric-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.rubric-modal-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0;
+}
+
+.rubric-modal-subtitle {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.rubric-modal-close {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #ddd;
+  background-color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rubric-modal-close:hover {
+  background-color: #f5f5f5;
+}
+
+.rubric-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.rubric-history-item {
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fafafa;
+}
+
+.rubric-history-item-button {
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rubric-history-item-button:hover {
+  border-color: rgba(178, 187, 30, 0.6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  background: #ffffff;
+}
+
+.rubric-history-item-button:focus {
+  outline: 2px solid rgba(178, 187, 30, 0.8);
+  outline-offset: 2px;
+}
+
+.rubric-history-item-button {
+  appearance: none;
+  border: 1px solid #e0e0e0;
+}
+
+.rubric-history-detail-meta {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  font-size: 13px;
+  color: #666;
+}
+
+.rubric-history-detail-meta > div {
+  text-align: left;
+  min-width: 0;
+}
+
+
+.rubric-history-version {
+  font-weight: 600;
+  color: #333;
+}
+
+.rubric-history-meta {
+  font-size: 13px;
+  color: #666;
+  margin-top: 2px;
+}
+
+.rubric-history-exp {
+  font-size: 13px;
+  color: #333;
+  white-space: nowrap;
+}
+
+.rubric-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+/* Ensure expiration popup appears above rubric history popup */
+.rubric-expiration-overlay {
+  z-index: 1400 !important;
+}
+
+.rubric-modal-button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  background-color: rgba(178, 187, 30, 1);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.rubric-modal-button:hover {
+  background-color: rgba(178, 187, 30, 0.9);
+}
+
+.rubric-modal-button.secondary {
+  background-color: #e0e0e0;
+  color: #333;
+}
+
+.rubric-modal-button.secondary:hover {
+  background-color: #d0d0d0;
 }
 
 .table-container {

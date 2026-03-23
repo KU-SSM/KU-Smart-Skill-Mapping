@@ -5,7 +5,6 @@ import { Routes, Route, useLocation } from 'react-router-dom';
 import Home from './Components/Home';
 import CertificateDetail from './Components/CertificateDetail';
 import SkillMap from './Components/SkillMap';
-import Portfolio from './Components/Portfolio';
 import RubricScoreList from './Components/RubricScoreList';
 import RubricScoreDetail from './Components/RubricScoreDetail';
 import RubricScoreListStudent from './Components/RubricScoreListStudent';
@@ -14,8 +13,10 @@ import Login from './Components/Login';
 import SignUp from './Components/SignUp';
 import Profile from './Components/Profile';
 import Profile2 from './Components/Profile2';
+import Profile2List from './Components/Profile2List';
 import Profile3 from './Components/Profile3';
 import Profile3Detail from './Components/Profile3Detail';
+import RubricVersionEvaluationDetail from './Components/RubricVersionEvaluationDetail';
 
 const App: React.FC = () => {
   const location = useLocation();
@@ -37,9 +38,11 @@ const App: React.FC = () => {
               <Route path="/rubric_score_student" element={<RubricScoreListStudent />} />
               <Route path="/rubric_score_student/:id" element={<RubricScoreDetailStudent />} />
               <Route path="/profile" element={<Profile />} />
-              <Route path="/profile2" element={<Profile2 />} />
+              <Route path="/profile2" element={<Profile2List />} />
+              <Route path="/profile2/:evaluationId" element={<Profile2 />} />
               <Route path="/profile3" element={<Profile3 />} />
               <Route path="/profile3/:requestId" element={<Profile3Detail />} />
+              <Route path="/rubric_version_detail" element={<RubricVersionEvaluationDetail />} />
             </Routes>
           </main>
         </div>
