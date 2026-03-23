@@ -1,17 +1,28 @@
 from fastapi import FastAPI, HTTPException, Depends, UploadFile, File
 from fastapi.responses import JSONResponse
-from typing import Annotated, List
-from sqlalchemy.orm import Session
+from typing import Annotated, List, Optional
+
+from sqlalchemy.orm import Session, joinedload
 from database import SessionLocal, engine
 import models
 from fastapi.middleware.cors import CORSMiddleware
 from services.openai_service import get_openai_service
+from services.ai_evaluation import (
+    PortfolioAIEvaluationResult,
+    run_portfolio_ai_evaluation,
+)
 import logging
 from datetime import datetime
+
 from schemas import *
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Manual CRUD for ai_evaluated_skill uses teacher-shaped bodies until AI owns criteria text.
+AI_EVALUATED_SKILL_CRITERIA_PLACEHOLDER = (
+    "[placeholder] Row created with teacher_evaluated_skill-shaped input; "
+    "replace when AI pipeline supplies criteria_passing_description."
+)
 
 app = FastAPI()
 
@@ -38,6 +49,45 @@ def get_db():
 db_dependency = Annotated[Session, Depends(get_db)]
 
 models.Base.metadata.create_all(bind=engine)
+
+"""User API: Create, Read, Update, Delete"""
+
+@app.post("/user/", response_model=UserModel)
+async def create_user(user: UserBase, db: db_dependency):
+    db_user = models.User(**user.model_dump())
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+@app.get("/user/{user_id}", response_model=UserModel)
+async def read_user(user_id: int, db: db_dependency):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"user_id {user_id} not found")
+    return user
+
+@app.delete("/user/{user_id}")
+async def delete_user(user_id: int, db: db_dependency):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail=f"user_id {user_id} not found")
+    db.delete(user)
+    db.commit()
+    return JSONResponse(status_code=200, content={"detail": f"user_id {user_id} deleted successfully"})
+
+@app.put("/user/{user_id}", response_model=UserModel)
+async def update_user(user_id: int, user: UserBase, db: db_dependency):
+    db_user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail=f"user_id {user_id} not found")
+    for key, value in user.model_dump().items():
+        setattr(db_user, key, value)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+"""Rubric Score Related API: Create, Read, Update, Delete"""
 
 @app.post("/rubric/", response_model=RubricScoreModel)
 async def create_rubric(rubric: RubricScoreBase, db: db_dependency):
@@ -249,7 +299,366 @@ async def update_criteria(criteria_id: int, criteria: CriteriaBase, db: db_depen
     db.refresh(db_criteria)
     return db_criteria
 
-# PDF Text Extraction Endpoint
+
+def _get_rubric_score_history_or_404(
+    db: Session, rubric_history_id: int
+) -> models.RubricScoreHistory:
+    rh = (
+        db.query(models.RubricScoreHistory)
+        .filter(models.RubricScoreHistory.id == rubric_history_id)
+        .first()
+    )
+    if not rh:
+        raise HTTPException(
+            status_code=404,
+            detail=f"rubric_score_history_id {rubric_history_id} not found",
+        )
+    return rh
+
+
+"""Rubric history API (snapshots): Create, Read, Delete only — no PUT"""
+
+
+@app.get(
+    "/rubric_score_history/by_rubric/{rubric_id}",
+    response_model=List[RubricScoreHistoryModel],
+)
+async def list_rubric_score_history_by_rubric(
+    rubric_id: int, db: db_dependency, skip: int = 0, limit: int = 100
+):
+    rubric = db.query(models.RubricScore).filter(models.RubricScore.id == rubric_id).first()
+    if not rubric:
+        raise HTTPException(status_code=404, detail=f"rubric_id {rubric_id} not found")
+    rows = (
+        db.query(models.RubricScoreHistory)
+        .filter(models.RubricScoreHistory.rubric_score_id == rubric_id)
+        .order_by(models.RubricScoreHistory.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+    return rows
+
+
+@app.post("/rubric_score_history/", response_model=RubricScoreHistoryModel)
+async def create_rubric_score_history(
+    body: RubricScoreHistoryCreate, db: db_dependency
+):
+    rubric = (
+        db.query(models.RubricScore)
+        .filter(models.RubricScore.id == body.rubric_score_id)
+        .first()
+    )
+    if not rubric:
+        raise HTTPException(
+            status_code=400,
+            detail=f"rubric_score_id {body.rubric_score_id} does not exist",
+        )
+    now = datetime.utcnow()
+    row = models.RubricScoreHistory(
+        rubric_score_id=body.rubric_score_id,
+        status=body.status or "valid",
+        expired_at=body.expired_at,
+        created_at=now,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.get("/rubric_score_history/", response_model=List[RubricScoreHistoryModel])
+async def list_rubric_score_history(
+    db: db_dependency, skip: int = 0, limit: int = 100
+):
+    return (
+        db.query(models.RubricScoreHistory)
+        .order_by(models.RubricScoreHistory.id.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
+
+
+@app.get(
+    "/rubric_score_history/{rubric_history_id}/rubric_skills",
+    response_model=List[RubricSkillHistoryModel],
+)
+async def list_rubric_skills_for_history(
+    rubric_history_id: int, db: db_dependency
+):
+    _get_rubric_score_history_or_404(db, rubric_history_id)
+    return (
+        db.query(models.RubricSkillHistory)
+        .filter(
+            models.RubricSkillHistory.rubric_history_id == rubric_history_id
+        )
+        .order_by(
+            models.RubricSkillHistory.display_order,
+            models.RubricSkillHistory.id,
+        )
+        .all()
+    )
+
+
+@app.get(
+    "/rubric_score_history/{rubric_history_id}/levels",
+    response_model=List[LevelHistoryModel],
+)
+async def list_levels_for_history(rubric_history_id: int, db: db_dependency):
+    _get_rubric_score_history_or_404(db, rubric_history_id)
+    return (
+        db.query(models.LevelHistory)
+        .filter(models.LevelHistory.rubric_history_id == rubric_history_id)
+        .order_by(models.LevelHistory.rank, models.LevelHistory.id)
+        .all()
+    )
+
+
+@app.get(
+    "/rubric_score_history/{rubric_history_id}/criteria",
+    response_model=List[CriteriaHistoryModel],
+)
+async def list_criteria_for_history(rubric_history_id: int, db: db_dependency):
+    _get_rubric_score_history_or_404(db, rubric_history_id)
+    return (
+        db.query(models.CriteriaHistory)
+        .join(
+            models.RubricSkillHistory,
+            models.CriteriaHistory.rubric_skill_history_id
+            == models.RubricSkillHistory.id,
+        )
+        .filter(
+            models.RubricSkillHistory.rubric_history_id == rubric_history_id
+        )
+        .all()
+    )
+
+
+@app.post(
+    "/rubric_score_history/{rubric_history_id}/rubric_skills",
+    response_model=RubricSkillHistoryModel,
+)
+async def create_rubric_skill_history_nested(
+    rubric_history_id: int, body: RubricSkillHistoryCreate, db: db_dependency
+):
+    _get_rubric_score_history_or_404(db, rubric_history_id)
+    now = datetime.utcnow()
+    row = models.RubricSkillHistory(
+        rubric_history_id=rubric_history_id,
+        name=body.name,
+        display_order=body.display_order,
+        created_at=body.created_at or now,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.post(
+    "/rubric_score_history/{rubric_history_id}/levels",
+    response_model=LevelHistoryModel,
+)
+async def create_level_history_nested(
+    rubric_history_id: int, body: LevelHistoryCreate, db: db_dependency
+):
+    _get_rubric_score_history_or_404(db, rubric_history_id)
+    now = datetime.utcnow()
+    row = models.LevelHistory(
+        rubric_history_id=rubric_history_id,
+        rank=body.rank,
+        description=body.description,
+        created_at=body.created_at or now,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.post(
+    "/rubric_score_history/{rubric_history_id}/criteria",
+    response_model=CriteriaHistoryModel,
+)
+async def create_criteria_history_nested(
+    rubric_history_id: int, body: CriteriaHistoryCreate, db: db_dependency
+):
+    _get_rubric_score_history_or_404(db, rubric_history_id)
+    sh = (
+        db.query(models.RubricSkillHistory)
+        .filter(
+            models.RubricSkillHistory.id == body.rubric_skill_history_id,
+            models.RubricSkillHistory.rubric_history_id == rubric_history_id,
+        )
+        .first()
+    )
+    if not sh:
+        raise HTTPException(
+            status_code=400,
+            detail="rubric_skill_history_id invalid or not under this rubric_score_history",
+        )
+    lh = (
+        db.query(models.LevelHistory)
+        .filter(
+            models.LevelHistory.id == body.level_history_id,
+            models.LevelHistory.rubric_history_id == rubric_history_id,
+        )
+        .first()
+    )
+    if not lh:
+        raise HTTPException(
+            status_code=400,
+            detail="level_history_id invalid or not under this rubric_score_history",
+        )
+    now = datetime.utcnow()
+    row = models.CriteriaHistory(
+        rubric_skill_history_id=body.rubric_skill_history_id,
+        level_history_id=body.level_history_id,
+        description=body.description,
+        created_at=body.created_at or now,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.get(
+    "/rubric_score_history/{rubric_history_id}",
+    response_model=RubricScoreHistoryModel,
+)
+async def read_rubric_score_history(rubric_history_id: int, db: db_dependency):
+    return _get_rubric_score_history_or_404(db, rubric_history_id)
+
+
+@app.delete("/rubric_score_history/{rubric_history_id}")
+async def delete_rubric_score_history(rubric_history_id: int, db: db_dependency):
+    row = _get_rubric_score_history_or_404(db, rubric_history_id)
+    db.delete(row)
+    db.commit()
+    return JSONResponse(
+        status_code=200,
+        content={
+            "detail": f"rubric_score_history_id {rubric_history_id} deleted (cascades per DB rules)"
+        },
+    )
+
+
+@app.get(
+    "/rubric_skill_history/{rubric_skill_history_id}",
+    response_model=RubricSkillHistoryModel,
+)
+async def read_rubric_skill_history(
+    rubric_skill_history_id: int, db: db_dependency
+):
+    row = (
+        db.query(models.RubricSkillHistory)
+        .filter(models.RubricSkillHistory.id == rubric_skill_history_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"rubric_skill_history_id {rubric_skill_history_id} not found",
+        )
+    return row
+
+
+@app.delete("/rubric_skill_history/{rubric_skill_history_id}")
+async def delete_rubric_skill_history(
+    rubric_skill_history_id: int, db: db_dependency
+):
+    row = (
+        db.query(models.RubricSkillHistory)
+        .filter(models.RubricSkillHistory.id == rubric_skill_history_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"rubric_skill_history_id {rubric_skill_history_id} not found",
+        )
+    db.delete(row)
+    db.commit()
+    return JSONResponse(
+        status_code=200,
+        content={"detail": f"rubric_skill_history_id {rubric_skill_history_id} deleted"},
+    )
+
+
+@app.get("/level_history/{level_history_id}", response_model=LevelHistoryModel)
+async def read_level_history(level_history_id: int, db: db_dependency):
+    row = (
+        db.query(models.LevelHistory)
+        .filter(models.LevelHistory.id == level_history_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404, detail=f"level_history_id {level_history_id} not found"
+        )
+    return row
+
+
+@app.delete("/level_history/{level_history_id}")
+async def delete_level_history(level_history_id: int, db: db_dependency):
+    row = (
+        db.query(models.LevelHistory)
+        .filter(models.LevelHistory.id == level_history_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404, detail=f"level_history_id {level_history_id} not found"
+        )
+    db.delete(row)
+    db.commit()
+    return JSONResponse(
+        status_code=200,
+        content={"detail": f"level_history_id {level_history_id} deleted"},
+    )
+
+
+@app.get(
+    "/criteria_history/{criteria_history_id}",
+    response_model=CriteriaHistoryModel,
+)
+async def read_criteria_history(criteria_history_id: int, db: db_dependency):
+    row = (
+        db.query(models.CriteriaHistory)
+        .filter(models.CriteriaHistory.id == criteria_history_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"criteria_history_id {criteria_history_id} not found",
+        )
+    return row
+
+
+@app.delete("/criteria_history/{criteria_history_id}")
+async def delete_criteria_history(criteria_history_id: int, db: db_dependency):
+    row = (
+        db.query(models.CriteriaHistory)
+        .filter(models.CriteriaHistory.id == criteria_history_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"criteria_history_id {criteria_history_id} not found",
+        )
+    db.delete(row)
+    db.commit()
+    return JSONResponse(
+        status_code=200,
+        content={"detail": f"criteria_history_id {criteria_history_id} deleted"},
+    )
+
+
+"""PDF Text Extraction Endpoint"""
 @app.post("/portfolio/import")
 async def extract_document(file: UploadFile = File(...)):
     try:
@@ -290,313 +699,588 @@ async def extract_document(file: UploadFile = File(...)):
             detail=f"Failed to extract text from PDF: {str(e)}"
         )
         
-""" AI Evaluation work in progress """
+def _portfolio_evaluate_response_from_result(
+    result: PortfolioAIEvaluationResult,
+) -> PortfolioEvaluateResponse:
+    return PortfolioEvaluateResponse(
+        success=True,
+        portfolio_id=result.portfolio_id,
+        skill_evaluation_id=result.skill_evaluation_id,
+        rubric_score_history_id=result.rubric_score_history_id,
+        classification=result.classification,
+        evaluations=[
+            AIEvaluationItemResponse(
+                id=e.id,
+                skill_evaluation_id=e.skill_evaluation_id,
+                rubric_score_history_id=e.rubric_score_history_id,
+                portfolio_id=e.portfolio_id,
+                skill_name=e.skill_name,
+                level_rank=e.level_rank,
+                criteria_passing_description=e.criteria_passing_description,
+                criteria_id=e.criteria_id,
+                confidence=e.confidence,
+                matched_from=e.matched_from,
+            )
+            for e in result.evaluations
+        ],
+    )
 
-@app.post("/portfolio/ai_evaluate")
-async def ai_evaluate(
-    text: str,  # full extracted text from portfolio import
+
+@app.post("/portfolio/evaluate", response_model=PortfolioEvaluateResponse)
+async def evaluate_and_save(
+    text: str,
     rubric_id: int,
     user_id: int,
     db: db_dependency,
     filename: str | None = None,
+    skill_evaluation_id: int | None = None,
 ):
     """
-    Classify the provided `text` using OpenAI service, match extracted skills
-    to rubric criteria, and persist AIEvaluatedSkill to be added in SkillEvaluation.
+    Primary upload-style evaluation: query params match the import → evaluate flow
+    (client sends extracted text after /portfolio/import). Creates Portfolio +
+    SkillEvaluation + one AIEvaluatedSkill per rubric skill, or refreshes AI rows
+    when skill_evaluation_id is provided (re-upload / new text).
+    For long text, prefer POST /ai_evaluation/run with a JSON body.
     """
     try:
-        if not text:
-            raise HTTPException(status_code=400, detail="text is required for evaluation")
-
         openai_service = get_openai_service()
-
-        # load rubric criteria for matching (must happen before calling match)
-        criteria_rows = db.query(models.Criteria).join(
-            models.RubricSkill, models.Criteria.rubric_skill_id == models.RubricSkill.id
-        ).filter(models.RubricSkill.rubric_id == rubric_id).all()
-
-        # Prepare criteria payload to send to OpenAI matching call
-        criteria_payload = [
-            {
-                "criteria_id": c.id,
-                "rubric_skill_id": c.rubric_skill_id,
-                "level_id": c.level_id,
-                "description": c.description,
-            }
-            for c in criteria_rows if c.description
-        ]
-
-        # Use OpenAI to match text directly to rubric criteria and produce
-        # both a classification and structured matches (skill/level/evidence).
-        match_result = await openai_service.match_text_to_criteria(text=text, classification={}, criteria=criteria_payload)
-
-        if isinstance(match_result, dict):
-            classification = match_result.get("classification") or {"skills": [], "categories": [], "summary": ""}
-            matches = match_result.get("matches") or []
-        else:
-            # backward compatibility: treat as matches list
-            classification = {"skills": [], "categories": [], "summary": ""}
-            matches = match_result
-
-        # create a Portfolio record to attach evaluated skills
-        db_portfolio = models.Portfolio(
-            filename=filename or "text_portfolio",
-            classification_json=classification,
-            created_at=datetime.utcnow()
-        )
-        db.add(db_portfolio)
-        db.commit()
-        db.refresh(db_portfolio)
-
-        # track which rubric version was used for this evaluation
-        rubric_history = models.RubricScoreHistory(
-            created_at=datetime.utcnow(),
-            status="valid",
-            rubric_score_id=rubric_id,
-        )
-        db.add(rubric_history)
-        db.commit()
-        db.refresh(rubric_history)
-
-        # page-level evaluation container
-        skill_evaluation = models.SkillEvaluation(
-            rubric_score_history_id=rubric_history.id,
-            portfolio_id=db_portfolio.id,
+        result = await run_portfolio_ai_evaluation(
+            db,
+            text=text,
+            rubric_id=rubric_id,
             user_id=user_id,
-            created_at=datetime.utcnow(),
-            status="draft",
+            filename=filename,
+            openai_service=openai_service,
+            skill_evaluation_id=skill_evaluation_id,
         )
-        db.add(skill_evaluation)
-        db.commit()
-        db.refresh(skill_evaluation)
-
-        saved_evals = []
-        # Persist matches returned by the OpenAI service
-        for m in matches:
-            crit_id = m.get("criteria_id")
-            crit = next((c for c in criteria_rows if c.id == crit_id), None)
-            if not crit:
-                continue
-
-            skill_name = crit.rubric_skill.name if crit.rubric_skill else "unknown"
-            level_rank = crit.level.rank if crit.level else 0
-
-            eval_row = models.AIEvaluatedSkill(
-                skill_evaluation_id=skill_evaluation.id,
-                rubric_score_history_id=rubric_history.id,
-                portfolio_id=db_portfolio.id,
-                criteria_passing_description=m.get("matched_text") or crit.description,
-                skill_name=skill_name,
-                level_rank=level_rank,
-            )
-            db.add(eval_row)
-            db.commit()
-            db.refresh(eval_row)
-
-            saved_evals.append({
-                "id": eval_row.id,
-                "skill_evaluation_id": eval_row.skill_evaluation_id,
-                "rubric_score_history_id": eval_row.rubric_score_history_id,
-                "skill_name": eval_row.skill_name,
-                "level_rank": eval_row.level_rank,
-                "criteria_passing_description": eval_row.criteria_passing_description
-            })
-
-        return JSONResponse(status_code=200, content={
-            "success": True,
-            "portfolio_id": db_portfolio.id,
-            "skill_evaluation_id": skill_evaluation.id,
-            "rubric_score_history_id": rubric_history.id,
-            "classification": classification,
-            "evaluations": saved_evals
-        })
-
+        return _portfolio_evaluate_response_from_result(result)
     except ValueError as e:
-        logger.error(f"Validation error: {str(e)}")
-        raise HTTPException(status_code=400, detail=str(e))
+        logger.error("Validation error: %s", e)
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(f"Error during evaluation: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Failed to evaluate and save: {str(e)}")
+        logger.error("Error during evaluation: %s", e)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to evaluate and save: {str(e)}"
+        ) from e
 
-@app.get("/skill_evaluation/{skill_evaluation_id}/ai_evaluations", response_model=List[AIEvaluatedSkillModel])
-async def read_ai_evaluations_for_skill_evaluation(skill_evaluation_id: int, db: db_dependency):
-    ai_evaluations = db.query(models.AIEvaluatedSkill).filter(models.AIEvaluatedSkill.skill_evaluation_id == skill_evaluation_id).all()
-    if not ai_evaluations:
-        raise HTTPException(status_code=404, detail=f"skill_evaluation_id {skill_evaluation_id} not found")
-    return ai_evaluations
 
-@app.delete("/ai_evaluation/{ai_evaluation_id}")
-async def delete_ai_evaluation(ai_evaluation_id: int, db: db_dependency):
-    ai_evaluation = db.query(models.AIEvaluatedSkill).filter(models.AIEvaluatedSkill.id == ai_evaluation_id).first()
-    if not ai_evaluation:
-        raise HTTPException(status_code=404, detail=f"ai_evaluation_id {ai_evaluation_id} not found")
-    db.delete(ai_evaluation)
-    db.commit()
-    return JSONResponse(status_code=200, content={"detail": f"ai_evaluation_id {ai_evaluation_id} deleted successfully"})
-
-@app.put("/ai_evaluation/{ai_evaluation_id}", response_model=AIEvaluatedSkillModel)
-async def update_ai_evaluation(ai_evaluation_id: int, ai_evaluation: AIEvaluatedSkillBase, db: db_dependency):
-    db_ai_evaluation = db.query(models.AIEvaluatedSkill).filter(models.AIEvaluatedSkill.id == ai_evaluation_id).first()
-    if not db_ai_evaluation:
-        raise HTTPException(status_code=404, detail=f"ai_evaluation_id {ai_evaluation_id} not found")
-    for key, value in ai_evaluation.model_dump().items():
-        setattr(db_ai_evaluation, key, value)
-    db.commit()
-    db.refresh(db_ai_evaluation)
-    return db_ai_evaluation
-
-@app.post("/student_evaluation/")
-async def create_student_evaluation(
-    student_evaluation: StudentEvaluatedSkillBase,
-    db: db_dependency
-):
-    db_student_evaluation = models.StudentEvaluatedSkill(
-        skill_evaluation_id=student_evaluation.skill_evaluation_id,
-        skill_name=student_evaluation.skill_name,
-        level_rank=student_evaluation.level_rank
-    )
-    db.add(db_student_evaluation)
-    db.commit()
-    db.refresh(db_student_evaluation)
-    return db_student_evaluation
-
-@app.get("/student_evaluation/{student_evaluation_id}", response_model=StudentEvaluatedSkillModel)
-async def read_student_evaluation(student_evaluation_id: int, db: db_dependency):
-    student_evaluation = db.query(models.StudentEvaluatedSkill).filter(models.StudentEvaluatedSkill.id == student_evaluation_id).first()
-    if not student_evaluation:
-        raise HTTPException(status_code=404, detail=f"student_evaluation_id {student_evaluation_id} not found")
-    return student_evaluation
-
-@app.get("/skill_evaluation/{skill_evaluation_id}/student_evaluations", response_model=List[StudentEvaluatedSkillModel])
-async def read_student_evaluations_for_skill_evaluation(skill_evaluation_id: int, db: db_dependency):
-    student_evaluations = db.query(models.StudentEvaluatedSkill).filter(models.StudentEvaluatedSkill.skill_evaluation_id == skill_evaluation_id).all()
-    if not student_evaluations:
-        raise HTTPException(status_code=404, detail=f"skill_evaluation_id {skill_evaluation_id} not found")
-    return student_evaluations
-
-@app.delete("/student_evaluation/{student_evaluation_id}")
-async def delete_student_evaluation(student_evaluation_id: int, db: db_dependency):
-    student_evaluation = db.query(models.StudentEvaluatedSkill).filter(models.StudentEvaluatedSkill.id == student_evaluation_id).first()
-    if not student_evaluation:
-        raise HTTPException(status_code=404, detail=f"student_evaluation_id {student_evaluation_id} not found")
-    db.delete(student_evaluation)
-    db.commit()
-    return JSONResponse(status_code=200, content={"detail": f"student_evaluation_id {student_evaluation_id} deleted successfully"})
-
-@app.put("/student_evaluation/{student_evaluation_id}", response_model=StudentEvaluatedSkillModel)
-async def update_student_evaluation(student_evaluation_id: int, student_evaluation: StudentEvaluatedSkillBase, db: db_dependency):
-    db_student_evaluation = db.query(models.StudentEvaluatedSkill).filter(models.StudentEvaluatedSkill.id == student_evaluation_id).first()
-    if not db_student_evaluation:
-        raise HTTPException(status_code=404, detail=f"student_evaluation_id {student_evaluation_id} not found")
-    for key, value in student_evaluation.model_dump().items():
-        setattr(db_student_evaluation, key, value)
-    db.commit()
-    db.refresh(db_student_evaluation)
-    return db_student_evaluation
-
-@app.post("/teacher_evaluation/")
-async def create_teacher_evaluation(
-    teacher_evaluation: TeacherEvaluatedSkillBase,
-    db: db_dependency
-):
-    db_teacher_evaluation = models.TeacherEvaluatedSkill(
-        skill_evaluation_id=teacher_evaluation.skill_evaluation_id,
-        skill_name=teacher_evaluation.skill_name,
-        level_rank=teacher_evaluation.level_rank)
-    db.add(db_teacher_evaluation)
-    db.commit()
-    db.refresh(db_teacher_evaluation)
-    return db_teacher_evaluation
-    
-@app.get("/teacher_evaluation/{teacher_evaluation_id}", response_model=TeacherEvaluatedSkillModel)
-async def read_teacher_evaluation(teacher_evaluation_id: int, db: db_dependency):
-    teacher_evaluation = db.query(models.TeacherEvaluatedSkill).filter(models.TeacherEvaluatedSkill.id == teacher_evaluation_id).first()
-    if not teacher_evaluation:
-        raise HTTPException(status_code=404, detail=f"teacher_evaluation_id {teacher_evaluation_id} not found")
-    return teacher_evaluation
-    
-@app.get("/skill_evaluation/{skill_evaluation_id}/teacher_evaluations", response_model=List[TeacherEvaluatedSkillModel])
-async def read_teacher_evaluations_for_skill_evaluation(skill_evaluation_id: int, db: db_dependency):
-    teacher_evaluations = db.query(models.TeacherEvaluatedSkill).filter(models.TeacherEvaluatedSkill.skill_evaluation_id == skill_evaluation_id).all()
-    if not teacher_evaluations:
-        raise HTTPException(status_code=404, detail=f"skill_evaluation_id {skill_evaluation_id} not found")
-    return teacher_evaluations
-
-@app.delete("/teacher_evaluation/{teacher_evaluation_id}")
-async def delete_teacher_evaluation(teacher_evaluation_id: int, db: db_dependency):
-    teacher_evaluation = db.query(models.TeacherEvaluatedSkill).filter(models.TeacherEvaluatedSkill.id == teacher_evaluation_id).first()
-    if not teacher_evaluation:
-        raise HTTPException(status_code=404, detail=f"teacher_evaluation_id {teacher_evaluation_id} not found")
-    db.delete(teacher_evaluation)
-    db.commit()
-    return JSONResponse(status_code=200, content={"detail": f"teacher_evaluation_id {teacher_evaluation_id} deleted successfully"})
-    
-@app.put("/teacher_evaluation/{teacher_evaluation_id}", response_model=TeacherEvaluatedSkillModel)
-async def update_teacher_evaluation(teacher_evaluation_id: int, teacher_evaluation: TeacherEvaluatedSkillBase, db: db_dependency):
-    db_teacher_evaluation = db.query(models.TeacherEvaluatedSkill).filter(models.TeacherEvaluatedSkill.id == teacher_evaluation_id).first()
-    if not db_teacher_evaluation:
-        raise HTTPException(status_code=404, detail=f"teacher_evaluation_id {teacher_evaluation_id} not found")
-    for key, value in teacher_evaluation.model_dump().items():
-        setattr(db_teacher_evaluation, key, value)
-    db.commit()
-    db.refresh(db_teacher_evaluation)
-    return db_teacher_evaluation
-
-@app.post("/skill_evaluation/")
-async def create_skill_evaluation(
-    rubric_score_history_id: int,
-    portfolio_id: int,
-    user_id: int,
-    evaluated_ai_ids: List[int] | None = None,
-    db: db_dependency = Depends(get_db)
-):
+@app.post("/ai_evaluation/run", response_model=PortfolioEvaluateResponse)
+async def ai_evaluation_run(body: PortfolioEvaluateRequest, db: db_dependency):
     """
-    Create a SkillEvaluation aggregate (required: rubric_score_history_id) and
-    optionally attach existing AI-evaluated skill rows to it.
+    Same logic as POST /portfolio/evaluate with a JSON body (better for long text).
+    Optional skill_evaluation_id replaces AI rows only and updates portfolio classification.
     """
     try:
-        # validate rubric history
-        rubric_history = db.query(models.RubricScoreHistory).filter(models.RubricScoreHistory.id == rubric_score_history_id).first()
-        if not rubric_history:
-            raise HTTPException(status_code=400, detail=f"rubric_score_history_id {rubric_score_history_id} not found")
-
-        # validate portfolio
-        portfolio = db.query(models.Portfolio).filter(models.Portfolio.id == portfolio_id).first()
-        if not portfolio:
-            raise HTTPException(status_code=400, detail=f"portfolio_id {portfolio_id} not found")
-
-        # create SkillEvaluation
-        skill_eval = models.SkillEvaluation(
-            rubric_score_history_id=rubric_score_history_id,
-            portfolio_id=portfolio_id,
-            user_id=user_id,
-            created_at=datetime.utcnow(),
-            status="draft",
+        openai_service = get_openai_service()
+        result = await run_portfolio_ai_evaluation(
+            db,
+            text=body.text,
+            rubric_id=body.rubric_id,
+            user_id=body.user_id,
+            filename=body.filename,
+            openai_service=openai_service,
+            skill_evaluation_id=body.skill_evaluation_id,
         )
-        db.add(skill_eval)
-        db.commit()
-        db.refresh(skill_eval)
-
-        attached = []
-        if evaluated_ai_ids:
-            for aid in evaluated_ai_ids:
-                ai_row = db.query(models.AIEvaluatedSkill).filter(models.AIEvaluatedSkill.id == aid, models.AIEvaluatedSkill.portfolio_id == portfolio_id).first()
-                if not ai_row:
-                    continue
-                ai_row.skill_evaluation_id = skill_eval.id
-                db.add(ai_row)
-                db.commit()
-                db.refresh(ai_row)
-                attached.append(ai_row.id)
-
-        return JSONResponse(status_code=201, content={
-            "success": True,
-            "skill_evaluation_id": skill_eval.id,
-            "attached_ai_ids": attached
-        })
-
-    except HTTPException:
-        raise
+        return _portfolio_evaluate_response_from_result(result)
+    except ValueError as e:
+        logger.error("Validation error: %s", e)
+        raise HTTPException(status_code=400, detail=str(e)) from e
     except Exception as e:
-        logger.error(f"Error creating SkillEvaluation: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error("Error during AI evaluation: %s", e)
+        raise HTTPException(
+            status_code=500, detail=f"Failed to evaluate and save: {str(e)}"
+        ) from e
+
+
+def _get_skill_evaluation_or_404(
+    db: Session, skill_evaluation_id: int
+) -> models.SkillEvaluation:
+    se = (
+        db.query(models.SkillEvaluation)
+        .filter(models.SkillEvaluation.id == skill_evaluation_id)
+        .first()
+    )
+    if not se:
+        raise HTTPException(
+            status_code=404,
+            detail=f"skill_evaluation_id {skill_evaluation_id} not found",
+        )
+    return se
+
+
+def _list_ai_evaluated_skills_for_skill_evaluation(
+    skill_evaluation_id: int, db: Session
+) -> list[models.AIEvaluatedSkill]:
+    _get_skill_evaluation_or_404(db, skill_evaluation_id)
+    return (
+        db.query(models.AIEvaluatedSkill)
+        .filter(
+            models.AIEvaluatedSkill.skill_evaluation_id == skill_evaluation_id
+        )
+        .all()
+    )
+
+
+@app.get(
+    "/skill_evaluation/{skill_evaluation_id}/ai_evaluations",
+    response_model=list[AIEvaluatedSkillModel],
+)
+async def list_ai_evaluations_for_skill_evaluation(
+    skill_evaluation_id: int, db: db_dependency
+):
+    return _list_ai_evaluated_skills_for_skill_evaluation(skill_evaluation_id, db)
+
+
+@app.get(
+    "/skill_evaluation/{skill_evaluation_id}/ai_evaluated_skills",
+    response_model=list[AIEvaluatedSkillModel],
+)
+async def list_ai_evaluated_skills_for_skill_evaluation(
+    skill_evaluation_id: int, db: db_dependency
+):
+    """Same data as /ai_evaluations; name aligned with student/teacher nested lists."""
+    return _list_ai_evaluated_skills_for_skill_evaluation(skill_evaluation_id, db)
+
+
+@app.get("/ai_evaluation/{ai_evaluated_skill_id}", response_model=AIEvaluatedSkillModel)
+async def get_ai_evaluation(ai_evaluated_skill_id: int, db: db_dependency):
+    row = (
+        db.query(models.AIEvaluatedSkill)
+        .filter(models.AIEvaluatedSkill.id == ai_evaluated_skill_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404, detail=f"ai_evaluated_skill_id {ai_evaluated_skill_id} not found"
+        )
+    return row
+
+
+"""Skill evaluation page API: SkillEvaluation + student / teacher / AI evaluated skills (CRUD)"""
+
+
+@app.post("/skill_evaluation/", response_model=SkillEvaluationModel)
+async def create_skill_evaluation(body: SkillEvaluationCreate, db: db_dependency):
+    if not (
+        db.query(models.RubricScoreHistory)
+        .filter(models.RubricScoreHistory.id == body.rubric_score_history_id)
+        .first()
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail=f"rubric_score_history_id {body.rubric_score_history_id} does not exist",
+        )
+    if not db.query(models.Portfolio).filter(models.Portfolio.id == body.portfolio_id).first():
+        raise HTTPException(
+            status_code=400, detail=f"portfolio_id {body.portfolio_id} does not exist"
+        )
+    if not db.query(models.User).filter(models.User.id == body.user_id).first():
+        raise HTTPException(status_code=400, detail=f"user_id {body.user_id} does not exist")
+    now = datetime.utcnow()
+    row = models.SkillEvaluation(
+        rubric_score_history_id=body.rubric_score_history_id,
+        portfolio_id=body.portfolio_id,
+        user_id=body.user_id,
+        created_at=body.created_at or now,
+        status=body.status,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.get("/skill_evaluation/", response_model=List[SkillEvaluationModel])
+async def list_skill_evaluations(
+    db: db_dependency,
+    skip: int = 0,
+    limit: int = 100,
+    user_id: Optional[int] = None,
+    portfolio_id: Optional[int] = None,
+):
+    q = db.query(models.SkillEvaluation)
+    if user_id is not None:
+        q = q.filter(models.SkillEvaluation.user_id == user_id)
+    if portfolio_id is not None:
+        q = q.filter(models.SkillEvaluation.portfolio_id == portfolio_id)
+    return q.order_by(models.SkillEvaluation.id.desc()).offset(skip).limit(limit).all()
+
+
+@app.get(
+    "/skill_evaluation/{skill_evaluation_id}/full",
+    response_model=SkillEvaluationFullModel,
+)
+async def read_skill_evaluation_full(
+    skill_evaluation_id: int, db: db_dependency
+):
+    se = (
+        db.query(models.SkillEvaluation)
+        .options(
+            joinedload(models.SkillEvaluation.ai_evaluated_skills),
+            joinedload(models.SkillEvaluation.student_evaluated_skills),
+            joinedload(models.SkillEvaluation.teacher_evaluated_skills),
+        )
+        .filter(models.SkillEvaluation.id == skill_evaluation_id)
+        .first()
+    )
+    if not se:
+        raise HTTPException(
+            status_code=404,
+            detail=f"skill_evaluation_id {skill_evaluation_id} not found",
+        )
+    return SkillEvaluationFullModel(
+        id=se.id,
+        rubric_score_history_id=se.rubric_score_history_id,
+        portfolio_id=se.portfolio_id,
+        user_id=se.user_id,
+        created_at=se.created_at,
+        status=se.status,
+        ai_evaluated_skills=[
+            AIEvaluatedSkillModel.model_validate(x) for x in se.ai_evaluated_skills
+        ],
+        student_evaluated_skills=[
+            StudentEvaluatedSkillModel.model_validate(x)
+            for x in se.student_evaluated_skills
+        ],
+        teacher_evaluated_skills=[
+            TeacherEvaluatedSkillModel.model_validate(x)
+            for x in se.teacher_evaluated_skills
+        ],
+    )
+
+
+@app.get("/skill_evaluation/{skill_evaluation_id}", response_model=SkillEvaluationModel)
+async def read_skill_evaluation(skill_evaluation_id: int, db: db_dependency):
+    return _get_skill_evaluation_or_404(db, skill_evaluation_id)
+
+
+@app.put("/skill_evaluation/{skill_evaluation_id}", response_model=SkillEvaluationModel)
+async def update_skill_evaluation(
+    skill_evaluation_id: int, body: SkillEvaluationUpdate, db: db_dependency
+):
+    row = _get_skill_evaluation_or_404(db, skill_evaluation_id)
+    data = body.model_dump(exclude_unset=True)
+    if "rubric_score_history_id" in data:
+        rid = data["rubric_score_history_id"]
+        if rid is not None and not (
+            db.query(models.RubricScoreHistory)
+            .filter(models.RubricScoreHistory.id == rid)
+            .first()
+        ):
+            raise HTTPException(
+                status_code=400, detail=f"rubric_score_history_id {rid} does not exist"
+            )
+    if "portfolio_id" in data:
+        pid = data["portfolio_id"]
+        if pid is not None and not (
+            db.query(models.Portfolio).filter(models.Portfolio.id == pid).first()
+        ):
+            raise HTTPException(status_code=400, detail=f"portfolio_id {pid} does not exist")
+    if "user_id" in data:
+        uid = data["user_id"]
+        if uid is not None and not (
+            db.query(models.User).filter(models.User.id == uid).first()
+        ):
+            raise HTTPException(status_code=400, detail=f"user_id {uid} does not exist")
+    for key, value in data.items():
+        setattr(row, key, value)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.delete("/skill_evaluation/{skill_evaluation_id}")
+async def delete_skill_evaluation(skill_evaluation_id: int, db: db_dependency):
+    row = _get_skill_evaluation_or_404(db, skill_evaluation_id)
+    db.delete(row)
+    db.commit()
+    return JSONResponse(
+        status_code=200,
+        content={"detail": f"skill_evaluation_id {skill_evaluation_id} deleted"},
+    )
+
+
+@app.post("/student_evaluated_skill/", response_model=StudentEvaluatedSkillModel)
+async def create_student_evaluated_skill(
+    body: StudentEvaluatedSkillBase, db: db_dependency
+):
+    _get_skill_evaluation_or_404(db, body.skill_evaluation_id)
+    row = models.StudentEvaluatedSkill(**body.model_dump())
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.get(
+    "/skill_evaluation/{skill_evaluation_id}/student_evaluated_skills",
+    response_model=List[StudentEvaluatedSkillModel],
+)
+async def list_student_evaluated_skills_for_skill_evaluation(
+    skill_evaluation_id: int, db: db_dependency
+):
+    _get_skill_evaluation_or_404(db, skill_evaluation_id)
+    return (
+        db.query(models.StudentEvaluatedSkill)
+        .filter(
+            models.StudentEvaluatedSkill.skill_evaluation_id == skill_evaluation_id
+        )
+        .all()
+    )
+
+
+@app.get(
+    "/student_evaluated_skill/{student_evaluated_skill_id}",
+    response_model=StudentEvaluatedSkillModel,
+)
+async def read_student_evaluated_skill(
+    student_evaluated_skill_id: int, db: db_dependency
+):
+    row = (
+        db.query(models.StudentEvaluatedSkill)
+        .filter(models.StudentEvaluatedSkill.id == student_evaluated_skill_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"student_evaluated_skill_id {student_evaluated_skill_id} not found",
+        )
+    return row
+
+
+@app.put(
+    "/student_evaluated_skill/{student_evaluated_skill_id}",
+    response_model=StudentEvaluatedSkillModel,
+)
+async def update_student_evaluated_skill(
+    student_evaluated_skill_id: int, body: StudentEvaluatedSkillBase, db: db_dependency
+):
+    row = (
+        db.query(models.StudentEvaluatedSkill)
+        .filter(models.StudentEvaluatedSkill.id == student_evaluated_skill_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"student_evaluated_skill_id {student_evaluated_skill_id} not found",
+        )
+    _get_skill_evaluation_or_404(db, body.skill_evaluation_id)
+    for key, value in body.model_dump().items():
+        setattr(row, key, value)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.delete("/student_evaluated_skill/{student_evaluated_skill_id}")
+async def delete_student_evaluated_skill(
+    student_evaluated_skill_id: int, db: db_dependency
+):
+    row = (
+        db.query(models.StudentEvaluatedSkill)
+        .filter(models.StudentEvaluatedSkill.id == student_evaluated_skill_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"student_evaluated_skill_id {student_evaluated_skill_id} not found",
+        )
+    db.delete(row)
+    db.commit()
+    return JSONResponse(
+        status_code=200,
+        content={
+            "detail": f"student_evaluated_skill_id {student_evaluated_skill_id} deleted"
+        },
+    )
+
+
+@app.post("/teacher_evaluated_skill/", response_model=TeacherEvaluatedSkillModel)
+async def create_teacher_evaluated_skill(
+    body: TeacherEvaluatedSkillBase, db: db_dependency
+):
+    _get_skill_evaluation_or_404(db, body.skill_evaluation_id)
+    row = models.TeacherEvaluatedSkill(**body.model_dump())
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.get(
+    "/skill_evaluation/{skill_evaluation_id}/teacher_evaluated_skills",
+    response_model=List[TeacherEvaluatedSkillModel],
+)
+async def list_teacher_evaluated_skills_for_skill_evaluation(
+    skill_evaluation_id: int, db: db_dependency
+):
+    _get_skill_evaluation_or_404(db, skill_evaluation_id)
+    return (
+        db.query(models.TeacherEvaluatedSkill)
+        .filter(
+            models.TeacherEvaluatedSkill.skill_evaluation_id == skill_evaluation_id
+        )
+        .all()
+    )
+
+
+@app.get(
+    "/teacher_evaluated_skill/{teacher_evaluated_skill_id}",
+    response_model=TeacherEvaluatedSkillModel,
+)
+async def read_teacher_evaluated_skill(
+    teacher_evaluated_skill_id: int, db: db_dependency
+):
+    row = (
+        db.query(models.TeacherEvaluatedSkill)
+        .filter(models.TeacherEvaluatedSkill.id == teacher_evaluated_skill_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"teacher_evaluated_skill_id {teacher_evaluated_skill_id} not found",
+        )
+    return row
+
+
+@app.put(
+    "/teacher_evaluated_skill/{teacher_evaluated_skill_id}",
+    response_model=TeacherEvaluatedSkillModel,
+)
+async def update_teacher_evaluated_skill(
+    teacher_evaluated_skill_id: int, body: TeacherEvaluatedSkillBase, db: db_dependency
+):
+    row = (
+        db.query(models.TeacherEvaluatedSkill)
+        .filter(models.TeacherEvaluatedSkill.id == teacher_evaluated_skill_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"teacher_evaluated_skill_id {teacher_evaluated_skill_id} not found",
+        )
+    _get_skill_evaluation_or_404(db, body.skill_evaluation_id)
+    for key, value in body.model_dump().items():
+        setattr(row, key, value)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.delete("/teacher_evaluated_skill/{teacher_evaluated_skill_id}")
+async def delete_teacher_evaluated_skill(
+    teacher_evaluated_skill_id: int, db: db_dependency
+):
+    row = (
+        db.query(models.TeacherEvaluatedSkill)
+        .filter(models.TeacherEvaluatedSkill.id == teacher_evaluated_skill_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"teacher_evaluated_skill_id {teacher_evaluated_skill_id} not found",
+        )
+    db.delete(row)
+    db.commit()
+    return JSONResponse(
+        status_code=200,
+        content={
+            "detail": f"teacher_evaluated_skill_id {teacher_evaluated_skill_id} deleted"
+        },
+    )
+
+
+@app.post("/ai_evaluated_skill/", response_model=AIEvaluatedSkillModel)
+async def create_ai_evaluated_skill_placeholder(
+    body: AIEvaluatedSkillPlaceholderCreate, db: db_dependency
+):
+    """
+    Placeholder CRUD: same request shape as teacher_evaluated_skill.
+    Fills rubric_score_history_id and portfolio_id from SkillEvaluation;
+    criteria_passing_description is a fixed placeholder until AI owns it.
+    """
+    se = _get_skill_evaluation_or_404(db, body.skill_evaluation_id)
+    row = models.AIEvaluatedSkill(
+        skill_evaluation_id=se.id,
+        rubric_score_history_id=se.rubric_score_history_id,
+        portfolio_id=se.portfolio_id,
+        criteria_passing_description=AI_EVALUATED_SKILL_CRITERIA_PLACEHOLDER,
+        skill_name=body.skill_name,
+        level_rank=body.level_rank,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.get(
+    "/ai_evaluated_skill/{ai_evaluated_skill_id}",
+    response_model=AIEvaluatedSkillModel,
+)
+async def read_ai_evaluated_skill(ai_evaluated_skill_id: int, db: db_dependency):
+    row = (
+        db.query(models.AIEvaluatedSkill)
+        .filter(models.AIEvaluatedSkill.id == ai_evaluated_skill_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"ai_evaluated_skill_id {ai_evaluated_skill_id} not found",
+        )
+    return row
+
+
+@app.put(
+    "/ai_evaluated_skill/{ai_evaluated_skill_id}",
+    response_model=AIEvaluatedSkillModel,
+)
+async def update_ai_evaluated_skill_placeholder(
+    ai_evaluated_skill_id: int, body: AIEvaluatedSkillPlaceholderUpdate, db: db_dependency
+):
+    """Placeholder: only skill_name / level_rank (teacher-shaped); criteria text unchanged."""
+    row = (
+        db.query(models.AIEvaluatedSkill)
+        .filter(models.AIEvaluatedSkill.id == ai_evaluated_skill_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"ai_evaluated_skill_id {ai_evaluated_skill_id} not found",
+        )
+    data = body.model_dump(exclude_unset=True)
+    if "skill_name" in data:
+        row.skill_name = data["skill_name"]
+    if "level_rank" in data:
+        row.level_rank = data["level_rank"]
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+@app.delete("/ai_evaluated_skill/{ai_evaluated_skill_id}")
+async def delete_ai_evaluated_skill(ai_evaluated_skill_id: int, db: db_dependency):
+    row = (
+        db.query(models.AIEvaluatedSkill)
+        .filter(models.AIEvaluatedSkill.id == ai_evaluated_skill_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"ai_evaluated_skill_id {ai_evaluated_skill_id} not found",
+        )
+    db.delete(row)
+    db.commit()
+    return JSONResponse(
+        status_code=200,
+        content={"detail": f"ai_evaluated_skill_id {ai_evaluated_skill_id} deleted"},
+    )

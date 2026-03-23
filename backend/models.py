@@ -30,7 +30,7 @@ class RubricScoreHistory(Base):
     __tablename__ = 'rubric_score_history'
     id = Column(Integer, primary_key=True, index=True)
     created_at = Column(DateTime) # only store the created_at time, never update, to keep track of when the rubric score is used for a portfolio.
-    expired_at = Column(DateTime, nullable=True) # when the rubric score is updated, we will set the expired_at time for the old rubric score, to keep track of the validity of the rubric score.
+    expired_at = Column(DateTime, nullable=True, default=None) # when the rubric score is updated, we will set the expired_at time for the old rubric score, to keep track of the validity of the rubric score.
     status = Column(String, default="valid") # valid, outdated, expired
     rubric_score_id = Column(Integer, ForeignKey('rubricscore.id', ondelete='CASCADE'), index=True)
     
