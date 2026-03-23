@@ -209,6 +209,10 @@ const Profile2: React.FC = () => {
     (skillEvaluationStatus === 'pending' ||
       skillEvaluationStatus === 'completed' ||
       skillEvaluationStatus === 'approved');
+  const isStudentEvaluationCompleted =
+    isStudent &&
+    (skillEvaluationStatus === 'completed' ||
+      skillEvaluationStatus === 'approved');
   const shouldShowTeacherPanel =
     !isStudent || skillEvaluationStatus === 'completed' || skillEvaluationStatus === 'approved';
   const evaluationPanelsGridClass = shouldShowTeacherPanel
@@ -791,9 +795,10 @@ const Profile2: React.FC = () => {
         setOriginalPortfolioDisplayName(uploadedFiles[0]?.name || portfolioDisplayName || '');
         setOriginalConfirmedRubricId(confirmedRubricId);
         setDraftAiEvaluations(null);
-        navigate('/profile2', {
-          state: { addedSkillEvaluationId: String(skillEvaluationIdToSave), refreshAt: Date.now() },
-        });
+        // Stay on this detail page after Save; for first-time create, switch URL to the new id.
+        if (String(evaluationId || '') !== String(skillEvaluationIdToSave)) {
+          navigate(`/profile2/${skillEvaluationIdToSave}`, { replace: true });
+        }
       } else {
         console.warn('Evaluation saved but no skill_evaluation_id returned.');
       }
@@ -817,6 +822,7 @@ const Profile2: React.FC = () => {
     aiEvaluations,
     draftAiEvaluations,
     resolveValidUserId,
+    evaluationId,
     navigate,
   ]);
 
@@ -837,9 +843,6 @@ const Profile2: React.FC = () => {
       await updateSkillEvaluation(evaluationId, { status: 'pending' });
       setSkillEvaluationStatus('pending');
       alert('Teacher evaluation requested. Status is now pending.');
-      navigate('/profile2', {
-        state: { addedSkillEvaluationId: String(evaluationId), refreshAt: Date.now() },
-      });
     } catch (error) {
       console.error('Failed to request teacher evaluation:', error);
       alert(`Failed to request teacher evaluation: ${getApiErrorDetail(error)}`);
@@ -1001,6 +1004,26 @@ const Profile2: React.FC = () => {
       skill.skillArea.toLowerCase().includes(query)
     );
   }, [teacherSkills, searchTeacher]);
+
+  const rubricLevelOptions = useMemo(() => {
+    const headers = selectedRubricData?.headers || [];
+    const levelCount = Math.max(1, headers.length || 0);
+    return Array.from({ length: levelCount }, (_, i) => ({
+      value: String(i + 1),
+      label: headers[i]?.trim() ? headers[i] : `Level ${i + 1}`,
+    }));
+  }, [selectedRubricData]);
+
+  const toRubricLevelLabel = useCallback(
+    (scoreRaw: string): string => {
+      const score = Number(scoreRaw);
+      if (!Number.isInteger(score) || score <= 0) return '';
+      const headers = selectedRubricData?.headers || [];
+      const header = headers[score - 1];
+      return header && header.trim() ? header : `Level ${score}`;
+    },
+    [selectedRubricData]
+  );
 
   /** Student in edit mode: preview AI run before Save; otherwise show saved AI scores. */
   const aiEvaluationsForDisplay = useMemo(() => {
@@ -1440,7 +1463,7 @@ const Profile2: React.FC = () => {
                         <input
                           type="text"
                           className="profile2-score-input ai-score-input"
-                          value={aiEvaluationsForDisplay[skill.skillArea] || ''}
+                          value={toRubricLevelLabel(aiEvaluationsForDisplay[skill.skillArea] || '')}
                           readOnly
                           placeholder="Auto"
                         />
@@ -1506,39 +1529,39 @@ const Profile2: React.FC = () => {
                         ) : (
                           <span className="skill-name">{skill.skillArea}</span>
                         )}
-                        <input
-                          type="text"
-                          className="profile2-score-input student-score-input"
-                          value={studentEvaluations[skill.skillArea] || ''}
-                          readOnly={!isStudent || isStudentEvaluationLocked}
-                          onChange={
-                            !isStudent || isStudentEvaluationLocked
-                              ? undefined
-                              : (e) => {
-                                  const value = e.target.value;
-                                  if (value === '' || /^\d+$/.test(value)) {
+                        {isStudentEvaluationCompleted ? (
+                          <input
+                            type="text"
+                            className="profile2-score-input student-score-input"
+                            value={toRubricLevelLabel(studentEvaluations[skill.skillArea] || '')}
+                            readOnly
+                            placeholder="-"
+                          />
+                        ) : (
+                          <select
+                            className="profile2-score-input student-score-input"
+                            value={studentEvaluations[skill.skillArea] || ''}
+                            disabled={!isStudent || isStudentEvaluationLocked}
+                            onChange={
+                              !isStudent || isStudentEvaluationLocked
+                                ? undefined
+                                : (e) => {
+                                    const value = e.target.value;
                                     setStudentEvaluations(prev => ({
                                       ...prev,
                                       [skill.skillArea]: value
                                     }));
                                   }
-                                }
-                          }
-                          onBlur={
-                            !isStudent || isStudentEvaluationLocked
-                              ? undefined
-                              : (e) => {
-                                  const value = e.target.value;
-                                  if (value && (!/^\d+$/.test(value) || parseInt(value) < 1)) {
-                                    setStudentEvaluations(prev => ({
-                                      ...prev,
-                                      [skill.skillArea]: ''
-                                    }));
-                                  }
-                                }
-                          }
-                          placeholder="Score"
-                        />
+                            }
+                          >
+                            <option value="">-</option>
+                            {rubricLevelOptions.map((level) => (
+                              <option key={level.value} value={level.value}>
+                                {level.label}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </div>
                     ))}
                     {isStudent && !isStudentEvaluationLocked && (
@@ -1603,7 +1626,7 @@ const Profile2: React.FC = () => {
                         <input
                           type="text"
                           className="profile2-score-input teacher-score-input"
-                          value={teacherEvaluations[skill.skillArea] || ''}
+                          value={toRubricLevelLabel(teacherEvaluations[skill.skillArea] || '')}
                           readOnly
                           placeholder="—"
                         />

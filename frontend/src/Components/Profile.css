@@ -1363,7 +1363,8 @@
   font-family: 'Roboto', sans-serif;
   font-size: 14px;
   text-align: center;
-  background-color: #ffffff;
+  background-color: #f5f5f5;
+  color: #666;
   transition: all 0.2s ease;
 }
 
@@ -1777,7 +1778,7 @@
 }
 
 .teacher-score-input {
-  width: 100px;
+  width: 80px;
 }
 
 /* AI Score Input - Auto-filled and read-only */
@@ -1880,7 +1881,7 @@
   }
   
   .teacher-score-input {
-    width: 100%;
+    width: 70px;
   }
 }
 

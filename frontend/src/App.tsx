@@ -4,6 +4,7 @@ import Navbar from './Components/Navbar';
 import { Routes, Route, useLocation } from 'react-router-dom';
 import Home from './Components/Home';
 import CertificateDetail from './Components/CertificateDetail';
+import CertificateList from './Components/CertificateList';
 import SkillMap from './Components/SkillMap';
 import RubricScoreList from './Components/RubricScoreList';
 import RubricScoreDetail from './Components/RubricScoreDetail';
@@ -31,7 +32,8 @@ const App: React.FC = () => {
           <main className="App-content">
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/certificate" element={<CertificateDetail />} />
+              <Route path="/certificate" element={<CertificateList />} />
+              <Route path="/certificate/:evaluationId" element={<CertificateDetail />} />
               <Route path="/skill_map" element={<SkillMap />} />
               <Route path="/rubric_score" element={<RubricScoreList />} />
               <Route path="/rubric_score/:id" element={<RubricScoreDetail />} />

@@ -320,6 +320,26 @@ const Profile3Detail: React.FC = () => {
     return teacherSkillsAll.filter(skill => skill.skillArea.toLowerCase().includes(query));
   }, [teacherSkillsAll, searchTeacher]);
 
+  const rubricLevelOptions = useMemo(() => {
+    const headers = selectedRubricData?.headers || [];
+    const levelCount = Math.max(1, headers.length || 0);
+    return Array.from({ length: levelCount }, (_, i) => ({
+      value: String(i + 1),
+      label: headers[i]?.trim() ? headers[i] : `Level ${i + 1}`,
+    }));
+  }, [selectedRubricData]);
+
+  const toRubricLevelLabel = useCallback(
+    (scoreRaw: string): string => {
+      const score = Number(scoreRaw);
+      if (!Number.isInteger(score) || score <= 0) return '';
+      const headers = selectedRubricData?.headers || [];
+      const header = headers[score - 1];
+      return header && header.trim() ? header : `Level ${score}`;
+    },
+    [selectedRubricData]
+  );
+
   const handleAddTeacherSkill = () => {
     const base = 'New Skill';
     const existing = new Set(teacherSkillsAll.map((s) => s.skillArea));
@@ -630,7 +650,7 @@ const Profile3Detail: React.FC = () => {
                           <input
                             type="text"
                             className="profile2-score-input ai-score-input"
-                            value={aiEvaluations[skill.skillArea] || ''}
+                            value={toRubricLevelLabel(aiEvaluations[skill.skillArea] || '')}
                             readOnly
                             placeholder="Auto"
                           />
@@ -661,7 +681,7 @@ const Profile3Detail: React.FC = () => {
                           <input
                             type="text"
                             className="profile2-score-input ai-score-input"
-                            value={studentEvaluations[skill.skillArea] || ''}
+                            value={toRubricLevelLabel(studentEvaluations[skill.skillArea] || '')}
                             readOnly
                             placeholder="—"
                           />
@@ -718,23 +738,18 @@ const Profile3Detail: React.FC = () => {
                           ) : (
                             <span className="skill-name">{skill.skillArea}</span>
                           )}
-                          <input
-                            type="text"
+                          <select
                             className="profile2-score-input teacher-score-input"
                             value={teacherScores[skill.skillArea] || ''}
-                            readOnly={false}
                             onChange={(e) => handleScoreChange(skill.skillArea, e.target.value)}
-                            onBlur={(e) => {
-                              const value = e.target.value;
-                              if (value && (!/^\d+$/.test(value) || parseInt(value) < 1)) {
-                                setTeacherScores(prev => ({
-                                  ...prev,
-                                  [skill.skillArea]: ''
-                                }));
-                              }
-                            }}
-                            placeholder="Score"
-                          />
+                          >
+                            <option value="">-</option>
+                            {rubricLevelOptions.map((level) => (
+                              <option key={level.value} value={level.value}>
+                                {level.label}
+                              </option>
+                            ))}
+                          </select>
                         </div>
                       ))}
                       <div
