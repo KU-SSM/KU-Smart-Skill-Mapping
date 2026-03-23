@@ -18,5 +18,6 @@ docker compose ps
 - SSL: Disable for local Docker.
 - Click **Test Connection** — you should see a successful connection and can run `SELECT version();`.
 
-## Next steps
-- Run Alembic migrations when ready: `alembic upgrade head` (from `backend/` with `DATABASE_URL` present).
+## Run Alembic Migration
+- Run Alembic migrations (from `backend/` with `DATABASE_URL` present).
+- [Alembic Setup](backend/alembic/alembic.md)
