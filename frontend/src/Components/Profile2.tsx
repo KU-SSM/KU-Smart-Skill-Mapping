@@ -193,8 +193,21 @@ const Profile2: React.FC = () => {
   const [originalPortfolioDisplayName, setOriginalPortfolioDisplayName] = useState<string>('');
   const [pendingHydratedScores, setPendingHydratedScores] = useState<EvaluationMaps | null>(null);
   const [hasAppliedHydratedScores, setHasAppliedHydratedScores] = useState<boolean>(false);
+  const hasTeacherSubmittedScores = useMemo(
+    () =>
+      Object.values(teacherEvaluations).some(
+        (value) =>
+          typeof value === 'string' &&
+          /^\d+$/.test(value.trim()) &&
+          Number(value.trim()) > 0
+      ),
+    [teacherEvaluations]
+  );
   const isStudentEvaluationLocked =
-    isStudent && (skillEvaluationStatus === 'completed' || skillEvaluationStatus === 'approved');
+    isStudent &&
+    (skillEvaluationStatus === 'pending' ||
+      skillEvaluationStatus === 'completed' ||
+      skillEvaluationStatus === 'approved');
   const shouldShowTeacherPanel =
     !isStudent || skillEvaluationStatus === 'completed' || skillEvaluationStatus === 'approved';
   const evaluationPanelsGridClass = shouldShowTeacherPanel
@@ -805,6 +818,27 @@ const Profile2: React.FC = () => {
     }
   };
 
+  const handleCancelPendingRequest = async () => {
+    if (skillEvaluationStatus !== 'pending') return;
+    if (hasTeacherSubmittedScores) {
+      alert('Cannot cancel request because teacher has already submitted scores.');
+      return;
+    }
+    const evaluationId = savedSkillEvaluationId;
+    if (!(typeof evaluationId === 'number' && evaluationId > 0)) return;
+    try {
+      await updateSkillEvaluation(evaluationId, { status: 'draft' });
+      setSkillEvaluationStatus('draft');
+      alert('Request cancelled. Evaluation is back to drafted.');
+      navigate('/profile2', {
+        state: { addedSkillEvaluationId: String(evaluationId), refreshAt: Date.now() },
+      });
+    } catch (error) {
+      console.error('Failed to cancel pending request:', error);
+      alert(`Failed to cancel request: ${getApiErrorDetail(error)}`);
+    }
+  };
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (isStudentEvaluationLocked) {
       event.target.value = '';
@@ -1028,7 +1062,6 @@ const Profile2: React.FC = () => {
   const canSaveEvaluation =
     !!confirmedRubricId &&
     !!selectedRubricData &&
-    hasUnsavedEvaluationChanges &&
     !isSavingEvaluation &&
     (typeof savedSkillEvaluationId === 'number' && savedSkillEvaluationId > 0) &&
     !isStudentEvaluationLocked;
@@ -1548,14 +1581,25 @@ const Profile2: React.FC = () => {
 
               {isStudent && (
                 <div className="profile3-submit-button-container">
-                  <button
-                    className="profile2-request-evaluation-button"
-                    type="button"
-                    onClick={handleCancelStudentEdits}
-                    disabled={!hasUnsavedEvaluationResultChanges || isStudentEvaluationLocked}
-                  >
-                    Cancel
-                  </button>
+                  {skillEvaluationStatus === 'pending' ? (
+                    <button
+                      className="profile2-request-evaluation-button"
+                      type="button"
+                      onClick={() => void handleCancelPendingRequest()}
+                      disabled={hasTeacherSubmittedScores}
+                    >
+                      Cancel Request
+                    </button>
+                  ) : (
+                    <button
+                      className="profile2-request-evaluation-button"
+                      type="button"
+                      onClick={handleCancelStudentEdits}
+                      disabled={!hasUnsavedEvaluationResultChanges || isStudentEvaluationLocked}
+                    >
+                      Cancel
+                    </button>
+                  )}
                 </div>
               )}
             </>
