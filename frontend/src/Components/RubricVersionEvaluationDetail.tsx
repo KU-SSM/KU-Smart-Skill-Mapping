@@ -2,6 +2,7 @@ import React, { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import RubricScoreTable from './RubricScoreTable';
 import './RubricScore.css';
+import { useAppRole } from '../context/AppRoleContext';
 
 interface TableData {
   skillArea: string;
@@ -34,6 +35,9 @@ interface LocationState {
 const RubricVersionEvaluationDetail: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  const { isStudent, isTeacher } = useAppRole();
+  const panelsClass =
+    isStudent || isTeacher ? 'profile2-two-panels' : 'profile2-three-panels';
   const state = (location.state || {}) as LocationState;
 
   const version = state.rubricVersion;
@@ -110,7 +114,7 @@ const RubricVersionEvaluationDetail: React.FC = () => {
         <div className="evaluation-section">
           <h2 className="evaluation-section-title">Evaluation Results</h2>
 
-          <div className="skills-panels-container profile2-three-panels">
+          <div className={`skills-panels-container ${panelsClass}`}>
             <div className="skills-panel profile2-panel">
               <h2 className="panel-title">AI</h2>
               <div className="skills-list">
@@ -128,6 +132,7 @@ const RubricVersionEvaluationDetail: React.FC = () => {
               </div>
             </div>
 
+            {!isTeacher && (
             <div className="skills-panel profile2-panel">
               <h2 className="panel-title">Student</h2>
               <div className="skills-list">
@@ -144,7 +149,9 @@ const RubricVersionEvaluationDetail: React.FC = () => {
                 ))}
               </div>
             </div>
+            )}
 
+            {!isStudent && (
             <div className="skills-panel profile2-panel">
               <h2 className="panel-title">Teacher</h2>
               <div className="skills-list">
@@ -161,6 +168,7 @@ const RubricVersionEvaluationDetail: React.FC = () => {
                 ))}
               </div>
             </div>
+            )}
           </div>
 
         </div>

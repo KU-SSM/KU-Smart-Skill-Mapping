@@ -558,16 +558,87 @@
   transform: translateY(-1px);
 }
 
+/* Profile2 — Your Profile title + delete evaluation (student) */
+.profile2-profile-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+  width: 100%;
+}
+
+.profile2-profile-title {
+  margin: 0 !important;
+  flex: 1;
+  min-width: 0;
+}
+
+.profile2-delete-eval-header-button {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #c62828;
+  cursor: pointer;
+  font-size: 22px;
+  line-height: 1;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+.profile2-delete-eval-header-button:hover {
+  background-color: #ffebee;
+  border-color: #e57373;
+  color: #b71c1c;
+}
+
+.profile2-delete-eval-header-button:active {
+  transform: scale(0.96);
+}
+
 /* Profile2 single-file upload style */
 .profile2-upload-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 16px;
   padding: 20px 24px;
   border: 1px solid #ddd;
   border-radius: 6px;
   background-color: #f7f8fa;
   box-sizing: border-box;
+}
+
+.profile2-remove-file-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #ffffff;
+  color: #c62828;
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.profile2-remove-file-button:hover {
+  background-color: #ffebee;
+  border-color: #e57373;
+  color: #b71c1c;
 }
 
 .profile2-upload-button {
@@ -786,13 +857,33 @@
   width: 100%;
 }
 
+/* Evaluation page — same heading scale for student (Profile2) and teacher (Profile3Detail) */
 .evaluation-section-title {
   font-family: 'Roboto', sans-serif;
-  font-size: 32px;
+  font-size: 2rem;
   font-weight: 600;
+  line-height: 1.25;
   color: #333;
   margin: 0 0 24px 0;
   text-align: left;
+}
+
+.evaluation-section-title-rubric {
+  font-size: 1.125rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: #666;
+  margin-left: 0.625rem;
+}
+
+/* Panel column headings (AI / Student / Teacher) — match across roles */
+.evaluation-container .skills-panel .panel-title {
+  font-family: 'Roboto', sans-serif;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #333;
+  margin: 0 0 16px 0;
 }
 
 .evaluation-box {
@@ -1192,6 +1283,13 @@
   width: 100%;
 }
 
+.profile2-two-panels {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  width: 100%;
+}
+
 .profile2-panel {
   width: 100%;
   min-height: 400px;
@@ -1358,8 +1456,21 @@
   box-shadow: none;
 }
 
+.profile2-ai-draft-hint {
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  line-height: 1.4;
+  color: #5c6310;
+  background: rgba(178, 187, 30, 0.12);
+  border: 1px solid rgba(178, 187, 30, 0.35);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin: 0 0 12px 0;
+}
+
 @media (max-width: 968px) {
-  .profile2-three-panels {
+  .profile2-three-panels,
+  .profile2-two-panels {
     grid-template-columns: 1fr;
     gap: 16px;
   }
@@ -1393,6 +1504,24 @@
 }
 
 /* Profile3 Teacher Evaluation Styles */
+/* Your Evaluation (Profile2List): space between cards and + add row */
+.profile2-yevaluation-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+}
+
+.profile2-yevaluation-empty {
+  padding: 40px;
+  text-align: center;
+  color: #666;
+}
+
+.profile2-yevaluation-add-box {
+  flex-shrink: 0;
+}
+
 .student-requests-list {
   display: flex;
   flex-direction: column;
@@ -1504,6 +1633,21 @@
   text-align: left;
 }
 
+/* Your Evaluation list — placeholders: no border/underline (avoids browser “dotted” dash under text) */
+.profile2-eval-detail-dashed {
+  display: inline;
+  padding: 0;
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: none;
+  color: #888;
+  font-style: italic;
+  text-decoration: none !important;
+  box-shadow: none;
+  line-height: inherit;
+}
+
 .portfolio-display-box,
 .rubric-display-box {
   background-color: #fafafa;
@@ -1512,6 +1656,16 @@
   padding: 40px;
   box-sizing: border-box;
   min-height: 200px;
+}
+
+/* Teacher view (Profile3): shorter Student Portfolio strip */
+.portfolio-display-box.profile3-student-portfolio-box {
+  padding: 14px 20px;
+  min-height: 0;
+}
+
+.portfolio-display-box.profile3-student-portfolio-box .portfolio-file-icon {
+  font-size: 36px;
 }
 
 .portfolio-file-display {

@@ -49,7 +49,7 @@ const RubricScoreListStudent: React.FC = () => {
     return (
       <div className="rubric-score-wrapper">
         <div className="rubric-score-container">
-          <h1 className="rubric-score-title">Rubric Score (Student)</h1>
+          <h1 className="rubric-score-title">Rubric Score</h1>
           <div style={{ textAlign: 'center', padding: '40px' }}>
             <p>Loading rubric scores...</p>
           </div>
@@ -61,7 +61,7 @@ const RubricScoreListStudent: React.FC = () => {
   return (
     <div className="rubric-score-wrapper">
       <div className="rubric-score-container">
-        <h1 className="rubric-score-title">Rubric Score (Student)</h1>
+        <h1 className="rubric-score-title">Rubric Score</h1>
         <div className="rubric-score-search-container">
           <input
             type="text"

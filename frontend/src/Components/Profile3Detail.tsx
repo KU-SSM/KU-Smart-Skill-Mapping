@@ -6,6 +6,7 @@ import { FaFilePdf, FaArrowLeft } from 'react-icons/fa';
 import { AiOutlineClose, AiOutlineInfoCircle, AiOutlinePlus } from 'react-icons/ai';
 import { getRubricScores, getRubricScore, RubricScoreDetail } from '../services/rubricScoreApi';
 import RubricScoreTable from './RubricScoreTable';
+import { useAppRole } from '../context/AppRoleContext';
 
 const PdfIcon = FaFilePdf as React.ComponentType;
 const ArrowLeftIcon = FaArrowLeft as React.ComponentType;
@@ -46,7 +47,10 @@ interface FormerRubricVersion {
 const Profile3Detail: React.FC = () => {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
-  
+  const { isStudent, isTeacher } = useAppRole();
+  /* Student: AI + self-eval; Teacher: AI + teacher scores (each role hides the other column). */
+  const evaluationPanelsGridClass = 'profile2-two-panels';
+
   // Mock student requests data - replace with API call later
   const [studentRequests] = useState<StudentRequest[]>([
     {
@@ -459,7 +463,7 @@ const Profile3Detail: React.FC = () => {
       <div className="portfolio-container">
         <div className="portfolio-section">
           <h2 className="portfolio-section-title">Student Portfolio</h2>
-          <div className="portfolio-display-box">
+          <div className="portfolio-display-box profile3-student-portfolio-box">
             <div className="portfolio-file-display">
               <div className="portfolio-file-icon">
                 {React.createElement(PdfIcon)}
@@ -489,8 +493,9 @@ const Profile3Detail: React.FC = () => {
             <h2 className="evaluation-section-title">
               Evaluation Results
               {selectedRubricData && (
-                <span style={{ fontSize: '18px', fontWeight: 'normal', marginLeft: '10px', color: '#666' }}>
-                  - {selectedRubricData.title}
+                <span className="evaluation-section-title-rubric">
+                  {' '}
+                  — {selectedRubricData.title}
                 </span>
               )}
             </h2>
@@ -514,7 +519,7 @@ const Profile3Detail: React.FC = () => {
             </div>
           ) : (
             <>
-              <div className="skills-panels-container profile2-three-panels">
+              <div className={`skills-panels-container ${evaluationPanelsGridClass}`}>
                   <div className="skills-panel profile2-panel">
                     <h2 className="panel-title">AI</h2>
                     <div className="search-container">
@@ -546,6 +551,7 @@ const Profile3Detail: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                  {!isTeacher && (
                   <div className="skills-panel profile2-panel">
                     <h2 className="panel-title">Student</h2>
                     <div className="search-container">
@@ -577,6 +583,8 @@ const Profile3Detail: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                  )}
+                  {!isStudent && (
                   <div className="skills-panel profile2-panel">
                     <h2 className="panel-title">Teacher</h2>
                     <div className="search-container">
@@ -684,8 +692,10 @@ const Profile3Detail: React.FC = () => {
                       )}
                     </div>
                   </div>
-                </div>
+                  )}
+              </div>
 
+                {!isStudent && (
                 <div className="profile3-submit-button-container">
                   {!isTeacherEditMode ? (
                     <button
@@ -722,6 +732,7 @@ const Profile3Detail: React.FC = () => {
                     </>
                   )}
                 </div>
+                )}
               </>
             )}
         </div>
@@ -738,6 +749,7 @@ const Profile3Detail: React.FC = () => {
           </span>
           <span>Back to Requests</span>
         </button>
+        {!isStudent && (
         <button
           className="profile2-request-evaluation-button"
           type="button"
@@ -746,6 +758,7 @@ const Profile3Detail: React.FC = () => {
         >
           {isSubmitting ? 'Submitting...' : 'Submit Evaluation'}
         </button>
+        )}
       </div>
 
       {/* Rubric info modal - view only */}

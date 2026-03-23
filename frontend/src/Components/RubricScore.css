@@ -44,6 +44,7 @@
 .rubric-score-title {
   font-family: 'Roboto', sans-serif;
   font-size: 40px;
+  font-weight: 600;
   margin: 0 0 20px 0;
   color: #333;
   text-align: left;
@@ -57,6 +58,7 @@
 .rubric-score-title-input {
   font-family: 'Roboto', sans-serif;
   font-size: 40px;
+  font-weight: 600;
   color: #333;
   text-align: left;
   flex: 1;

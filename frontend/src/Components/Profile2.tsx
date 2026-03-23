@@ -1,18 +1,20 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import './Profile.css';
 import './RubricScore.css';
-import { AiOutlineClose, AiOutlineInfoCircle, AiOutlinePlus } from 'react-icons/ai';
+import { AiOutlineClose, AiOutlineDelete, AiOutlineInfoCircle, AiOutlinePlus } from 'react-icons/ai';
 import { FaBriefcase } from 'react-icons/fa';
 import { evaluatePortfolio, importPortfolio } from '../services/portfolioApi';
 import { getRubricScores, getRubricScore, RubricScoreDetail } from '../services/rubricScoreApi';
 import RubricScoreTable from './RubricScoreTable';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import api from '../api/index';
+import { useAppRole } from '../context/AppRoleContext';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const BriefcaseIcon = FaBriefcase as React.ComponentType;
 const InfoIcon = AiOutlineInfoCircle as React.ComponentType;
 const PlusIcon = AiOutlinePlus as React.ComponentType;
+const DeleteOutlineIcon = AiOutlineDelete as React.ComponentType;
 
 interface Skill {
   skillArea: string;
@@ -57,6 +59,9 @@ const Profile2: React.FC = () => {
   const { evaluationId } = useParams<{ evaluationId: string }>();
   const location = useLocation();
   const navigate = useNavigate();
+  const { isStudent, isTeacher } = useAppRole();
+  const evaluationPanelsGridClass =
+    isStudent || isTeacher ? 'profile2-two-panels' : 'profile2-three-panels';
   const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -95,6 +100,10 @@ const Profile2: React.FC = () => {
   const [isStudentEditMode, setIsStudentEditMode] = useState<boolean>(false);
   const [originalStudentSkills, setOriginalStudentSkills] = useState<Skill[]>([]);
   const [originalStudentEvaluations, setOriginalStudentEvaluations] = useState<{ [skillArea: string]: string }>({});
+  /** Baseline AI scores when student entered edit mode (for cancel / done without save). */
+  const [originalAiEvaluations, setOriginalAiEvaluations] = useState<{ [skillArea: string]: string }>({});
+  /** Student: AI run results before Save (committed to aiEvaluations on Save only). */
+  const [draftAiEvaluations, setDraftAiEvaluations] = useState<{ [skillArea: string]: string } | null>(null);
   const [extractedPortfolioText, setExtractedPortfolioText] = useState<string>('');
   const [isAiEvaluating, setIsAiEvaluating] = useState<boolean>(false);
 
@@ -155,6 +164,7 @@ const Profile2: React.FC = () => {
         setTeacherEvaluations(newTeacherValues);
         setAiEvaluations(newAiValues);
         setStudentEvaluations(newStudentValues);
+        setDraftAiEvaluations(null);
       } catch (error: any) {
         console.error('Error loading rubric data:', error);
         // Only set to null if it's a critical error (like rubric not found or network failure)
@@ -184,6 +194,8 @@ const Profile2: React.FC = () => {
   /** Manual AI evaluation — avoids surprise API calls and re-runs on every state tick. */
   const runAiEvaluation = useCallback(async () => {
     if (!confirmedRubricId || !selectedRubricData || !extractedPortfolioText.trim()) return;
+    // Only students use this (teachers have no Evaluate with AI button); results stay draft until Save.
+    if (!isStudent || !isStudentEditMode) return;
 
     try {
       setIsAiEvaluating(true);
@@ -219,13 +231,20 @@ const Profile2: React.FC = () => {
         nextAiEvaluations[rowKey] = String(levelRank);
       });
 
-      setAiEvaluations(nextAiEvaluations);
+      setDraftAiEvaluations(nextAiEvaluations);
     } catch (error: any) {
       console.error('AI evaluation failed:', error);
     } finally {
       setIsAiEvaluating(false);
     }
-  }, [confirmedRubricId, selectedRubricData, extractedPortfolioText, uploadedFiles]);
+  }, [
+    confirmedRubricId,
+    selectedRubricData,
+    extractedPortfolioText,
+    uploadedFiles,
+    isStudent,
+    isStudentEditMode,
+  ]);
 
   const canRunAiEvaluation =
     !!confirmedRubricId &&
@@ -254,6 +273,7 @@ const Profile2: React.FC = () => {
     setAiEvaluations({ ...evaluations.ai });
     setStudentEvaluations({ ...evaluations.student });
     setTeacherEvaluations({ ...evaluations.teacher });
+    setDraftAiEvaluations(null);
     setIsStudentEditMode(false);
     setSelectedFormerVersion(null);
     setIsRubricHistoryOpen(false);
@@ -335,6 +355,43 @@ const Profile2: React.FC = () => {
     fileInputRef.current?.click();
   };
 
+  const clearPortfolioFile = useCallback(() => {
+    setUploadedFiles([]);
+    setExtractedPortfolioText('');
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setAiEvaluations((prev) => {
+      const cleared: { [skillArea: string]: string } = {};
+      Object.keys(prev).forEach((k) => {
+        cleared[k] = '';
+      });
+      return cleared;
+    });
+    setDraftAiEvaluations(null);
+  }, []);
+
+  const handleRemoveUploadedFile = () => {
+    if (!uploadedFiles.length) return;
+    if (!window.confirm('Remove the uploaded portfolio file?')) return;
+    clearPortfolioFile();
+  };
+
+  const handleDeleteEvaluation = () => {
+    if (!evaluationId) {
+      navigate('/profile2');
+      return;
+    }
+    if (
+      !window.confirm(
+        'Delete this evaluation? This will remove it from your list and discard unsaved work on this page.'
+      )
+    ) {
+      return;
+    }
+    navigate('/profile2', { state: { removeEvaluationId: evaluationId } });
+  };
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -373,6 +430,7 @@ const Profile2: React.FC = () => {
         });
         return cleared;
       });
+      setDraftAiEvaluations(null);
     } catch (error: any) {
       console.error('Error importing portfolio:', error);
       setExtractedPortfolioText('');
@@ -462,6 +520,14 @@ const Profile2: React.FC = () => {
     );
   }, [teacherSkills, searchTeacher]);
 
+  /** Student in edit mode: preview AI run before Save; otherwise show saved AI scores. */
+  const aiEvaluationsForDisplay = useMemo(() => {
+    if (isStudent && isStudentEditMode && draftAiEvaluations) {
+      return draftAiEvaluations;
+    }
+    return aiEvaluations;
+  }, [isStudent, isStudentEditMode, draftAiEvaluations, aiEvaluations]);
+
   const isConfirmDisabled =
     !selectedRubricId || selectedRubricId === confirmedRubricId;
   const hasSelectedPortfolio = uploadedFiles.length > 0;
@@ -470,22 +536,36 @@ const Profile2: React.FC = () => {
   const handleEnterStudentEditMode = () => {
     setOriginalStudentSkills(studentSkills.map((s) => ({ ...s })));
     setOriginalStudentEvaluations({ ...studentEvaluations });
+    setOriginalAiEvaluations({ ...aiEvaluations });
+    setDraftAiEvaluations(null);
     setIsStudentEditMode(true);
   };
 
   const handleSaveStudentEdits = () => {
-    // Save current edits as the new baseline, stay in edit mode
+    let committedAi = aiEvaluations;
+    if (draftAiEvaluations !== null) {
+      committedAi = { ...draftAiEvaluations };
+      setAiEvaluations(committedAi);
+      setDraftAiEvaluations(null);
+    }
     setOriginalStudentSkills(studentSkills.map((s) => ({ ...s })));
     setOriginalStudentEvaluations({ ...studentEvaluations });
+    setOriginalAiEvaluations({ ...committedAi });
   };
 
   const handleCancelStudentEdits = () => {
     setStudentSkills(originalStudentSkills.map((s) => ({ ...s })));
     setStudentEvaluations({ ...originalStudentEvaluations });
+    setAiEvaluations({ ...originalAiEvaluations });
+    setDraftAiEvaluations(null);
     setIsStudentEditMode(false);
   };
 
   const handleDoneStudentEditing = () => {
+    if (draftAiEvaluations !== null) {
+      setAiEvaluations({ ...originalAiEvaluations });
+      setDraftAiEvaluations(null);
+    }
     setIsStudentEditMode(false);
   };
 
@@ -545,7 +625,20 @@ const Profile2: React.FC = () => {
       {/* Your Profile Section */}
       <div className="portfolio-container">
         <div className="portfolio-section">
-          <h2 className="portfolio-section-title">Your Profile</h2>
+          <div className="profile2-profile-title-row">
+            <h2 className="portfolio-section-title profile2-profile-title">Your Profile</h2>
+            {isStudent && (
+              <button
+                type="button"
+                className="profile2-delete-eval-header-button"
+                title="Delete evaluation"
+                aria-label="Delete evaluation"
+                onClick={handleDeleteEvaluation}
+              >
+                {React.createElement(DeleteOutlineIcon)}
+              </button>
+            )}
+          </div>
 
           <div className="profile2-upload-row">
             <input
@@ -568,6 +661,18 @@ const Profile2: React.FC = () => {
                 {uploadedFiles[0]?.name || 'Upload File'}
               </span>
             </button>
+
+            {isStudent && uploadedFiles.length > 0 && (
+              <button
+                type="button"
+                className="profile2-remove-file-button"
+                title="Remove uploaded file"
+                aria-label="Remove uploaded file"
+                onClick={handleRemoveUploadedFile}
+              >
+                {React.createElement(DeleteOutlineIcon)}
+              </button>
+            )}
 
             <span className="profile2-upload-hint">
               Max file size 10MB.
@@ -646,12 +751,14 @@ const Profile2: React.FC = () => {
             <h2 className="evaluation-section-title">
               Evaluation Results
               {selectedRubricData && (
-                <span style={{ fontSize: '18px', fontWeight: 'normal', marginLeft: '10px', color: '#666' }}>
-                  - {selectedRubricData.title}
+                <span className="evaluation-section-title-rubric">
+                  {' '}
+                  — {selectedRubricData.title}
                 </span>
               )}
             </h2>
             <div className="evaluation-header-actions">
+              {isStudent && isStudentEditMode && (
               <button
                 className="profile2-ai-evaluate-button"
                 type="button"
@@ -661,23 +768,26 @@ const Profile2: React.FC = () => {
                     ? 'Upload and import a portfolio first'
                     : !confirmedRubricId || !selectedRubricData
                       ? 'Confirm a rubric first'
-                      : 'Run AI evaluation on your portfolio with the selected rubric'
+                      : 'Run AI evaluation — click Save below to keep results'
                 }
                 onClick={() => runAiEvaluation()}
               >
                 {isAiEvaluating ? 'Evaluating…' : 'Evaluate with AI'}
               </button>
-              <button
-                className="profile2-request-evaluation-button"
-                type="button"
-                disabled={!confirmedRubricId || !selectedRubricData}
-                onClick={() => {
-                  // Handle request teacher evaluation (placeholder)
-                  console.log('Request Teacher Evaluation clicked');
-                }}
-              >
-                Request Teacher Evaluation
-              </button>
+              )}
+              {isStudent && (
+                <button
+                  className="profile2-request-evaluation-button"
+                  type="button"
+                  disabled={!confirmedRubricId || !selectedRubricData}
+                  onClick={() => {
+                    // Handle request teacher evaluation (placeholder)
+                    console.log('Request Teacher Evaluation clicked');
+                  }}
+                >
+                  Request Teacher Evaluation
+                </button>
+              )}
 
             </div>
           </div>
@@ -702,12 +812,17 @@ const Profile2: React.FC = () => {
                   <p className="evaluation-submessage">AI is evaluating the selected portfolio...</p>
                 </div>
               )}
-              {/* Skills Selection Panels - 3 boxes in a row */}
-              <div className="skills-panels-container profile2-three-panels">
+              {/* AI + Student (student role) or AI + Teacher (teacher role); feature flag until login */}
+              <div className={`skills-panels-container ${evaluationPanelsGridClass}`}>
                 <div className="skills-panel profile2-panel">
                   <h2 className="panel-title">
                     AI
                   </h2>
+                  {isStudent && isStudentEditMode && draftAiEvaluations && (
+                    <p className="profile2-ai-draft-hint" role="status">
+                      Preview only — click <strong>Save</strong> to keep these AI scores.
+                    </p>
+                  )}
                   <div className="search-container">
                     <input
                       type="text"
@@ -734,7 +849,7 @@ const Profile2: React.FC = () => {
                         <input
                           type="text"
                           className="profile2-score-input ai-score-input"
-                          value={aiEvaluations[skill.skillArea] || ''}
+                          value={aiEvaluationsForDisplay[skill.skillArea] || ''}
                           readOnly
                           placeholder="Auto"
                         />
@@ -742,6 +857,7 @@ const Profile2: React.FC = () => {
                     ))}
                   </div>
                 </div>
+                {!isTeacher && (
                 <div className="skills-panel profile2-panel">
                   <h2 className="panel-title">
                     Student
@@ -862,6 +978,8 @@ const Profile2: React.FC = () => {
                     )}
                   </div>
                 </div>
+                )}
+                {!isStudent && (
                 <div className="skills-panel profile2-panel">
                   <h2 className="panel-title">
                     Teacher
@@ -900,8 +1018,10 @@ const Profile2: React.FC = () => {
                     ))}
                   </div>
                 </div>
+                )}
               </div>
 
+              {isStudent && (
               <div className="profile3-submit-button-container">
                 {!isStudentEditMode ? (
                   <button
@@ -938,6 +1058,7 @@ const Profile2: React.FC = () => {
                   </>
                 )}
               </div>
+              )}
             </>
           ) : (
             <div className="evaluation-content">

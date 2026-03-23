@@ -8,10 +8,15 @@ import { MdHome } from 'react-icons/md'
 import { FaCertificate, FaBriefcase } from 'react-icons/fa'
 import { AiOutlineCheckSquare } from 'react-icons/ai'
 
+/** Who sees this link until real auth exists. Default: everyone. `none` = hidden for all. */
+export type SidebarAudience = 'all' | 'student' | 'teacher' | 'none';
+
 export interface SidebarItem {
     title: string;
     link: string;
     icon: IconType;
+    /** Omit or 'all' = both roles; 'none' = never show */
+    audience?: SidebarAudience;
 }
 
 export const SideBarData: SidebarItem[] = [
@@ -38,17 +43,20 @@ export const SideBarData: SidebarItem[] = [
     {
         title: "Your Profile (Old)",
         link:"/profile",
-        icon: BsPersonLinesFill
+        icon: BsPersonLinesFill,
+        audience: 'none',
     },
     {
-        title: "Evaluation (Student)",
+        title: "Evaluation",
         link:"/profile2",
-        icon: BsPersonLinesFill
+        icon: BsPersonLinesFill,
+        audience: 'student',
     },
     {
-        title: "Evaluation (Teacher)",
+        title: "Evaluation",
         link:"/profile3",
-        icon: BsPersonLinesFill
+        icon: BsPersonLinesFill,
+        audience: 'teacher',
     },
     {
         title: "Skill Map",
@@ -61,14 +69,16 @@ export const SideBarData: SidebarItem[] = [
         icon: FaCertificate
     },
     {
-        title: "Rubric Score (Teacher)",
+        title: "Rubric Score",
         link:"/rubric_score",
-        icon: AiOutlineCheckSquare
+        icon: AiOutlineCheckSquare,
+        audience: 'teacher',
     },
     {
-        title: "Rubric Score (Student)",
+        title: "Rubric Score",
         link:"/rubric_score_student",
-        icon: AiOutlineCheckSquare
+        icon: AiOutlineCheckSquare,
+        audience: 'student',
     },
     {
         title: "Home",

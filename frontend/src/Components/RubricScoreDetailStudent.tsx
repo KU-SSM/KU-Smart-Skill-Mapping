@@ -19,6 +19,7 @@ interface FormerRubricVersion {
   version: string;
   createdAt: string;
   expiresAt: string;
+  title: string;
   headers: string[];
   rows: TableData[];
 }
@@ -32,6 +33,31 @@ const RubricScoreDetailStudent: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isFormerRubricsOpen, setIsFormerRubricsOpen] = useState<boolean>(false);
   const [selectedFormerVersion, setSelectedFormerVersion] = useState<FormerRubricVersion | null>(null);
+  const [savedFormerRubricVersions, setSavedFormerRubricVersions] = useState<FormerRubricVersion[]>([]);
+
+  const historyStorageKey = useMemo(() => {
+    if (!id) return null;
+    return `former_rubric_versions_${id}`;
+  }, [id]);
+
+  // Same storage key as teacher rubric detail — students only read (no edits / no expiration modal).
+  useEffect(() => {
+    if (!historyStorageKey) {
+      setSavedFormerRubricVersions([]);
+      return;
+    }
+    try {
+      const raw = localStorage.getItem(historyStorageKey);
+      if (!raw) {
+        setSavedFormerRubricVersions([]);
+        return;
+      }
+      const parsed = JSON.parse(raw) as FormerRubricVersion[];
+      setSavedFormerRubricVersions(Array.isArray(parsed) ? parsed : []);
+    } catch {
+      setSavedFormerRubricVersions([]);
+    }
+  }, [historyStorageKey]);
 
   useEffect(() => {
     const loadRubricScore = async () => {
@@ -59,12 +85,7 @@ const RubricScoreDetailStudent: React.FC = () => {
     loadRubricScore();
   }, [id]);
 
-  const handleBack = () => {
-    navigate('/rubric_score_student');
-  };
-
-  const formerRubricVersions = useMemo<FormerRubricVersion[]>(() => {
-    // Mock data (no backend yet)
+  const mockFormerRubricVersions = useMemo<FormerRubricVersion[]>(() => {
     const now = new Date();
     const iso = (d: Date) => d.toISOString().replace('T', ' ').slice(0, 19);
     const d1 = new Date(now);
@@ -76,6 +97,7 @@ const RubricScoreDetailStudent: React.FC = () => {
     return [
       {
         version: 'v1',
+        title: `${title || 'Rubric'} (v1)`,
         createdAt: iso(new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000)),
         expiresAt: iso(d1),
         headers: ['Level 1', 'Level 2', 'Level 3'],
@@ -86,6 +108,7 @@ const RubricScoreDetailStudent: React.FC = () => {
       },
       {
         version: 'v2',
+        title: `${title || 'Rubric'} (v2)`,
         createdAt: iso(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)),
         expiresAt: iso(d2),
         headers: ['Level 1', 'Level 2', 'Level 3', 'Level 4'],
@@ -96,7 +119,14 @@ const RubricScoreDetailStudent: React.FC = () => {
         ],
       },
     ];
-  }, []);
+  }, [title]);
+
+  const formerRubricVersions =
+    savedFormerRubricVersions.length > 0 ? savedFormerRubricVersions : mockFormerRubricVersions;
+
+  const handleBack = () => {
+    navigate('/rubric_score_student');
+  };
 
   const handleOpenFormerRubrics = () => {
     setIsFormerRubricsOpen(true);
@@ -106,6 +136,10 @@ const RubricScoreDetailStudent: React.FC = () => {
   const handleCloseFormerRubrics = () => {
     setIsFormerRubricsOpen(false);
     setSelectedFormerVersion(null);
+  };
+
+  const handleOpenFormerVersion = (item: FormerRubricVersion) => {
+    setSelectedFormerVersion(item);
   };
 
   if (isLoading) {
@@ -204,8 +238,7 @@ const RubricScoreDetailStudent: React.FC = () => {
                       key={item.version}
                       type="button"
                       className="rubric-history-item rubric-history-item-button"
-                      onClick={() => {}}
-                      disabled
+                      onClick={() => handleOpenFormerVersion(item)}
                     >
                       <div className="rubric-history-left">
                         <div className="rubric-history-version">{item.version}</div>

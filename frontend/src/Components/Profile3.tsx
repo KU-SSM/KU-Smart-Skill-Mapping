@@ -70,11 +70,9 @@ const Profile3: React.FC = () => {
   }, [studentRequests, searchStudentName]);
 
   return (
-    <div className="profile-wrapper">
-      {/* Student Evaluation Requests Section */}
-      <div className="portfolio-container">
-        <div className="portfolio-section">
-          <h2 className="portfolio-section-title">Student Evaluation Requests</h2>
+    <div className="rubric-score-wrapper">
+      <div className="rubric-score-container">
+        <h1 className="rubric-score-title">Student Evaluation Requests</h1>
 
           <div className="rubric-score-search-container" style={{ marginBottom: '16px' }}>
             <input
@@ -141,7 +139,6 @@ const Profile3: React.FC = () => {
               ))}
             </div>
           )}
-        </div>
       </div>
     </div>
   );
