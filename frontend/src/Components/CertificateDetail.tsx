@@ -40,6 +40,12 @@ const scoreMapFromRows = (rows: { skill_name: string; level_rank: number }[]) =>
   return out;
 };
 
+const toRadarSkillLabel = (skill: string): string => {
+  const clean = skill.trim();
+  if (clean.length <= 18) return clean;
+  return `${clean.slice(0, 16)}...`;
+};
+
 interface SkillEvaluationFullResponse {
   id: number;
   rubric_score_history_id: number;
@@ -279,6 +285,7 @@ const CertificateDetail: React.FC = () => {
     () =>
       mappedSkillSummary.map((row) => ({
         skill: row.skill,
+        skillLabel: toRadarSkillLabel(row.skill),
         student: row.student || 0,
         ai: row.ai || 0,
         teacher: row.teacher || 0,
@@ -292,6 +299,34 @@ const CertificateDetail: React.FC = () => {
     const rowCount = rubricDetail?.rows.length || 0;
     const colCount = (rubricDetail?.headers.length || 0) + 1; // + skill area
     const complexity = rowCount * Math.max(colCount, 1);
+    const safeRowBase = 5;
+    const safeColBase = 6;
+    const rowScale = rowCount > 0 ? Math.min(1, safeRowBase / rowCount) : 1;
+    const colScale = colCount > 0 ? Math.min(1, safeColBase / colCount) : 1;
+    const allCells = rubricDetail?.rows || [];
+    const bodyTextChars = allCells.reduce(
+      (sum, row) =>
+        sum +
+        row.values.reduce((inner, cell) => inner + (cell?.trim()?.length || 0), 0),
+      0
+    );
+    const cellCount = Math.max(1, rowCount * Math.max(1, colCount - 1));
+    const avgCharsPerCell = bodyTextChars / cellCount;
+    const maxCharsPerCell = allCells.reduce((max, row) => {
+      const rowMax = row.values.reduce(
+        (innerMax, cell) => Math.max(innerMax, cell?.trim()?.length || 0),
+        0
+      );
+      return Math.max(max, rowMax);
+    }, 0);
+    // Heuristic for very text-heavy rubrics.
+    const densityFactor = Math.max(
+      1,
+      avgCharsPerCell / 45,
+      maxCharsPerCell / 180
+    );
+    const densityScale = 1 / densityFactor;
+    const tableScale = Math.max(0.08, Math.min(1, rowScale, colScale, densityScale));
 
     let fontSize = 10;
     let cellPadY = 6;
@@ -346,6 +381,7 @@ const CertificateDetail: React.FC = () => {
       ['--cert-rubric-section-margin-top' as string]: `${sectionTopMargin}px`,
       ['--cert-rubric-line-height' as string]: String(lineHeight),
       ['--cert-rubric-first-col-width' as string]: `${firstColWidth}%`,
+      ['--cert-rubric-table-scale' as string]: String(tableScale),
     } as React.CSSProperties;
   }, [rubricDetail]);
 
@@ -410,17 +446,17 @@ const CertificateDetail: React.FC = () => {
                   <div className="certificate-radar-empty">No chart data</div>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
-                    <RadarChart data={radarData} margin={{ top: 10, right: 18, bottom: 0, left: 18 }}>
+                    <RadarChart data={radarData} margin={{ top: 6, right: 12, bottom: 4, left: 12 }}>
                       <PolarGridChart stroke="#ccc" />
                       <PolarAngleAxisChart
-                        dataKey="skill"
-                        tick={{ fill: '#333', fontSize: 12 }}
+                        dataKey="skillLabel"
+                        tick={{ fill: '#333', fontSize: 8 }}
                         tickLine={{ stroke: '#ccc' }}
                       />
                       <PolarRadiusAxisChart
                         angle={90}
                         domain={[0, maxLevel]}
-                        tick={{ fill: '#666', fontSize: 11 }}
+                        tick={{ fill: '#666', fontSize: 8 }}
                         tickCount={Math.min(maxLevel + 1, 6)}
                       />
                       <RadarChartShape
@@ -477,28 +513,30 @@ const CertificateDetail: React.FC = () => {
               </div>
               <div className="certificate-evaluation-rubric-section" style={rubricTableLayoutVars}>
                 <div className="certificate-evaluation-rubric-table-wrap">
-                  <table className="certificate-evaluation-rubric-table">
-                    <thead>
-                      <tr>
-                        <th>Skill Area</th>
-                        {(rubricDetail?.headers || []).map((header, index) => (
-                          <th key={`${header}-${index}`}>{header}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(rubricDetail?.rows || []).map((row) => (
-                        <tr key={row.skillArea}>
-                          <td>{row.skillArea}</td>
-                          {(rubricDetail?.headers || []).map((_, levelIndex) => (
-                            <td key={`${row.skillArea}-${levelIndex}`}>
-                              {row.values[levelIndex]?.trim() || '-'}
-                            </td>
+                  <div className="certificate-evaluation-rubric-table-inner">
+                    <table className="certificate-evaluation-rubric-table">
+                      <thead>
+                        <tr>
+                          <th>Skill Area</th>
+                          {(rubricDetail?.headers || []).map((header, index) => (
+                            <th key={`${header}-${index}`}>{header}</th>
                           ))}
                         </tr>
-                      ))}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {(rubricDetail?.rows || []).map((row) => (
+                          <tr key={row.skillArea}>
+                            <td>{row.skillArea}</td>
+                            {(rubricDetail?.headers || []).map((_, levelIndex) => (
+                              <td key={`${row.skillArea}-${levelIndex}`}>
+                                {row.values[levelIndex]?.trim() || '-'}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
             </div>

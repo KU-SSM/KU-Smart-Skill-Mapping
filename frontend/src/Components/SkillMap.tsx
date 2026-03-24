@@ -142,6 +142,12 @@ const maxRankForRows = (rows: SkillMapRadarRow[]): number => {
   return m;
 };
 
+const toRadarAxisLabel = (value: string): string => {
+  const clean = value.trim();
+  if (clean.length <= 18) return clean;
+  return `${clean.slice(0, 16)}...`;
+};
+
 const SkillMap: React.FC = () => {
   const { isTeacher } = useAppRole();
   const [availableEvaluations, setAvailableEvaluations] = useState<SkillEvaluationRecord[]>([]);
@@ -401,56 +407,59 @@ const SkillMap: React.FC = () => {
             ) : chartData.length === 0 ? (
               <div className="skill-map-chart-empty">No skills for this evaluation.</div>
             ) : (
-              <ResponsiveContainer width="100%" height={500}>
-                <RadarChart
-                  data={chartData}
-                  margin={{ top: 20, right: 36, bottom: 20, left: 36 }}
-                >
-                  <PolarGrid stroke="#ccc" />
-                  <PolarAngleAxisComponent
-                    dataKey="skill"
-                    tick={{ fill: '#333', fontSize: 11 }}
-                    tickLine={{ stroke: '#ccc' }}
-                  />
-                  <PolarRadiusAxisComponent
-                    angle={90}
-                    domain={[0, radiusMax]}
-                    tick={{ fill: '#666', fontSize: 10 }}
-                    tickCount={Math.min(radiusMax + 1, 6)}
-                  />
-                  {showStudent && (
-                    <Radar
-                      name={PARTY_CONFIG.student.label}
-                      dataKey="student"
-                      stroke={PARTY_CONFIG.student.stroke}
-                      fill={PARTY_CONFIG.student.fill}
-                      fillOpacity={0.35}
-                      strokeWidth={2}
+              <div className="skill-map-radar-fixed-size">
+                <ResponsiveContainer width="100%" height="100%">
+                  <RadarChart
+                    data={chartData}
+                    margin={{ top: 14, right: 26, bottom: 14, left: 26 }}
+                  >
+                    <PolarGrid stroke="#ccc" />
+                    <PolarAngleAxisComponent
+                      dataKey="skill"
+                      tick={{ fill: '#333', fontSize: 10 }}
+                      tickLine={{ stroke: '#ccc' }}
+                      tickFormatter={toRadarAxisLabel}
                     />
-                  )}
-                  {showAi && (
-                    <Radar
-                      name={PARTY_CONFIG.ai.label}
-                      dataKey="ai"
-                      stroke={PARTY_CONFIG.ai.stroke}
-                      fill={PARTY_CONFIG.ai.fill}
-                      fillOpacity={0.35}
-                      strokeWidth={2}
+                    <PolarRadiusAxisComponent
+                      angle={90}
+                      domain={[0, radiusMax]}
+                      tick={{ fill: '#666', fontSize: 9 }}
+                      tickCount={Math.min(radiusMax + 1, 6)}
                     />
-                  )}
-                  {showTeacher && (
-                    <Radar
-                      name={PARTY_CONFIG.teacher.label}
-                      dataKey="teacher"
-                      stroke={PARTY_CONFIG.teacher.stroke}
-                      fill={PARTY_CONFIG.teacher.fill}
-                      fillOpacity={0.35}
-                      strokeWidth={2}
-                    />
-                  )}
-                  <Legend wrapperStyle={{ paddingTop: '16px' }} iconType="circle" />
-                </RadarChart>
-              </ResponsiveContainer>
+                    {showStudent && (
+                      <Radar
+                        name={PARTY_CONFIG.student.label}
+                        dataKey="student"
+                        stroke={PARTY_CONFIG.student.stroke}
+                        fill={PARTY_CONFIG.student.fill}
+                        fillOpacity={0.35}
+                        strokeWidth={2}
+                      />
+                    )}
+                    {showAi && (
+                      <Radar
+                        name={PARTY_CONFIG.ai.label}
+                        dataKey="ai"
+                        stroke={PARTY_CONFIG.ai.stroke}
+                        fill={PARTY_CONFIG.ai.fill}
+                        fillOpacity={0.35}
+                        strokeWidth={2}
+                      />
+                    )}
+                    {showTeacher && (
+                      <Radar
+                        name={PARTY_CONFIG.teacher.label}
+                        dataKey="teacher"
+                        stroke={PARTY_CONFIG.teacher.stroke}
+                        fill={PARTY_CONFIG.teacher.fill}
+                        fillOpacity={0.35}
+                        strokeWidth={2}
+                      />
+                    )}
+                    <Legend wrapperStyle={{ paddingTop: '10px' }} iconType="circle" />
+                  </RadarChart>
+                </ResponsiveContainer>
+              </div>
             )}
           </div>
         </div>

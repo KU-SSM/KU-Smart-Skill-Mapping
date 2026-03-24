@@ -39,10 +39,14 @@ const Profile3: React.FC = () => {
   const rubricTitleByHistoryIdRef = useRef<Map<number, string>>(new Map());
 
   const mapBackendRequest = useCallback(async (ev: SkillEvaluationRecord): Promise<StudentRequest | null> => {
-    const mappedStatus: StudentRequest['status'] =
-      ev.status === 'pending' ? 'pending' : ev.status === 'completed' || ev.status === 'approved' ? 'completed' : 'completed';
+    const mappedStatus: StudentRequest['status'] | null =
+      ev.status === 'pending'
+        ? 'pending'
+        : ev.status === 'completed' || ev.status === 'approved'
+          ? 'completed'
+          : null;
 
-    if (mappedStatus !== 'pending' && mappedStatus !== 'completed') {
+    if (!mappedStatus) {
       return null;
     }
 
@@ -139,7 +143,7 @@ const Profile3: React.FC = () => {
         ),
       ]);
 
-      const mapped = await Promise.all(rows.map((row) => mapBackendRequest(row)));
+      const mapped = await Promise.all(relevantRows.map((row) => mapBackendRequest(row)));
       setStudentRequests(
         mapped
           .filter((item): item is StudentRequest => item !== null)
