@@ -1,7 +1,7 @@
 import './App.css';
 import SideBar from './Components/Sidebar';
 import Navbar from './Components/Navbar';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Home from './Components/Home';
 import CertificateDetail from './Components/CertificateDetail';
 import CertificateList from './Components/CertificateList';
@@ -45,6 +45,10 @@ const App: React.FC = () => {
               <Route path="/profile3" element={<Profile3 />} />
               <Route path="/profile3/:requestId" element={<Profile3Detail />} />
               <Route path="/rubric_version_detail" element={<RubricVersionEvaluationDetail />} />
+              <Route path="/courses_and_skills" element={<Navigate to="/" replace />} />
+              <Route path="/jobs_and_skills" element={<Navigate to="/" replace />} />
+              <Route path="/recommend_course" element={<Navigate to="/" replace />} />
+              <Route path="/export_chart" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
         </div>

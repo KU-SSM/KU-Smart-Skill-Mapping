@@ -10,7 +10,11 @@ import {
 } from 'recharts';
 import './SkillMap.css';
 import api from '../api/index';
-import { getSkillEvaluationsByUser, type SkillEvaluationRecord } from '../services/skillEvaluationApi';
+import {
+  getSkillEvaluations,
+  getSkillEvaluationsByUser,
+  type SkillEvaluationRecord,
+} from '../services/skillEvaluationApi';
 import { getCurrentUserId } from '../utils/currentUser';
 import { useAppRole } from '../context/AppRoleContext';
 
@@ -47,6 +51,7 @@ interface SkillMapEvaluation {
   id: string;
   title: string;
   rubricHint: string;
+  status: 'pending' | 'completed';
   rows: SkillMapRadarRow[];
   rubricScore: RubricScoreSession;
 }
@@ -139,7 +144,7 @@ const maxRankForRows = (rows: SkillMapRadarRow[]): number => {
 
 const SkillMap: React.FC = () => {
   const { isTeacher } = useAppRole();
-  const [completedEvaluations, setCompletedEvaluations] = useState<SkillEvaluationRecord[]>([]);
+  const [availableEvaluations, setAvailableEvaluations] = useState<SkillEvaluationRecord[]>([]);
   const [evaluationCache, setEvaluationCache] = useState<Record<string, SkillMapEvaluation>>({});
   const [rubricTitleByHistoryId, setRubricTitleByHistoryId] = useState<Record<number, string>>({});
   const [selectedEvalId, setSelectedEvalId] = useState<string>('');
@@ -165,24 +170,27 @@ const SkillMap: React.FC = () => {
 
   const filteredModalEvaluations = useMemo(() => {
     const q = modalSearch.trim().toLowerCase();
-    if (!q) return completedEvaluations;
-    return completedEvaluations.filter(
+    if (!q) return availableEvaluations;
+    return availableEvaluations.filter(
       (ev) =>
         (rubricTitleByHistoryId[ev.rubric_score_history_id] || '').toLowerCase().includes(q) ||
         `Evaluation #${ev.id}`.toLowerCase().includes(q) ||
-        String(ev.id).toLowerCase().includes(q)
+        String(ev.id).toLowerCase().includes(q) ||
+        (ev.status || '').toLowerCase().includes(q)
     );
-  }, [modalSearch, completedEvaluations, rubricTitleByHistoryId]);
+  }, [modalSearch, availableEvaluations, rubricTitleByHistoryId]);
 
   useEffect(() => {
-    const loadCompletedEvaluations = async () => {
+    const loadAvailableEvaluations = async () => {
       try {
         setIsLoadingEvaluations(true);
-        const rows = await getSkillEvaluationsByUser(getCurrentUserId());
-        const completed = rows.filter((row) => row.status === 'completed' || row.status === 'approved');
-        setCompletedEvaluations(completed);
+        const rows = isTeacher
+          ? await getSkillEvaluations()
+          : await getSkillEvaluationsByUser(getCurrentUserId());
+        const eligible = rows;
+        setAvailableEvaluations(eligible);
         const uniqueHistoryIds = Array.from(
-          new Set(completed.map((row) => row.rubric_score_history_id))
+          new Set(rows.map((row) => row.rubric_score_history_id))
         );
         const resolvedPairs = await Promise.all(
           uniqueHistoryIds.map(async (historyId) => {
@@ -205,16 +213,16 @@ const SkillMap: React.FC = () => {
         setSelectedEvalId('');
         setPendingEvalId('');
       } catch (error) {
-        console.error('Failed to load completed evaluations for skill map:', error);
-        setCompletedEvaluations([]);
+        console.error('Failed to load evaluations for skill map:', error);
+        setAvailableEvaluations([]);
         setSelectedEvalId('');
         setPendingEvalId('');
       } finally {
         setIsLoadingEvaluations(false);
       }
     };
-    void loadCompletedEvaluations();
-  }, []);
+    void loadAvailableEvaluations();
+  }, [isTeacher]);
 
   useEffect(() => {
     const loadSelectedEvaluation = async () => {
@@ -320,6 +328,10 @@ const SkillMap: React.FC = () => {
           id: selectedEvalId,
           title: rubricTitle || `Evaluation #${full.id}`,
           rubricHint: rubricTitle,
+          status:
+            full.status === 'pending' ? 'pending' : full.status === 'completed' || full.status === 'approved'
+              ? 'completed'
+              : 'completed',
           rows: radarRows,
           rubricScore: {
             title: rubricTitle,
@@ -330,7 +342,7 @@ const SkillMap: React.FC = () => {
 
         setEvaluationCache((prev) => ({ ...prev, [selectedEvalId]: mapped }));
       } catch (error) {
-        console.error('Failed to load selected completed evaluation:', error);
+        console.error('Failed to load selected evaluation:', error);
       } finally {
         setIsLoadingSelected(false);
       }
@@ -368,18 +380,6 @@ const SkillMap: React.FC = () => {
 
   const anyPartyVisible = showStudent || showAi || showTeacher;
 
-  if (isTeacher) {
-    return (
-      <div className="skill-map-wrapper">
-        <div className="skill-map-container">
-          <div className="skill-map-chart-empty" style={{ width: '100%', padding: '48px 24px' }}>
-            Skill Map is available for students only.
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="skill-map-wrapper">
       <div className="skill-map-container">
@@ -391,12 +391,12 @@ const SkillMap: React.FC = () => {
                 Turn on at least one party below to see the radar chart.
               </div>
             ) : isLoadingEvaluations || isLoadingSelected ? (
-              <div className="skill-map-chart-empty">Loading completed evaluation...</div>
+              <div className="skill-map-chart-empty">Loading evaluation...</div>
             ) : !selectedEvalId ? (
               <div className="skill-map-chart-empty">
-                {completedEvaluations.length === 0
-                  ? 'No completed evaluations found.'
-                  : 'Please choose a completed evaluation.'}
+                {availableEvaluations.length === 0
+                  ? 'No evaluations found.'
+                  : 'Please choose an evaluation.'}
               </div>
             ) : chartData.length === 0 ? (
               <div className="skill-map-chart-empty">No skills for this evaluation.</div>
@@ -622,7 +622,7 @@ const SkillMap: React.FC = () => {
                       onClick={() => setPendingEvalId(String(ev.id))}
                     >
                       <span className="skill-map-modal-item-title">
-                        {rubricTitleByHistoryId[ev.rubric_score_history_id] || `Evaluation #${ev.id}`}
+                        {rubricTitleByHistoryId[ev.rubric_score_history_id] || `Evaluation #${ev.id}`} ({ev.status === 'pending' ? 'Pending' : 'Completed'})
                       </span>
                     </button>
                   </li>

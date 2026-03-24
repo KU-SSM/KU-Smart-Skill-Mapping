@@ -73,6 +73,7 @@ const Profile3Detail: React.FC = () => {
 
   const [selectedRequest, setSelectedRequest] = useState<StudentRequest | null>(null);
   const [requestNotFound, setRequestNotFound] = useState<boolean>(false);
+  const isCompletedView = selectedRequest?.status === 'completed';
 
   // Rubric selection and data
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -341,6 +342,7 @@ const Profile3Detail: React.FC = () => {
   );
 
   const handleAddTeacherSkill = () => {
+    if (isCompletedView) return;
     const base = 'New Skill';
     const existing = new Set(teacherSkillsAll.map((s) => s.skillArea));
     let nextName = base;
@@ -355,6 +357,7 @@ const Profile3Detail: React.FC = () => {
   };
 
   const handleDeleteTeacherCustomSkill = (skillArea: string) => {
+    if (isCompletedView) return;
     setTeacherExtraSkills((prev) => prev.filter((s) => s.skillArea !== skillArea));
     setTeacherScores((prev) => {
       const next = { ...prev };
@@ -364,6 +367,7 @@ const Profile3Detail: React.FC = () => {
   };
 
   const handleRenameTeacherCustomSkill = (oldSkillArea: string, nextSkillAreaRaw: string) => {
+    if (isCompletedView) return;
     const nextSkillArea = nextSkillAreaRaw.trim();
     if (!nextSkillArea || nextSkillArea === oldSkillArea) return;
 
@@ -388,6 +392,7 @@ const Profile3Detail: React.FC = () => {
   };
 
   const handleScoreChange = (skillArea: string, value: string) => {
+    if (isCompletedView) return;
     // Only allow numbers
     if (value === '' || /^\d+$/.test(value)) {
       setTeacherScores(prev => ({
@@ -592,7 +597,7 @@ const Profile3Detail: React.FC = () => {
               )}
             </h2>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              {!isStudent && (
+              {!isStudent && !isCompletedView && (
                 <button
                   className={`profile2-request-evaluation-button ${
                     hasUnsavedTeacherChanges
@@ -709,7 +714,8 @@ const Profile3Detail: React.FC = () => {
                     <div className="skills-list">
                       {filteredTeacherSkills.map((skill, index) => (
                         <div key={index} className="skill-item profile2-skill-item profile2-skill-item-deletable">
-                          {teacherExtraSkills.some((s) => s.skillArea === skill.skillArea) && (
+                          {!isCompletedView &&
+                            teacherExtraSkills.some((s) => s.skillArea === skill.skillArea) && (
                               <button
                                 type="button"
                                 className="profile2-skill-delete-button"
@@ -720,7 +726,8 @@ const Profile3Detail: React.FC = () => {
                                 {React.createElement(CloseIcon)}
                               </button>
                             )}
-                          {teacherExtraSkills.some((s) => s.skillArea === skill.skillArea) ? (
+                          {!isCompletedView &&
+                          teacherExtraSkills.some((s) => s.skillArea === skill.skillArea) ? (
                             <input
                               type="text"
                               className="profile2-custom-skill-name-input"
@@ -738,46 +745,58 @@ const Profile3Detail: React.FC = () => {
                           ) : (
                             <span className="skill-name">{skill.skillArea}</span>
                           )}
-                          <select
-                            className="profile2-score-input teacher-score-input"
-                            value={teacherScores[skill.skillArea] || ''}
-                            onChange={(e) => handleScoreChange(skill.skillArea, e.target.value)}
-                          >
-                            <option value="">-</option>
-                            {rubricLevelOptions.map((level) => (
-                              <option key={level.value} value={level.value}>
-                                {level.label}
-                              </option>
-                            ))}
-                          </select>
+                          {isCompletedView ? (
+                            <input
+                              type="text"
+                              className="profile2-score-input teacher-score-input"
+                              value={toRubricLevelLabel(teacherScores[skill.skillArea] || '')}
+                              readOnly
+                              placeholder="—"
+                            />
+                          ) : (
+                            <select
+                              className="profile2-score-input teacher-score-input"
+                              value={teacherScores[skill.skillArea] || ''}
+                              onChange={(e) => handleScoreChange(skill.skillArea, e.target.value)}
+                            >
+                              <option value="">-</option>
+                              {rubricLevelOptions.map((level) => (
+                                <option key={level.value} value={level.value}>
+                                  {level.label}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                         </div>
                       ))}
-                      <div
-                        className="rubric-score-add-box"
-                        onClick={handleAddTeacherSkill}
-                        title="Add Skill"
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleAddTeacherSkill();
-                          }
-                        }}
-                      >
-                        <span className="rubric-score-add-box-spacer"></span>
-                        <button
-                          className="rubric-score-add-box-button"
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddTeacherSkill();
-                          }}
+                      {!isCompletedView && (
+                        <div
+                          className="rubric-score-add-box"
+                          onClick={handleAddTeacherSkill}
                           title="Add Skill"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleAddTeacherSkill();
+                            }
+                          }}
                         >
-                          {React.createElement(PlusIcon)}
-                        </button>
-                      </div>
+                          <span className="rubric-score-add-box-spacer"></span>
+                          <button
+                            className="rubric-score-add-box-button"
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddTeacherSkill();
+                            }}
+                            title="Add Skill"
+                          >
+                            {React.createElement(PlusIcon)}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                   )}
@@ -796,9 +815,9 @@ const Profile3Detail: React.FC = () => {
           <span className="back-button-icon">
             {React.createElement(ArrowLeftIcon)}
           </span>
-          <span>Back to Requests</span>
+          <span>Back to Evaluation Main Page</span>
         </button>
-        {!isStudent && (
+        {!isStudent && !isCompletedView && (
         <button
           className="profile2-request-evaluation-button"
           type="button"

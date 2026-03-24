@@ -11,6 +11,14 @@
   width: 100%;
   max-width: 1400px;
   display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-sizing: border-box;
+}
+
+.home-top-row {
+  width: 100%;
+  display: flex;
   align-items: center;
   gap: 40px;
   box-sizing: border-box;
@@ -81,8 +89,123 @@
   margin-bottom: 0;
 }
 
+.home-instruction-section {
+  margin-top: 20px;
+  width: 100%;
+}
+
+.home-instruction-heading {
+  margin: 0 0 28px 0;
+  font-family: 'Roboto', sans-serif;
+  font-size: 40px;
+  font-weight: 800;
+  color: #222;
+  text-align: left;
+  animation: fadeUp 0.8s ease-out 0.8s forwards;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.home-instruction-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.home-instruction-card {
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 14px;
+  box-sizing: border-box;
+  aspect-ratio: 1 / 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  animation: fadeUp 0.8s ease-out forwards;
+  opacity: 0;
+  transform: translateY(30px);
+}
+
+.home-instruction-grid .home-instruction-card:nth-child(1) {
+  animation-delay: 1s;
+}
+
+.home-instruction-grid .home-instruction-card:nth-child(2) {
+  animation-delay: 1.15s;
+}
+
+.home-instruction-grid .home-instruction-card:nth-child(3) {
+  animation-delay: 1.3s;
+}
+
+.home-instruction-grid .home-instruction-card:nth-child(4) {
+  animation-delay: 1.45s;
+}
+
+.home-instruction-card--with-action {
+  position: relative;
+}
+
+.home-instruction-icon {
+  font-size: 44px;
+  font-weight: 900;
+  color: #000000;
+  line-height: 1;
+  margin-bottom: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-instruction-title {
+  margin: 0 0 8px 0;
+  font-family: 'Roboto', sans-serif;
+  font-size: 24px;
+  font-weight: 800;
+  color: #111111;
+  text-align: center;
+}
+
+.home-instruction-text {
+  margin: 0;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #666;
+  text-align: center;
+}
+
+.home-start-now-button {
+  margin-top: 0;
+  padding: 8px 14px;
+  border: 1px solid rgba(178, 187, 30, 1);
+  border-radius: 8px;
+  background-color: rgba(178, 187, 30, 1);
+  color: #fff;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.home-start-now-button:hover {
+  background-color: rgba(154, 160, 23, 1);
+  border-color: rgba(154, 160, 23, 1);
+  transform: translateX(-50%) translateY(-1px);
+}
+
 @media (max-width: 1024px) {
-  .home-container {
+  .home-top-row {
     flex-direction: column;
     gap: 30px;
   }
@@ -102,5 +225,19 @@
 
   .greeting-message {
     font-size: 16px;
+  }
+
+  .home-instruction-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-instruction-heading {
+    font-size: 24px;
+  }
+}
+
+@media (max-width: 640px) {
+  .home-instruction-grid {
+    grid-template-columns: 1fr;
   }
 }

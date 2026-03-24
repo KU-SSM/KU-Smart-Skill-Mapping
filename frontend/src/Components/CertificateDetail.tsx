@@ -88,6 +88,13 @@ interface LevelHistoryResponse {
   description?: string | null;
 }
 
+interface CriteriaHistoryResponse {
+  id: number;
+  rubric_skill_history_id: number;
+  level_history_id: number;
+  description?: string | null;
+}
+
 interface BackendRubricSkill {
   id: number;
   rubric_id: number;
@@ -100,6 +107,13 @@ interface BackendLevel {
   rubric_id: number;
   rank: number;
   description: string | null;
+}
+
+interface BackendCriteria {
+  id: number;
+  rubric_skill_id: number;
+  level_id: number;
+  description: string;
 }
 
 const CertificateDetail: React.FC = () => {
@@ -151,10 +165,14 @@ const CertificateDetail: React.FC = () => {
 
         let skills: { id: number; name: string; display_order?: number | null }[] = [];
         let levels: { id: number; rank?: number | null; description?: string | null }[] = [];
+        let criteria: { rubric_skill_id: number; level_id: number; description: string }[] = [];
         const hasHistorySnapshot =
           skillHistoryRes.data.length > 0 && levelHistoryRes.data.length > 0;
 
         if (hasHistorySnapshot) {
+          const criteriaHistoryRes = await api.get<CriteriaHistoryResponse[]>(
+            `rubric_score_history/${full.rubric_score_history_id}/criteria`
+          );
           skills = skillHistoryRes.data.map((s) => ({
             id: s.id,
             name: s.name || `Skill #${s.id}`,
@@ -165,10 +183,16 @@ const CertificateDetail: React.FC = () => {
             rank: l.rank ?? null,
             description: l.description ?? '',
           }));
+          criteria = criteriaHistoryRes.data.map((c) => ({
+            rubric_skill_id: c.rubric_skill_history_id,
+            level_id: c.level_history_id,
+            description: (c.description || '').trim(),
+          }));
         } else {
-          const [liveSkillsRes, liveLevelsRes] = await Promise.all([
+          const [liveSkillsRes, liveLevelsRes, liveCriteriaRes] = await Promise.all([
             api.get<BackendRubricSkill[]>(`rubric/${rubricId}/rubric_skills`),
             api.get<BackendLevel[]>(`rubric/${rubricId}/levels`),
+            api.get<BackendCriteria[]>(`rubric/${rubricId}/criteria`),
           ]);
           skills = liveSkillsRes.data.map((s) => ({
             id: s.id,
@@ -179,6 +203,11 @@ const CertificateDetail: React.FC = () => {
             id: l.id,
             rank: l.rank ?? null,
             description: l.description ?? '',
+          }));
+          criteria = liveCriteriaRes.data.map((c) => ({
+            rubric_skill_id: c.rubric_skill_id,
+            level_id: c.level_id,
+            description: (c.description || '').trim(),
           }));
         }
 
@@ -196,27 +225,31 @@ const CertificateDetail: React.FC = () => {
           const desc = (l.description || '').trim();
           return desc || `Level ${index + 1}`;
         });
+        const levelIndexById = new Map<number, number>();
+        sortedLevels.forEach((level, idx) => {
+          levelIndexById.set(level.id, idx);
+        });
 
-        const studentMap = scoreMapFromRows(full.student_evaluated_skills);
-        const aiMap = scoreMapFromRows(full.ai_evaluated_skills);
-        const teacherMap = scoreMapFromRows(full.teacher_evaluated_skills);
-
-        const allSkillNames = new Set<string>();
-        sortedSkills.forEach((s) => allSkillNames.add(s.name));
-        Object.keys(studentMap).forEach((k) => allSkillNames.add(k));
-        Object.keys(aiMap).forEach((k) => allSkillNames.add(k));
-        Object.keys(teacherMap).forEach((k) => allSkillNames.add(k));
-
-        const orderedNames = [
-          ...sortedSkills.map((s) => s.name).filter((name) => allSkillNames.has(name)),
-          ...Array.from(allSkillNames).filter((name) => !sortedSkills.some((s) => s.name === name)),
-        ];
+        // Keep certificate rows strictly aligned to the matched rubric skills.
+        const orderedNames = sortedSkills.map((s) => s.name);
 
         setRubricDetail({
           id: String(rubricId),
           title: rubricTitle,
           headers,
-          rows: orderedNames.map((skillArea) => ({ skillArea, values: [] })),
+          rows: orderedNames.map((skillArea) => {
+            const skill = sortedSkills.find((s) => s.name === skillArea);
+            const values = headers.map(() => '');
+            if (skill) {
+              criteria.forEach((criterion) => {
+                if (criterion.rubric_skill_id !== skill.id) return;
+                const levelIndex = levelIndexById.get(criterion.level_id);
+                if (typeof levelIndex !== 'number' || levelIndex < 0) return;
+                values[levelIndex] = criterion.description;
+              });
+            }
+            return { skillArea, values };
+          }),
         });
       } catch (error) {
         console.error('Failed to load certificate preview data:', error);
@@ -254,6 +287,67 @@ const CertificateDetail: React.FC = () => {
   );
 
   const maxLevel = useMemo(() => Math.max(1, rubricDetail?.headers.length || 1), [rubricDetail]);
+
+  const rubricTableLayoutVars = useMemo(() => {
+    const rowCount = rubricDetail?.rows.length || 0;
+    const colCount = (rubricDetail?.headers.length || 0) + 1; // + skill area
+    const complexity = rowCount * Math.max(colCount, 1);
+
+    let fontSize = 10;
+    let cellPadY = 6;
+    let cellPadX = 8;
+    let chartMinHeight = 470;
+    let sectionTopMargin = 28;
+    let lineHeight = 1.25;
+    let firstColWidth = 24;
+
+    if (complexity > 80) {
+      fontSize = 9;
+      cellPadY = 5;
+      cellPadX = 7;
+      chartMinHeight = 430;
+      sectionTopMargin = 22;
+      lineHeight = 1.2;
+      firstColWidth = 22;
+    }
+    if (complexity > 130) {
+      fontSize = 8;
+      cellPadY = 4;
+      cellPadX = 6;
+      chartMinHeight = 390;
+      sectionTopMargin = 16;
+      lineHeight = 1.15;
+      firstColWidth = 20;
+    }
+    if (complexity > 190) {
+      fontSize = 7;
+      cellPadY = 3;
+      cellPadX = 5;
+      chartMinHeight = 350;
+      sectionTopMargin = 12;
+      lineHeight = 1.1;
+      firstColWidth = 18;
+    }
+    if (complexity > 260) {
+      fontSize = 6;
+      cellPadY = 2;
+      cellPadX = 4;
+      chartMinHeight = 300;
+      sectionTopMargin = 10;
+      lineHeight = 1.05;
+      firstColWidth = 16;
+    }
+
+    return {
+      ['--cert-rubric-font-size' as string]: `${fontSize}px`,
+      ['--cert-rubric-cell-pad-y' as string]: `${cellPadY}px`,
+      ['--cert-rubric-cell-pad-x' as string]: `${cellPadX}px`,
+      ['--cert-radar-min-height' as string]: `${chartMinHeight}px`,
+      ['--cert-rubric-section-margin-top' as string]: `${sectionTopMargin}px`,
+      ['--cert-rubric-line-height' as string]: String(lineHeight),
+      ['--cert-rubric-first-col-width' as string]: `${firstColWidth}%`,
+    } as React.CSSProperties;
+  }, [rubricDetail]);
 
   const handleExport = async () => {
     if (!previewRef.current) return;
@@ -380,6 +474,32 @@ const CertificateDetail: React.FC = () => {
                   />
                   {PARTY_CONFIG.teacher.label}
                 </span>
+              </div>
+              <div className="certificate-evaluation-rubric-section" style={rubricTableLayoutVars}>
+                <div className="certificate-evaluation-rubric-table-wrap">
+                  <table className="certificate-evaluation-rubric-table">
+                    <thead>
+                      <tr>
+                        <th>Skill Area</th>
+                        {(rubricDetail?.headers || []).map((header, index) => (
+                          <th key={`${header}-${index}`}>{header}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(rubricDetail?.rows || []).map((row) => (
+                        <tr key={row.skillArea}>
+                          <td>{row.skillArea}</td>
+                          {(rubricDetail?.headers || []).map((_, levelIndex) => (
+                            <td key={`${row.skillArea}-${levelIndex}`}>
+                              {row.values[levelIndex]?.trim() || '-'}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
             </div>
           </div>

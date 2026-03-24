@@ -93,7 +93,7 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-top: 10px;
+  margin-top: 20px;
   width: 100%;
 }
 
@@ -159,7 +159,7 @@
 
 .certificate-radar-chart-box {
   height: 100%;
-  min-height: 470px;
+  min-height: var(--cert-radar-min-height, 470px);
   width: 100%;
   padding: 0;
 }
@@ -186,6 +186,87 @@
   height: 8px;
   border-radius: 999px;
   display: inline-block;
+}
+
+.certificate-evaluation-rubric-section {
+  width: 100%;
+  margin-top: var(--cert-rubric-section-margin-top, 28px);
+  flex: 0 0 auto;
+  min-height: 0;
+}
+
+.certificate-evaluation-rubric-title {
+  margin: 0 0 8px 0;
+  text-align: left;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.certificate-evaluation-rubric-table-wrap {
+  width: 100%;
+  max-height: none;
+  overflow: visible;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #ffffff;
+  box-sizing: border-box;
+  /* Keep a guaranteed visible frame on all edges in preview/export. */
+  box-shadow: inset -1px 0 0 #d1d5db, inset 0 -1px 0 #d1d5db;
+}
+
+.certificate-evaluation-rubric-table {
+  width: calc(100% - 1px);
+  border-collapse: collapse;
+  table-layout: fixed;
+  min-width: 100%;
+  border: 1px solid #d1d5db;
+  box-sizing: border-box;
+  margin-right: 1px;
+}
+
+.certificate-evaluation-rubric-table th,
+.certificate-evaluation-rubric-table td {
+  border: 1px solid #d1d5db;
+  padding: var(--cert-rubric-cell-pad-y, 6px) var(--cert-rubric-cell-pad-x, 8px);
+  text-align: left;
+  vertical-align: top;
+  font-size: var(--cert-rubric-font-size, 10px);
+  line-height: var(--cert-rubric-line-height, 1.25);
+  color: #111827;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+.certificate-evaluation-rubric-table th {
+  background: #f8fafc;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-weight: 600;
+}
+
+.certificate-evaluation-rubric-table td {
+  font-family: Garamond, 'Times New Roman', serif;
+}
+
+.certificate-evaluation-rubric-table th:last-child,
+.certificate-evaluation-rubric-table td:last-child {
+  border-right: 1px solid #d1d5db;
+}
+
+.certificate-evaluation-rubric-table th:first-child,
+.certificate-evaluation-rubric-table td:first-child {
+  border-left: 1px solid #d1d5db;
+}
+
+.certificate-evaluation-rubric-table tr:last-child td {
+  border-bottom: 1px solid #d1d5db;
+}
+
+.certificate-evaluation-rubric-table th:first-child,
+.certificate-evaluation-rubric-table td:first-child {
+  width: var(--cert-rubric-first-col-width, 24%);
 }
 
 .certificate-radar-empty {
@@ -459,6 +540,11 @@
     margin-top: -2px;
     gap: 12px;
     font-size: 10px;
+  }
+
+  .certificate-evaluation-rubric-table th,
+  .certificate-evaluation-rubric-table td {
+    font-size: 11px;
   }
 
   .certificate-template-footer {
