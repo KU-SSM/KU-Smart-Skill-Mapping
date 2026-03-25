@@ -3,6 +3,7 @@ uvicorn
 sqlalchemy
 openai
 python-multipart
+#pdf processing
 pypdf
 pdfplumber
 pdf2image
