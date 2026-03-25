@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import './Profile.css';
 import './RubricScore.css';
@@ -64,15 +64,45 @@ interface FormerRubricVersion {
   rows: TableData[];
 }
 
+const teacherCustomSkillsKey = (evaluationId: string) =>
+  `evaluation_teacher_custom_skills_${evaluationId}`;
+
+const readTeacherCustomSkills = (evaluationId: string): string[] => {
+  try {
+    const raw = localStorage.getItem(teacherCustomSkillsKey(evaluationId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((v) => (typeof v === 'string' ? v.trim() : ''))
+      .filter((v) => v !== '');
+  } catch {
+    return [];
+  }
+};
+
+const writeTeacherCustomSkills = (evaluationId: string, skills: string[]): void => {
+  try {
+    const normalized = skills
+      .map((s) => s.trim())
+      .filter((s) => s !== '');
+    localStorage.setItem(teacherCustomSkillsKey(evaluationId), JSON.stringify(normalized));
+  } catch {
+    // ignore localStorage errors
+  }
+};
+
 const Profile3Detail: React.FC = () => {
   const { requestId } = useParams<{ requestId: string }>();
   const navigate = useNavigate();
   const { isStudent, isTeacher } = useAppRole();
-  /* Student: AI + self-eval; Teacher: AI + teacher scores (each role hides the other column). */
-  const evaluationPanelsGridClass = isTeacher ? 'profile2-three-panels' : 'profile2-two-panels';
 
   const [selectedRequest, setSelectedRequest] = useState<StudentRequest | null>(null);
   const [requestNotFound, setRequestNotFound] = useState<boolean>(false);
+  const isCompletedView = selectedRequest?.status === 'completed';
+  /* Teacher: three panels. Student: two until evaluation is completed, then show Teacher column too. */
+  const evaluationPanelsGridClass =
+    isTeacher || (isStudent && isCompletedView) ? 'profile2-three-panels' : 'profile2-two-panels';
 
   // Rubric selection and data
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -87,6 +117,12 @@ const Profile3Detail: React.FC = () => {
   const [isRubricInfoLoading, setIsRubricInfoLoading] = useState<boolean>(false);
   const [rubricInfoError, setRubricInfoError] = useState<string | null>(null);
   const [teacherScores, setTeacherScores] = useState<{ [skillArea: string]: string }>({});
+  const teacherScoresRef = useRef(teacherScores);
+  teacherScoresRef.current = teacherScores;
+  /** Teacher-added custom names not yet in localStorage — must not be pruned when syncing student rows. */
+  const locallyAddedTeacherCustomRef = useRef<Set<string>>(new Set());
+  /** Tracks student (non-rubric) skill names so we can drop matching teacher rows when the student removes a custom. */
+  const prevStudentExtrasRef = useRef<Set<string>>(new Set());
   const [aiEvaluations, setAiEvaluations] = useState<{ [skillArea: string]: string }>({});
   const [studentEvaluations, setStudentEvaluations] = useState<{ [skillArea: string]: string }>({});
   const [teacherExtraSkills, setTeacherExtraSkills] = useState<Skill[]>([]);
@@ -143,12 +179,43 @@ const Profile3Detail: React.FC = () => {
         setSelectedRubricId(rubricId);
         setConfirmedRubricId(rubricId);
         setAiEvaluations(toScoreMap(ev.ai_evaluated_skills || []));
-        setStudentEvaluations(toScoreMap(ev.student_evaluated_skills || []));
+
+        const studentMap = toScoreMap(ev.student_evaluated_skills || []);
+        const rubricDetail = await getRubricScore(rubricId);
+        const rubricSetHydrate = new Set(
+          rubricDetail.rows.map((r) => (r.skillArea || '').trim()).filter((n) => n !== '')
+        );
+
+        setStudentEvaluations(studentMap);
+
         const hydratedTeacherScores = toScoreMap(ev.teacher_evaluated_skills || []);
+        const savedTeacherCustomSkills = readTeacherCustomSkills(String(ev.id));
+        const savedTeacherTrimmed = new Set(
+          savedTeacherCustomSkills.map((s) => s.trim()).filter(Boolean)
+        );
+        savedTeacherCustomSkills.forEach((skillArea) => {
+          if (!(skillArea in hydratedTeacherScores)) {
+            hydratedTeacherScores[skillArea] = '0';
+          }
+        });
+        Object.keys({ ...hydratedTeacherScores }).forEach((k) => {
+          const t = k.trim();
+          if (!t || rubricSetHydrate.has(t)) return;
+          const inStudent = Object.keys(studentMap).some((sk) => sk.trim() === t);
+          if (!inStudent && !savedTeacherTrimmed.has(t)) {
+            delete hydratedTeacherScores[k];
+          }
+        });
+
+        prevStudentExtrasRef.current = new Set(
+          Object.keys(studentMap)
+            .map((k) => k.trim())
+            .filter((t) => t !== '' && !rubricSetHydrate.has(t))
+        );
+
         setTeacherScores(hydratedTeacherScores);
-        setOriginalTeacherScores(hydratedTeacherScores);
         setTeacherExtraSkills([]);
-        setOriginalTeacherExtraSkills([]);
+        /* originalTeacher* aligned after rubric loads — see sync effect. */
       } catch (error) {
         console.error('Failed to load evaluation request:', error);
         setRequestNotFound(true);
@@ -157,6 +224,11 @@ const Profile3Detail: React.FC = () => {
 
     void loadRequest();
   }, [requestId, toScoreMap]);
+
+  useEffect(() => {
+    locallyAddedTeacherCustomRef.current.clear();
+    prevStudentExtrasRef.current.clear();
+  }, [requestId]);
 
   // Load rubric list on mount
   useEffect(() => {
@@ -175,31 +247,116 @@ const Profile3Detail: React.FC = () => {
     loadRubrics();
   }, []);
 
-  // Load rubric data when confirmed rubric changes
+  // Fetch rubric definition only when the evaluation's rubric id changes — not when the teacher edits scores
+  // (including teacherScores in deps re-ran loading, toggled the panel, and jumped scroll to top).
   useEffect(() => {
-    const loadRubricData = async () => {
-      if (!confirmedRubricId) {
-        setSelectedRubricData(null);
-        setTeacherExtraSkills([]);
-        return;
-      }
+    if (!confirmedRubricId) {
+      setSelectedRubricData(null);
+      setTeacherExtraSkills([]);
+      return;
+    }
 
+    let cancelled = false;
+    const loadRubricData = async () => {
       try {
         setIsLoadingRubric(true);
         const rubricData = await getRubricScore(confirmedRubricId);
+        if (cancelled) return;
         setSelectedRubricData(rubricData);
-        setTeacherExtraSkills([]);
       } catch (error) {
         console.error('Error loading rubric data:', error);
-        setSelectedRubricData(null);
-        setTeacherExtraSkills([]);
+        if (!cancelled) {
+          setSelectedRubricData(null);
+          setTeacherExtraSkills([]);
+        }
       } finally {
-        setIsLoadingRubric(false);
+        if (!cancelled) setIsLoadingRubric(false);
       }
     };
 
-    loadRubricData();
+    void loadRubricData();
+    return () => {
+      cancelled = true;
+    };
   }, [confirmedRubricId]);
+
+  // After rubric + student eval are known: sync teacher rows with current student data.
+  // Drop teacher rows for student customs the student removed (unless they are teacher-listed customs).
+  // Seed missing student customs. Align baseline (original) so Save only lights on real edits.
+  useEffect(() => {
+    if (!selectedRubricData || !selectedRequest?.id) return;
+
+    const rubricSkillSet = new Set(
+      selectedRubricData.rows
+        .map((row) => (row.skillArea || '').trim())
+        .filter((name) => name !== '')
+    );
+
+    const teacherCustomNames = new Set(
+      readTeacherCustomSkills(selectedRequest.id).map((s) => s.trim()).filter(Boolean)
+    );
+
+    const currentStudentExtras = new Set(
+      Object.keys(studentEvaluations)
+        .map((k) => k.trim())
+        .filter((t) => t !== '' && !rubricSkillSet.has(t))
+    );
+
+    const prev = { ...teacherScoresRef.current };
+    const next: { [skillArea: string]: string } = { ...prev };
+
+    const prevStudentSnapshot = new Set(prevStudentExtrasRef.current);
+
+    Object.keys(next).forEach((k) => {
+      const t = k.trim();
+      if (!t || rubricSkillSet.has(t)) return;
+      const wasStudentExtra = prevStudentSnapshot.has(t);
+      const isStudentExtraNow = currentStudentExtras.has(t);
+      const teacherListedOrLocal =
+        teacherCustomNames.has(t) || locallyAddedTeacherCustomRef.current.has(t);
+      if (wasStudentExtra && !isStudentExtraNow && !teacherListedOrLocal) {
+        delete next[k];
+      }
+    });
+
+    Object.keys(studentEvaluations).forEach((skillArea) => {
+      const t = skillArea.trim();
+      if (!t || rubricSkillSet.has(t)) return;
+      const hasTrimMatch = Object.keys(next).some((k) => k.trim() === t);
+      if (!hasTrimMatch) {
+        next[skillArea] = '0';
+      }
+    });
+
+    const restoredTeacherExtras = Object.keys(next)
+      .filter((k) => {
+        const t = k.trim();
+        return t !== '' && !rubricSkillSet.has(t);
+      })
+      .map((skillArea) => ({ skillArea }));
+
+    const extraKeys = (m: { [k: string]: string }) =>
+      Object.keys(m)
+        .filter((k) => {
+          const t = k.trim();
+          return t !== '' && !rubricSkillSet.has(t);
+        })
+        .map((k) => k.trim())
+        .sort();
+    const scoresSame = JSON.stringify(prev) === JSON.stringify(next);
+    const extrasSame = JSON.stringify(extraKeys(prev)) === JSON.stringify(extraKeys(next));
+
+    if (scoresSame && extrasSame) {
+      prevStudentExtrasRef.current = currentStudentExtras;
+      return;
+    }
+
+    setTeacherScores(next);
+    setOriginalTeacherScores({ ...next });
+    setTeacherExtraSkills(restoredTeacherExtras);
+    setOriginalTeacherExtraSkills(restoredTeacherExtras.map((s) => ({ ...s })));
+    prevStudentExtrasRef.current = currentStudentExtras;
+  }, [selectedRubricData, studentEvaluations, selectedRequest?.id]);
 
   const filteredRubricScores = useMemo(() => {
     if (!searchQuery.trim()) return rubricScores;
@@ -298,9 +455,51 @@ const Profile3Detail: React.FC = () => {
     }));
   }, [selectedRubricData]);
 
+  const rubricSkillAreaSet = useMemo(
+    () =>
+      new Set(skills.map((s) => (s.skillArea || '').trim()).filter((name) => name !== '')),
+    [skills]
+  );
+
+  /** Rubric rows first, then any non-rubric teacher rows (custom skills from API, localStorage, or in-progress edits). */
   const teacherSkillsAll = useMemo((): Skill[] => {
-    return [...skills, ...teacherExtraSkills];
-  }, [skills, teacherExtraSkills]);
+    if (!selectedRubricData) return [...skills, ...teacherExtraSkills];
+    const extraOrdered: Skill[] = [];
+    const seen = new Set<string>();
+    const pushExtra = (raw: string) => {
+      const t = raw.trim();
+      if (!t || rubricSkillAreaSet.has(t) || seen.has(t)) return;
+      seen.add(t);
+      extraOrdered.push({ skillArea: t });
+    };
+    teacherExtraSkills.forEach((s) => pushExtra(s.skillArea));
+    Object.keys(teacherScores).forEach((k) => pushExtra(k));
+    if (selectedRequest?.id) {
+      readTeacherCustomSkills(selectedRequest.id).forEach((n) => pushExtra(n));
+    }
+    return [...skills, ...extraOrdered];
+  }, [
+    selectedRubricData,
+    skills,
+    teacherExtraSkills,
+    teacherScores,
+    rubricSkillAreaSet,
+    selectedRequest?.id,
+  ]);
+
+  /** Rubric rows first, then current student skills not on the rubric (from API only — no stale order). */
+  const studentSkillsAll = useMemo((): Skill[] => {
+    const rubricSkillSet = new Set(
+      skills.map((s) => (s.skillArea || '').trim()).filter((name) => name !== '')
+    );
+    const extraKeys = Object.keys(studentEvaluations).filter((key) => {
+      const t = key.trim();
+      return t !== '' && !rubricSkillSet.has(t);
+    });
+    extraKeys.sort((a, b) => a.trim().localeCompare(b.trim()));
+    const extras: Skill[] = extraKeys.map((skillArea) => ({ skillArea }));
+    return [...skills, ...extras];
+  }, [skills, studentEvaluations]);
 
   const filteredAiSkills = useMemo(() => {
     if (!searchAi.trim()) return skills;
@@ -309,10 +508,12 @@ const Profile3Detail: React.FC = () => {
   }, [skills, searchAi]);
 
   const filteredStudentSkills = useMemo(() => {
-    if (!searchStudent.trim()) return skills;
+    if (!searchStudent.trim()) return studentSkillsAll;
     const query = searchStudent.toLowerCase();
-    return skills.filter(skill => skill.skillArea.toLowerCase().includes(query));
-  }, [skills, searchStudent]);
+    return studentSkillsAll.filter((skill) =>
+      skill.skillArea.toLowerCase().includes(query)
+    );
+  }, [studentSkillsAll, searchStudent]);
 
   const filteredTeacherSkills = useMemo(() => {
     if (!searchTeacher.trim()) return teacherSkillsAll;
@@ -320,7 +521,30 @@ const Profile3Detail: React.FC = () => {
     return teacherSkillsAll.filter(skill => skill.skillArea.toLowerCase().includes(query));
   }, [teacherSkillsAll, searchTeacher]);
 
+  const rubricLevelOptions = useMemo(() => {
+    const headers = selectedRubricData?.headers || [];
+    const levelCount = Math.max(1, headers.length || 0);
+    return Array.from({ length: levelCount }, (_, i) => ({
+      value: String(i + 1),
+      label: headers[i]?.trim() ? headers[i] : `Level ${i + 1}`,
+    }));
+  }, [selectedRubricData]);
+
+  const toRubricLevelLabel = useCallback(
+    (scoreRaw: string): string => {
+      const score = Number(scoreRaw);
+      if (!Number.isInteger(score)) return '';
+      if (score === 0) return 'No Passing Criteria';
+      if (score < 0) return '';
+      const headers = selectedRubricData?.headers || [];
+      const header = headers[score - 1];
+      return header && header.trim() ? header : `Level ${score}`;
+    },
+    [selectedRubricData]
+  );
+
   const handleAddTeacherSkill = () => {
+    if (isCompletedView) return;
     const base = 'New Skill';
     const existing = new Set(teacherSkillsAll.map((s) => s.skillArea));
     let nextName = base;
@@ -330,11 +554,14 @@ const Profile3Detail: React.FC = () => {
       i += 1;
     }
 
+    locallyAddedTeacherCustomRef.current.add(nextName.trim());
     setTeacherExtraSkills((prev) => [...prev, { skillArea: nextName }]);
-    setTeacherScores((prev) => ({ ...prev, [nextName]: '' }));
+    setTeacherScores((prev) => ({ ...prev, [nextName]: '0' }));
   };
 
   const handleDeleteTeacherCustomSkill = (skillArea: string) => {
+    if (isCompletedView) return;
+    locallyAddedTeacherCustomRef.current.delete(skillArea.trim());
     setTeacherExtraSkills((prev) => prev.filter((s) => s.skillArea !== skillArea));
     setTeacherScores((prev) => {
       const next = { ...prev };
@@ -344,6 +571,7 @@ const Profile3Detail: React.FC = () => {
   };
 
   const handleRenameTeacherCustomSkill = (oldSkillArea: string, nextSkillAreaRaw: string) => {
+    if (isCompletedView) return;
     const nextSkillArea = nextSkillAreaRaw.trim();
     if (!nextSkillArea || nextSkillArea === oldSkillArea) return;
 
@@ -355,6 +583,8 @@ const Profile3Detail: React.FC = () => {
       return;
     }
 
+    locallyAddedTeacherCustomRef.current.delete(oldSkillArea.trim());
+    locallyAddedTeacherCustomRef.current.add(nextSkillArea);
     setTeacherExtraSkills((prev) =>
       prev.map((s) => (s.skillArea === oldSkillArea ? { ...s, skillArea: nextSkillArea } : s))
     );
@@ -368,6 +598,7 @@ const Profile3Detail: React.FC = () => {
   };
 
   const handleScoreChange = (skillArea: string, value: string) => {
+    if (isCompletedView) return;
     // Only allow numbers
     if (value === '' || /^\d+$/.test(value)) {
       setTeacherScores(prev => ({
@@ -378,27 +609,20 @@ const Profile3Detail: React.FC = () => {
   };
 
   const hasUnsavedTeacherChanges = useMemo(() => {
-    const serializeScoreMap = (scores: { [skillArea: string]: string }) =>
+    const snapshot = (scores: { [skillArea: string]: string }) =>
       JSON.stringify(
-        Object.keys(scores)
-          .sort()
-          .map((k) => [k, scores[k] ?? ''])
+        teacherSkillsAll.map((s) => [s.skillArea, (scores[s.skillArea] ?? '').trim()])
       );
-    const serializeSkillNames = (skillsList: Skill[]) =>
-      JSON.stringify(
-        [...skillsList.map((s) => s.skillArea)]
-          .filter((name) => name.trim() !== '')
-          .sort()
-      );
+    return snapshot(teacherScores) !== snapshot(originalTeacherScores);
+  }, [teacherSkillsAll, teacherScores, originalTeacherScores]);
 
-    const hasTeacherScoreChange =
-      serializeScoreMap(teacherScores) !== serializeScoreMap(originalTeacherScores);
-    const hasTeacherSkillChange =
-      serializeSkillNames(teacherExtraSkills) !==
-      serializeSkillNames(originalTeacherExtraSkills);
-
-    return hasTeacherScoreChange || hasTeacherSkillChange;
-  }, [teacherScores, originalTeacherScores, teacherExtraSkills, originalTeacherExtraSkills]);
+  const allTeacherScoresFilled = useMemo(() => {
+    if (!selectedRubricData || isCompletedView) return true;
+    return !teacherSkillsAll.some((skill) => {
+      const v = teacherScores[skill.skillArea];
+      return typeof v !== 'string' || v.trim() === '';
+    });
+  }, [selectedRubricData, isCompletedView, teacherSkillsAll, teacherScores]);
 
   const persistTeacherEvaluations = useCallback(async (skillEvaluationId: number) => {
     const existingTeacherRows = await api.get<{ id: number }[]>(
@@ -408,12 +632,24 @@ const Profile3Detail: React.FC = () => {
       existingTeacherRows.data.map((row) => api.delete(`teacher_evaluated_skill/${row.id}`))
     );
 
+    const rubricSkillSet = new Set(
+      (selectedRubricData?.rows || [])
+        .map((row) => (row.skillArea || '').trim())
+        .filter((name) => name !== '')
+    );
     const payloads = Object.entries(teacherScores)
-      .map(([skillArea, score]) => ({ skillArea: skillArea.trim(), score: score.trim() }))
-      .filter(
-        ({ skillArea, score }) =>
-          skillArea !== '' && /^\d+$/.test(score) && Number(score) > 0
-      );
+      .map(([skillAreaRaw, scoreRaw]) => {
+        const skillArea = skillAreaRaw.trim();
+        const trimmedScore = scoreRaw.trim();
+        if (skillArea === '') return null;
+        const isCustomTeacherRow = !rubricSkillSet.has(skillArea);
+        // Allow blank custom skill to be persisted as "No Passing Criteria" (0).
+        const normalizedScore =
+          trimmedScore === '' && isCustomTeacherRow ? '0' : trimmedScore;
+        if (!/^\d+$/.test(normalizedScore) || Number(normalizedScore) < 0) return null;
+        return { skillArea, score: normalizedScore };
+      })
+      .filter((item): item is { skillArea: string; score: string } => item !== null);
 
     await Promise.all(
       payloads.map(({ skillArea, score }) =>
@@ -424,7 +660,7 @@ const Profile3Detail: React.FC = () => {
         })
       )
     );
-  }, [teacherScores]);
+  }, [teacherScores, selectedRubricData]);
 
   const handleSaveTeacherEvaluation = useCallback(async () => {
     if (!selectedRequest) return;
@@ -432,6 +668,10 @@ const Profile3Detail: React.FC = () => {
       setIsSavingEvaluation(true);
       const skillEvaluationId = Number(selectedRequest.id);
       await persistTeacherEvaluations(skillEvaluationId);
+      writeTeacherCustomSkills(
+        String(skillEvaluationId),
+        teacherExtraSkills.map((s) => s.skillArea)
+      );
       setOriginalTeacherScores({ ...teacherScores });
       setOriginalTeacherExtraSkills(teacherExtraSkills.map((s) => ({ ...s })));
       alert('Teacher evaluation saved.');
@@ -446,8 +686,10 @@ const Profile3Detail: React.FC = () => {
   const handleSubmitEvaluation = async () => {
     if (!selectedRequest || !selectedRubricData) return;
 
-    // Validate that all skills have scores
-    const missingScores = skills.filter(skill => !teacherScores[skill.skillArea] || teacherScores[skill.skillArea].trim() === '');
+    // Validate that all skills have scores (rubric + teacher extras, including student custom skills)
+    const missingScores = teacherSkillsAll.filter(
+      (skill) => !teacherScores[skill.skillArea] || teacherScores[skill.skillArea].trim() === ''
+    );
     if (missingScores.length > 0) {
       alert(`Please fill in scores for all skills. Missing: ${missingScores.map(s => s.skillArea).join(', ')}`);
       return;
@@ -457,10 +699,23 @@ const Profile3Detail: React.FC = () => {
       setIsSubmitting(true);
       const skillEvaluationId = Number(selectedRequest.id);
       await persistTeacherEvaluations(skillEvaluationId);
+      writeTeacherCustomSkills(
+        String(skillEvaluationId),
+        teacherExtraSkills.map((s) => s.skillArea)
+      );
 
       await updateSkillEvaluation(skillEvaluationId, { status: 'completed' });
+      setOriginalTeacherScores({ ...teacherScores });
+      setOriginalTeacherExtraSkills(teacherExtraSkills.map((s) => ({ ...s })));
+      setSelectedRequest((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: 'completed',
+            }
+          : prev
+      );
       alert('Evaluation submitted successfully and marked as completed.');
-      navigate('/profile3');
     } catch (error) {
       console.error('Error submitting evaluation:', error);
       alert(`Failed to submit evaluation: ${getApiErrorDetail(error)}`);
@@ -572,7 +827,7 @@ const Profile3Detail: React.FC = () => {
               )}
             </h2>
             <div style={{ display: 'flex', gap: '12px', alignItems: 'center', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-              {!isStudent && (
+              {!isStudent && !isCompletedView && (
                 <button
                   className={`profile2-request-evaluation-button ${
                     hasUnsavedTeacherChanges
@@ -630,9 +885,15 @@ const Profile3Detail: React.FC = () => {
                           <input
                             type="text"
                             className="profile2-score-input ai-score-input"
-                            value={aiEvaluations[skill.skillArea] || ''}
+                            value={
+                              (() => {
+                                const raw = aiEvaluations[skill.skillArea];
+                                if (typeof raw !== 'string' || raw.trim() === '') return '-';
+                                return toRubricLevelLabel(raw) || '-';
+                              })()
+                            }
                             readOnly
-                            placeholder="Auto"
+                            placeholder="-"
                           />
                         </div>
                       ))}
@@ -661,7 +922,7 @@ const Profile3Detail: React.FC = () => {
                           <input
                             type="text"
                             className="profile2-score-input ai-score-input"
-                            value={studentEvaluations[skill.skillArea] || ''}
+                            value={toRubricLevelLabel(studentEvaluations[skill.skillArea] || '')}
                             readOnly
                             placeholder="—"
                           />
@@ -669,7 +930,7 @@ const Profile3Detail: React.FC = () => {
                       ))}
                     </div>
                   </div>
-                  {!isStudent && (
+                  {(!isStudent || isCompletedView) && (
                   <div className="skills-panel profile2-panel">
                     <h2 className="panel-title">Teacher</h2>
                     <div className="search-container">
@@ -687,9 +948,20 @@ const Profile3Detail: React.FC = () => {
                       )}
                     </div>
                     <div className="skills-list">
-                      {filteredTeacherSkills.map((skill, index) => (
+                      {filteredTeacherSkills.map((skill, index) => {
+                        const isCustomTeacherSkill = !rubricSkillAreaSet.has(
+                          skill.skillArea.trim()
+                        );
+                        const rawTeacherScore = teacherScores[skill.skillArea] ?? '';
+                        const teacherSelectValue = isCustomTeacherSkill
+                          ? /^\d+$/.test(rawTeacherScore.trim())
+                            ? rawTeacherScore.trim()
+                            : '0'
+                          : rawTeacherScore;
+                        return (
                         <div key={index} className="skill-item profile2-skill-item profile2-skill-item-deletable">
-                          {teacherExtraSkills.some((s) => s.skillArea === skill.skillArea) && (
+                          {!isCompletedView &&
+                            isCustomTeacherSkill && (
                               <button
                                 type="button"
                                 className="profile2-skill-delete-button"
@@ -700,7 +972,8 @@ const Profile3Detail: React.FC = () => {
                                 {React.createElement(CloseIcon)}
                               </button>
                             )}
-                          {teacherExtraSkills.some((s) => s.skillArea === skill.skillArea) ? (
+                          {!isCompletedView &&
+                          isCustomTeacherSkill ? (
                             <input
                               type="text"
                               className="profile2-custom-skill-name-input"
@@ -718,51 +991,60 @@ const Profile3Detail: React.FC = () => {
                           ) : (
                             <span className="skill-name">{skill.skillArea}</span>
                           )}
-                          <input
-                            type="text"
-                            className="profile2-score-input teacher-score-input"
-                            value={teacherScores[skill.skillArea] || ''}
-                            readOnly={false}
-                            onChange={(e) => handleScoreChange(skill.skillArea, e.target.value)}
-                            onBlur={(e) => {
-                              const value = e.target.value;
-                              if (value && (!/^\d+$/.test(value) || parseInt(value) < 1)) {
-                                setTeacherScores(prev => ({
-                                  ...prev,
-                                  [skill.skillArea]: ''
-                                }));
-                              }
-                            }}
-                            placeholder="Score"
-                          />
+                          {isCompletedView ? (
+                            <input
+                              type="text"
+                              className="profile2-score-input teacher-score-input"
+                              value={toRubricLevelLabel(teacherScores[skill.skillArea] || '')}
+                              readOnly
+                              placeholder="—"
+                            />
+                          ) : (
+                            <select
+                              className="profile2-score-input teacher-score-input"
+                              value={teacherSelectValue}
+                              onChange={(e) => handleScoreChange(skill.skillArea, e.target.value)}
+                            >
+                              <option value="0">No Passing Criteria</option>
+                              {!isCustomTeacherSkill && <option value="">-</option>}
+                              {rubricLevelOptions.map((level) => (
+                                <option key={level.value} value={level.value}>
+                                  {level.label}
+                                </option>
+                              ))}
+                            </select>
+                          )}
                         </div>
-                      ))}
-                      <div
-                        className="rubric-score-add-box"
-                        onClick={handleAddTeacherSkill}
-                        title="Add Skill"
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleAddTeacherSkill();
-                          }
-                        }}
-                      >
-                        <span className="rubric-score-add-box-spacer"></span>
-                        <button
-                          className="rubric-score-add-box-button"
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddTeacherSkill();
-                          }}
+                        );
+                      })}
+                      {!isCompletedView && (
+                        <div
+                          className="rubric-score-add-box"
+                          onClick={handleAddTeacherSkill}
                           title="Add Skill"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleAddTeacherSkill();
+                            }
+                          }}
                         >
-                          {React.createElement(PlusIcon)}
-                        </button>
-                      </div>
+                          <span className="rubric-score-add-box-spacer"></span>
+                          <button
+                            className="rubric-score-add-box-button"
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddTeacherSkill();
+                            }}
+                            title="Add Skill"
+                          >
+                            {React.createElement(PlusIcon)}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                   )}
@@ -781,14 +1063,16 @@ const Profile3Detail: React.FC = () => {
           <span className="back-button-icon">
             {React.createElement(ArrowLeftIcon)}
           </span>
-          <span>Back to Requests</span>
+          <span>Back to Evaluation Main Page</span>
         </button>
-        {!isStudent && (
+        {!isStudent && !isCompletedView && (
         <button
           className="profile2-request-evaluation-button"
           type="button"
           onClick={handleSubmitEvaluation}
-          disabled={isSubmitting || isSavingEvaluation}
+          disabled={
+            isSubmitting || isSavingEvaluation || !allTeacherScoresFilled
+          }
         >
           {isSubmitting ? 'Submitting...' : 'Submit Evaluation'}
         </button>

@@ -71,6 +71,13 @@
   justify-content: center;
 }
 
+.skill-map-radar-fixed-size {
+  width: min(500px, 100%);
+  height: 360px;
+  max-width: 500px;
+  flex: 0 0 auto;
+}
+
 .skill-map-sidebar {
   flex: 1;
   max-width: 380px;
@@ -608,5 +615,10 @@
 
   .skill-map-sidebar {
     width: 100%;
+  }
+
+  .skill-map-radar-fixed-size {
+    width: min(460px, 100%);
+    height: 340px;
   }
 }

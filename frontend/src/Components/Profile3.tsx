@@ -27,16 +27,26 @@ interface RubricResponse {
   name: string;
 }
 
+type TeacherRequestFilter = 'all' | 'pending' | 'completed';
+
 const Profile3: React.FC = () => {
   const navigate = useNavigate();
   const [searchStudentName, setSearchStudentName] = useState<string>('');
   const [studentRequests, setStudentRequests] = useState<StudentRequest[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [statusFilter, setStatusFilter] = useState<TeacherRequestFilter>('all');
   const studentNameByUserIdRef = useRef<Map<number, string>>(new Map());
   const rubricTitleByHistoryIdRef = useRef<Map<number, string>>(new Map());
 
   const mapBackendRequest = useCallback(async (ev: SkillEvaluationRecord): Promise<StudentRequest | null> => {
-    if (ev.status !== 'pending') {
+    const mappedStatus: StudentRequest['status'] | null =
+      ev.status === 'pending'
+        ? 'pending'
+        : ev.status === 'completed' || ev.status === 'approved'
+          ? 'completed'
+          : null;
+
+    if (!mappedStatus) {
       return null;
     }
 
@@ -76,7 +86,7 @@ const Profile3: React.FC = () => {
       portfolioFileName,
       rubricTitle,
       requestedAt: ev.created_at || '',
-      status: 'pending',
+      status: mappedStatus,
     };
   }, []);
 
@@ -85,17 +95,19 @@ const Profile3: React.FC = () => {
       setIsLoading(true);
       const rows = await getSkillEvaluations();
 
-      const pendingRows = rows.filter((row) => row.status === 'pending');
+      const relevantRows = rows.filter(
+        (row) => row.status === 'pending' || row.status === 'completed' || row.status === 'approved'
+      );
       const userIdsToFetch = Array.from(
         new Set(
-          pendingRows
+          relevantRows
             .map((row) => row.user_id)
             .filter((id) => !studentNameByUserIdRef.current.has(id))
         )
       );
       const historyIdsToFetch = Array.from(
         new Set(
-          pendingRows
+          relevantRows
             .map((row) => row.rubric_score_history_id)
             .filter((id) => !rubricTitleByHistoryIdRef.current.has(id))
         )
@@ -131,11 +143,17 @@ const Profile3: React.FC = () => {
         ),
       ]);
 
-      const mapped = await Promise.all(rows.map((row) => mapBackendRequest(row)));
+      const mapped = await Promise.all(relevantRows.map((row) => mapBackendRequest(row)));
       setStudentRequests(
         mapped
           .filter((item): item is StudentRequest => item !== null)
-          .sort((a, b) => Number(b.id) - Number(a.id))
+          .sort((a, b) => {
+            // In "All" view, pending should appear before completed.
+            if (a.status !== b.status) {
+              return a.status === 'pending' ? -1 : 1;
+            }
+            return Number(b.id) - Number(a.id);
+          })
       );
     } catch (error) {
       console.error('Error loading student evaluation requests:', error);
@@ -166,16 +184,41 @@ const Profile3: React.FC = () => {
 
   const filteredRequests = useMemo(() => {
     const q = searchStudentName.trim().toLowerCase();
-    if (!q) return studentRequests;
-    return studentRequests.filter((req) =>
-      req.studentName.toLowerCase().includes(q)
-    );
-  }, [studentRequests, searchStudentName]);
+    return studentRequests.filter((req) => {
+      const matchesSearch = !q || req.studentName.toLowerCase().includes(q);
+      const matchesStatus = statusFilter === 'all' || req.status === statusFilter;
+      return matchesSearch && matchesStatus;
+    });
+  }, [studentRequests, searchStudentName, statusFilter]);
 
   return (
     <div className="rubric-score-wrapper">
       <div className="rubric-score-container">
         <h1 className="rubric-score-title">Student Evaluation Requests</h1>
+
+          <div className="profile3-filter-group">
+            <button
+              type="button"
+              className={`profile3-filter-button ${statusFilter === 'all' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('all')}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              className={`profile3-filter-button ${statusFilter === 'pending' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('pending')}
+            >
+              Pending
+            </button>
+            <button
+              type="button"
+              className={`profile3-filter-button ${statusFilter === 'completed' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('completed')}
+            >
+              Completed
+            </button>
+          </div>
 
           <div className="rubric-score-search-container" style={{ marginBottom: '16px' }}>
             <input
@@ -205,7 +248,7 @@ const Profile3: React.FC = () => {
                   ? 'Loading student evaluation requests...'
                   : studentRequests.length === 0
                   ? 'No student evaluation requests available.'
-                  : 'No matching students found.'}
+                  : 'No matching requests found.'}
               </p>
             </div>
           ) : (
