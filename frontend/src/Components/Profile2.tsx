@@ -297,6 +297,7 @@ const Profile2: React.FC = () => {
   const [isSavingEvaluation, setIsSavingEvaluation] = useState<boolean>(false);
   const [portfolioDisplayName, setPortfolioDisplayName] = useState<string>('');
   const [originalPortfolioDisplayName, setOriginalPortfolioDisplayName] = useState<string>('');
+  const [originalExtractedPortfolioText, setOriginalExtractedPortfolioText] = useState<string>('');
   const [originalConfirmedRubricId, setOriginalConfirmedRubricId] = useState<string | null>(null);
   const [pendingHydratedScores, setPendingHydratedScores] = useState<EvaluationMaps | null>(null);
   const [hasAppliedHydratedScores, setHasAppliedHydratedScores] = useState<boolean>(false);
@@ -337,6 +338,7 @@ const Profile2: React.FC = () => {
       setSavedSkillEvaluationId(null);
       setSkillEvaluationStatus('draft');
       setOriginalPortfolioDisplayName('');
+      setOriginalExtractedPortfolioText('');
       setOriginalConfirmedRubricId(null);
       setHasAppliedHydratedScores(false);
       hasEphemeralEvaluationRef.current = false;
@@ -398,6 +400,7 @@ const Profile2: React.FC = () => {
           setExtractedPortfolioText(savedExtractedText);
         }
         setOriginalPortfolioDisplayName(resolvedPortfolioName);
+        setOriginalExtractedPortfolioText(savedExtractedText || '');
         const hydratedStudentScores = toScoreMap(
           studentRowsRes.data || se.data.student_evaluated_skills || []
         );
@@ -1116,6 +1119,7 @@ const Profile2: React.FC = () => {
         setOriginalStudentEvaluations({ ...studentEvaluations });
         setOriginalAiEvaluations(committedAiEvaluations);
         setOriginalPortfolioDisplayName(uploadedFiles[0]?.name || portfolioDisplayName || '');
+        setOriginalExtractedPortfolioText(extractedPortfolioText);
         setOriginalConfirmedRubricId(confirmedRubricId);
         setDraftAiEvaluations(null);
         setIsAiPreviewDirty(false);
@@ -1475,12 +1479,14 @@ const Profile2: React.FC = () => {
       serializeSkillNames(studentExtraSkills) !==
       serializeSkillNames(originalStudentExtraSkills);
     const hasAiDraftPreview = draftAiEvaluations !== null;
+    const hasAiBackendPreview = isAiPreviewDirty;
 
     return (
       hasPortfolioChange ||
       hasStudentScoreChange ||
       hasStudentSkillChange ||
-      hasAiDraftPreview
+      hasAiDraftPreview ||
+      hasAiBackendPreview
     );
   }, [
     uploadedFiles,
@@ -1491,36 +1497,7 @@ const Profile2: React.FC = () => {
     studentExtraSkills,
     originalStudentExtraSkills,
     draftAiEvaluations,
-  ]);
-
-  const hasUnsavedEvaluationResultChanges = useMemo(() => {
-    const serializeScoreMap = (scores: { [skillArea: string]: string }) =>
-      JSON.stringify(
-        Object.keys(scores)
-          .sort()
-          .map((k) => [k, scores[k] ?? ''])
-      );
-    const serializeSkillNames = (skills: Skill[]) =>
-      JSON.stringify(
-        [...skills.map((s) => s.skillArea)]
-          .filter((name) => name.trim() !== '')
-          .sort()
-      );
-
-    const hasStudentScoreChange =
-      serializeScoreMap(studentEvaluations) !== serializeScoreMap(originalStudentEvaluations);
-    const hasStudentSkillChange =
-      serializeSkillNames(studentExtraSkills) !==
-      serializeSkillNames(originalStudentExtraSkills);
-    const hasAiDraftPreview = draftAiEvaluations !== null;
-
-    return hasStudentScoreChange || hasStudentSkillChange || hasAiDraftPreview;
-  }, [
-    studentEvaluations,
-    originalStudentEvaluations,
-    studentExtraSkills,
-    originalStudentExtraSkills,
-    draftAiEvaluations,
+    isAiPreviewDirty,
   ]);
 
   const isConfirmDisabled =
@@ -1530,6 +1507,9 @@ const Profile2: React.FC = () => {
     !!portfolioDisplayName ||
     (typeof savedSkillEvaluationId === 'number' && savedSkillEvaluationId > 0);
   const hasSelectedRubric = !!confirmedRubricId;
+  const hasRubricChange =
+    !!originalConfirmedRubricId && confirmedRubricId !== originalConfirmedRubricId;
+  const hasUnsavedAnySectionChanges = hasUnsavedEvaluationChanges || hasRubricChange;
   const canSaveEvaluation = (() => {
     if (
       !confirmedRubricId ||
@@ -1545,8 +1525,6 @@ const Profile2: React.FC = () => {
     if (!hasSavedEvaluationId) {
       return true;
     }
-    const hasRubricChange =
-      !!originalConfirmedRubricId && confirmedRubricId !== originalConfirmedRubricId;
     return hasUnsavedEvaluationChanges || hasRubricChange;
   })();
 
@@ -1637,6 +1615,26 @@ const Profile2: React.FC = () => {
     if (isStudentEvaluationLocked) return;
     await revertAiPreviewOnBackend();
     await cleanupUnsavedInitialEvaluation();
+    if (
+      originalConfirmedRubricId &&
+      (selectedRubricId !== originalConfirmedRubricId ||
+        confirmedRubricId !== originalConfirmedRubricId)
+    ) {
+      setSelectedRubricId(originalConfirmedRubricId);
+      setConfirmedRubricId(originalConfirmedRubricId);
+    }
+    setUploadedFiles([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    setPortfolioDisplayName(originalPortfolioDisplayName || '');
+    setExtractedPortfolioText(originalExtractedPortfolioText || '');
+    if (typeof savedSkillEvaluationId === 'number' && savedSkillEvaluationId > 0) {
+      writeEvaluationExtractedText(
+        String(savedSkillEvaluationId),
+        originalExtractedPortfolioText || ''
+      );
+    }
     setStudentSkills(originalStudentSkills.map((s) => ({ ...s })));
     setStudentExtraSkills(originalStudentExtraSkills.map((s) => ({ ...s })));
     setStudentEvaluations({ ...originalStudentEvaluations });
@@ -2051,7 +2049,7 @@ const Profile2: React.FC = () => {
               className="profile2-request-evaluation-button"
               type="button"
               onClick={() => void handleCancelStudentEdits()}
-              disabled={!hasUnsavedEvaluationResultChanges || isStudentEvaluationLocked}
+              disabled={!hasUnsavedAnySectionChanges || isStudentEvaluationLocked}
             >
               Cancel
             </button>
