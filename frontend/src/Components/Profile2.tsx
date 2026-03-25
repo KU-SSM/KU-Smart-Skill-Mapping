@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import './Profile.css';
 import './RubricScore.css';
-import { AiOutlineClose, AiOutlineDelete, AiOutlineInfoCircle, AiOutlinePlus } from 'react-icons/ai';
+import { AiOutlineClose, AiOutlineDelete, AiOutlineInfoCircle } from 'react-icons/ai';
 import { FaBriefcase } from 'react-icons/fa';
 import { FaArrowLeft } from 'react-icons/fa';
 import { evaluatePortfolio, importPortfolio } from '../services/portfolioApi';
@@ -20,7 +20,6 @@ import { getApiErrorDetail } from '../utils/apiErrors';
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const BriefcaseIcon = FaBriefcase as React.ComponentType;
 const InfoIcon = AiOutlineInfoCircle as React.ComponentType;
-const PlusIcon = AiOutlinePlus as React.ComponentType;
 const DeleteOutlineIcon = AiOutlineDelete as React.ComponentType;
 const ArrowLeftIcon = FaArrowLeft as React.ComponentType;
 
@@ -280,6 +279,9 @@ const Profile2: React.FC = () => {
   const [originalAiEvaluations, setOriginalAiEvaluations] = useState<{ [skillArea: string]: string }>({});
   /** Student: AI run results before Save (committed to aiEvaluations on Save only). */
   const [draftAiEvaluations, setDraftAiEvaluations] = useState<{ [skillArea: string]: string } | null>(null);
+  /** Track whether the student explicitly clicked "Evaluate with AI". */
+  const [hasRunAiEvaluation, setHasRunAiEvaluation] = useState<boolean>(false);
+  const [isImportingPortfolio, setIsImportingPortfolio] = useState<boolean>(false);
   const [extractedPortfolioText, setExtractedPortfolioText] = useState<string>('');
   const [isAiEvaluating, setIsAiEvaluating] = useState<boolean>(false);
   const [savedSkillEvaluationId, setSavedSkillEvaluationId] = useState<number | null>(null);
@@ -512,6 +514,8 @@ const Profile2: React.FC = () => {
           newAiValues[skillArea] = ''; // Set by backend AI evaluation after portfolio+rubric are selected
           newStudentValues[skillArea] = '';
         });
+        // New rubric selection requires an explicit "Evaluate with AI" click.
+        setHasRunAiEvaluation(false);
         
         if (pendingHydratedScores) {
           const baseSkillSet = new Set(skillsFromRubric.map((s) => s.skillArea));
@@ -592,6 +596,7 @@ const Profile2: React.FC = () => {
     }
 
     try {
+      setHasRunAiEvaluation(true);
       if (isLowQualityPortfolioText(extractedPortfolioText)) {
         alert(
           'Portfolio text looks too short or low-quality. The backend may run OCR fallback automatically, but AI evaluation can still fail for some files.'
@@ -827,6 +832,7 @@ const Profile2: React.FC = () => {
       return cleared;
     });
     setDraftAiEvaluations(null);
+    setHasRunAiEvaluation(false);
   }, []);
 
   const handleRemoveUploadedFile = () => {
@@ -953,10 +959,10 @@ const Profile2: React.FC = () => {
         let committedAiEvaluations = draftAiEvaluations
           ? { ...draftAiEvaluations }
           : { ...aiEvaluations };
-
-        // If user saved a brand-new evaluation without running AI,
-        // remove backend-created AI rows and keep AI panel blank.
-        if (isInitialCreate && draftAiEvaluations === null) {
+        // If the student hasn't clicked "Evaluate with AI", ensure both:
+        // 1) backend AI rows are removed (so a re-load doesn't re-populate), and
+        // 2) UI AI state stays blank.
+        if (!hasRunAiEvaluation) {
           await clearPersistedAiEvaluations(skillEvaluationIdToSave);
           committedAiEvaluations = Object.keys(committedAiEvaluations).reduce(
             (acc, skillArea) => {
@@ -1020,6 +1026,7 @@ const Profile2: React.FC = () => {
     studentEvaluations,
     aiEvaluations,
     draftAiEvaluations,
+    hasRunAiEvaluation,
     clearPersistedAiEvaluations,
     resolveValidUserId,
     evaluationId,
@@ -1093,6 +1100,34 @@ const Profile2: React.FC = () => {
     // Store only a single selected file
     setUploadedFiles([file]);
     setPortfolioDisplayName(file.name);
+    // Clear AI-related UI immediately to avoid showing stale AI scores
+    // if the user clicks "Save Evaluation" before the async import finishes.
+    // Also reset student scores on existing evaluation pages.
+    setStudentEvaluations((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((k) => {
+        next[k] = '';
+      });
+      return next;
+    });
+    setOriginalStudentEvaluations((prev) => {
+      const next = { ...prev };
+      Object.keys(next).forEach((k) => {
+        next[k] = '';
+      });
+      return next;
+    });
+    setExtractedPortfolioText('');
+    setDraftAiEvaluations(null);
+    setHasRunAiEvaluation(false);
+    setAiEvaluations((prev) => {
+      const cleared: { [skillArea: string]: string } = {};
+      Object.keys(prev).forEach((k) => {
+        cleared[k] = '';
+      });
+      return cleared;
+    });
+    setIsImportingPortfolio(true);
     
     try {
       const result = await importPortfolio(
@@ -1120,9 +1155,12 @@ const Profile2: React.FC = () => {
         return cleared;
       });
       setDraftAiEvaluations(null);
+      setHasRunAiEvaluation(false);
     } catch (error: any) {
       console.error('Error importing portfolio:', error);
       setExtractedPortfolioText('');
+    } finally {
+      setIsImportingPortfolio(false);
     }
   };
 
@@ -1191,15 +1229,12 @@ const Profile2: React.FC = () => {
   }, [aiSkills, searchAi]);
 
   const filteredStudentSkills = useMemo(() => {
-    const combined = [...studentSkills, ...studentExtraSkills];
     if (!searchStudent.trim()) {
-      return combined;
+      return studentSkills;
     }
     const query = searchStudent.toLowerCase();
-    return combined.filter(skill =>
-      skill.skillArea.toLowerCase().includes(query)
-    );
-  }, [studentSkills, studentExtraSkills, searchStudent]);
+    return studentSkills.filter((skill) => skill.skillArea.toLowerCase().includes(query));
+  }, [studentSkills, searchStudent]);
 
   const rubricSkillAreaSetForTeacher = useMemo(
     () =>
@@ -1358,7 +1393,13 @@ const Profile2: React.FC = () => {
     (typeof savedSkillEvaluationId === 'number' && savedSkillEvaluationId > 0);
   const hasSelectedRubric = !!confirmedRubricId;
   const canSaveEvaluation = (() => {
-    if (!confirmedRubricId || !selectedRubricData || isSavingEvaluation || isStudentEvaluationLocked) {
+    if (
+      !confirmedRubricId ||
+      !selectedRubricData ||
+      isSavingEvaluation ||
+      isImportingPortfolio ||
+      isStudentEvaluationLocked
+    ) {
       return false;
     }
     const hasSavedEvaluationId =
@@ -1411,60 +1452,7 @@ const Profile2: React.FC = () => {
     setStudentEvaluations({ ...originalStudentEvaluations });
     setAiEvaluations({ ...originalAiEvaluations });
     setDraftAiEvaluations(null);
-  };
-
-  const handleAddStudentSkill = () => {
-    if (isStudentEvaluationLocked) return;
-    const base = 'New Skill';
-    const existing = new Set(
-      [...studentSkills, ...studentExtraSkills].map((s) => s.skillArea)
-    );
-    let nextName = base;
-    let i = 2;
-    while (existing.has(nextName)) {
-      nextName = `${base} ${i}`;
-      i += 1;
-    }
-
-    setStudentExtraSkills((prev) => [...prev, { skillArea: nextName }]);
-    setStudentEvaluations((prev) => ({ ...prev, [nextName]: '0' }));
-  };
-
-  const handleDeleteStudentCustomSkill = (skillArea: string) => {
-    if (isStudentEvaluationLocked) return;
-    setStudentExtraSkills((prev) => prev.filter((s) => s.skillArea !== skillArea));
-    setStudentEvaluations((prev) => {
-      const next = { ...prev };
-      delete next[skillArea];
-      return next;
-    });
-  };
-
-  const handleRenameStudentCustomSkill = (oldSkillArea: string, nextSkillAreaRaw: string) => {
-    if (isStudentEvaluationLocked) return;
-    const nextSkillArea = nextSkillAreaRaw.trim();
-    if (!nextSkillArea || nextSkillArea === oldSkillArea) return;
-
-    const existing = new Set(
-      [...studentSkills, ...studentExtraSkills].map((s) => s.skillArea)
-    );
-    existing.delete(oldSkillArea);
-
-    if (existing.has(nextSkillArea)) {
-      alert('That skill name already exists.');
-      return;
-    }
-
-    setStudentExtraSkills((prev) =>
-      prev.map((s) => (s.skillArea === oldSkillArea ? { ...s, skillArea: nextSkillArea } : s))
-    );
-    setStudentEvaluations((prev) => {
-      const next = { ...prev };
-      const oldVal = next[oldSkillArea] ?? '';
-      delete next[oldSkillArea];
-      next[nextSkillArea] = oldVal;
-      return next;
-    });
+    setHasRunAiEvaluation(false);
   };
 
   return (
@@ -1704,50 +1692,13 @@ const Profile2: React.FC = () => {
                   </div>
                   <div className="skills-list">
                     {filteredStudentSkills.map((skill, index) => {
-                      const isCustomStudentSkill = studentExtraSkills.some(
-                        (s) => s.skillArea === skill.skillArea
-                      );
                       const rawStudentScore = studentEvaluations[skill.skillArea] ?? '';
-                      const studentSelectValue = isCustomStudentSkill
-                        ? /^\d+$/.test(rawStudentScore.trim())
-                          ? rawStudentScore.trim()
-                          : '0'
-                        : rawStudentScore;
+                      const studentSelectValue = /^\d+$/.test(rawStudentScore.trim())
+                        ? rawStudentScore.trim()
+                        : '';
                       return (
                       <div key={index} className="skill-item profile2-skill-item profile2-skill-item-deletable">
-                        {isStudent &&
-                          !isStudentEvaluationLocked &&
-                          isCustomStudentSkill && (
-                            <button
-                              type="button"
-                              className="profile2-skill-delete-button"
-                              title="Remove skill"
-                              aria-label="Remove skill"
-                              onClick={() => handleDeleteStudentCustomSkill(skill.skillArea)}
-                            >
-                              {React.createElement(CloseIcon)}
-                            </button>
-                          )}
-                        {isStudent &&
-                        !isStudentEvaluationLocked &&
-                        isCustomStudentSkill ? (
-                          <input
-                            type="text"
-                            className="profile2-custom-skill-name-input"
-                            defaultValue={skill.skillArea}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                (e.currentTarget as HTMLInputElement).blur();
-                              } else if (e.key === 'Escape') {
-                                e.currentTarget.value = skill.skillArea;
-                                (e.currentTarget as HTMLInputElement).blur();
-                              }
-                            }}
-                            onBlur={(e) => handleRenameStudentCustomSkill(skill.skillArea, e.target.value)}
-                          />
-                        ) : (
-                          <span className="skill-name">{skill.skillArea}</span>
-                        )}
+                        <span className="skill-name">{skill.skillArea}</span>
                         {isStudentEvaluationCompleted ? (
                           <input
                             type="text"
@@ -1774,7 +1725,7 @@ const Profile2: React.FC = () => {
                             }
                           >
                             <option value="0">No Passing Criteria</option>
-                            {!isCustomStudentSkill && <option value="">-</option>}
+                            <option value="">-</option>
                             {rubricLevelOptions.map((level) => (
                               <option key={level.value} value={level.value}>
                                 {level.label}
@@ -1785,34 +1736,6 @@ const Profile2: React.FC = () => {
                       </div>
                     );
                     })}
-                    {isStudent && !isStudentEvaluationLocked && (
-                      <div
-                        className="rubric-score-add-box"
-                        onClick={handleAddStudentSkill}
-                        title="Add Skill"
-                        role="button"
-                        tabIndex={0}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            handleAddStudentSkill();
-                          }
-                        }}
-                      >
-                        <span className="rubric-score-add-box-spacer"></span>
-                        <button
-                          className="rubric-score-add-box-button"
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleAddStudentSkill();
-                          }}
-                          title="Add Skill"
-                        >
-                          {React.createElement(PlusIcon)}
-                        </button>
-                      </div>
-                    )}
                   </div>
                 </div>
                 )}
@@ -1879,26 +1802,6 @@ const Profile2: React.FC = () => {
                   </div>
                   <div className="profile2-bottom-actions-right">
                     <button
-                      className={`profile2-request-evaluation-button ${
-                        hasUnsavedEvaluationChanges
-                          ? 'profile2-save-evaluation-button-active'
-                          : 'profile2-save-evaluation-button-idle'
-                      }`}
-                      type="button"
-                      disabled={!canSaveEvaluation}
-                      onClick={() => void handleSaveEvaluationToBackend()}
-                    >
-                      {isSavingEvaluation ? 'Saving...' : 'Save Evaluation'}
-                    </button>
-                    <button
-                      className="profile2-request-evaluation-button"
-                      type="button"
-                      onClick={handleCancelStudentEdits}
-                      disabled={!hasUnsavedEvaluationResultChanges || isStudentEvaluationLocked}
-                    >
-                      Cancel
-                    </button>
-                    <button
                       className="profile2-request-evaluation-button"
                       type="button"
                       disabled={
@@ -1938,6 +1841,30 @@ const Profile2: React.FC = () => {
           </span>
           <span>Back to Evaluation Main Page</span>
         </button>
+        {isStudent && selectedRubricData && selectedRubricData.rows.length > 0 && (
+          <div className="profile2-bottom-actions-right">
+            <button
+              className={`profile2-request-evaluation-button ${
+                hasUnsavedEvaluationChanges
+                  ? 'profile2-save-evaluation-button-active'
+                  : 'profile2-save-evaluation-button-idle'
+              }`}
+              type="button"
+              disabled={!canSaveEvaluation}
+              onClick={() => void handleSaveEvaluationToBackend()}
+            >
+              {isSavingEvaluation ? 'Saving...' : 'Save Evaluation'}
+            </button>
+            <button
+              className="profile2-request-evaluation-button"
+              type="button"
+              onClick={handleCancelStudentEdits}
+              disabled={!hasUnsavedEvaluationResultChanges || isStudentEvaluationLocked}
+            >
+              Cancel
+            </button>
+          </div>
+        )}
       </div>
 
       {isRubricInfoOpen && (

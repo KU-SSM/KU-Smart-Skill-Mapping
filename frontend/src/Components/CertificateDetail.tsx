@@ -236,7 +236,7 @@ const CertificateDetail: React.FC = () => {
           levelIndexById.set(level.id, idx);
         });
 
-        // Keep certificate rows strictly aligned to the matched rubric skills.
+        // Keep certificate rows strictly aligned to the rubric snapshot skills.
         const orderedNames = sortedSkills.map((s) => s.name);
 
         setRubricDetail({
