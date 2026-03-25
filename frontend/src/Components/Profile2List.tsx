@@ -233,6 +233,33 @@ const Profile2List: React.FC = () => {
             )}
           </div>
 
+          <div
+            className="rubric-score-add-box profile2-yevaluation-add-box"
+            onClick={handleAddEvaluationItem}
+            title="Add Evaluation"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleAddEvaluationItem();
+              }
+            }}
+          >
+            <span className="rubric-score-add-box-spacer" />
+            <button
+              className="rubric-score-add-box-button"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddEvaluationItem();
+              }}
+              title="Add Evaluation"
+            >
+              {React.createElement(PlusIcon)}
+            </button>
+          </div>
+
           <div className="profile2-yevaluation-stack">
             {filteredEvaluations.length === 0 ? (
               <div className="profile2-yevaluation-empty">
@@ -327,32 +354,6 @@ const Profile2List: React.FC = () => {
               </div>
             )}
 
-            <div
-              className="rubric-score-add-box profile2-yevaluation-add-box"
-              onClick={handleAddEvaluationItem}
-              title="Add Evaluation"
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleAddEvaluationItem();
-                }
-              }}
-            >
-              <span className="rubric-score-add-box-spacer" />
-              <button
-                className="rubric-score-add-box-button"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddEvaluationItem();
-                }}
-                title="Add Evaluation"
-              >
-                {React.createElement(PlusIcon)}
-              </button>
-            </div>
           </div>
       </div>
     </div>
