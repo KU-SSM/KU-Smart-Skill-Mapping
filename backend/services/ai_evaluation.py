@@ -1,11 +1,7 @@
 """
 AI rubric matching + persistence (Portfolio, RubricScoreHistory, SkillEvaluation, AIEvaluatedSkill).
 
-- One AIEvaluatedSkill row per rubric skill (full rubric coverage), using the best OpenAI match
-  per skill when available; otherwise a placeholder row (level_rank=0, no description).
-- New run: creates Portfolio + RubricScoreHistory + SkillEvaluation + AI rows.
-- Re-upload / refresh: pass skill_evaluation_id to replace AI rows only and update portfolio
-  classification (same SkillEvaluation; new RubricScoreHistory if rubric_id changes).
+Criteria rows come from CriteriaHistory (snapshot). One AIEvaluatedSkill per RubricSkillHistory.
 """
 from __future__ import annotations
 
@@ -18,6 +14,10 @@ from typing import Any, Protocol
 from sqlalchemy.orm import Session, joinedload
 
 import models
+from services.rubric_snapshot import (
+    apply_time_based_expiry_on_history,
+    get_current_evaluable_rubric_history,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ class AIEvaluationPersistedRow:
     skill_name: str
     level_rank: int
     criteria_passing_description: str | None
-    criteria_id: int | None
+    criteria_history_id: int | None
     confidence: float | None
     matched_from: str | None
 
@@ -81,37 +81,33 @@ def _safe_float(value: Any) -> float | None:
         return None
 
 
-def _group_matches_by_rubric_skill(matches: list) -> dict[int, list[dict[str, Any]]]:
+def _group_matches_by_rubric_skill_history(matches: list) -> dict[int, list[dict[str, Any]]]:
     by_skill: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for m in matches:
         if not isinstance(m, dict):
             continue
-        sid = _safe_int(m.get("rubric_skill_id"))
+        sid = _safe_int(m.get("rubric_skill_history_id"))
         if sid is not None:
             by_skill[sid].append(m)
     return by_skill
 
 
-def _build_ai_rows_per_rubric_skill(
+def _build_ai_rows_per_snapshot_skill(
     *,
-    rubric_skills: list[models.RubricSkill],
+    rubric_skill_histories: list[models.RubricSkillHistory],
     matches: list,
-    crit_by_id: dict[int, models.Criteria],
-    level_by_id: dict[int, models.Level],
+    crit_hist_by_id: dict[int, models.CriteriaHistory],
+    level_hist_by_id: dict[int, models.LevelHistory],
     skill_evaluation_id: int,
     rubric_history_id: int,
     portfolio_id: int,
 ) -> tuple[list[models.AIEvaluatedSkill], list[dict[str, Any]]]:
-    """
-    One AIEvaluatedSkill per rubric skill. Best match = highest confidence among matches
-    for that rubric_skill_id; resolve level via criteria_id or level_id on the match.
-    """
-    by_skill = _group_matches_by_rubric_skill(matches)
+    by_skill = _group_matches_by_rubric_skill_history(matches)
     eval_rows: list[models.AIEvaluatedSkill] = []
     match_extras: list[dict[str, Any]] = []
 
-    for rs in rubric_skills:
-        cands = by_skill.get(rs.id, [])
+    for sh in rubric_skill_histories:
+        cands = by_skill.get(sh.id, [])
         if not cands:
             eval_rows.append(
                 models.AIEvaluatedSkill(
@@ -119,13 +115,13 @@ def _build_ai_rows_per_rubric_skill(
                     rubric_score_history_id=rubric_history_id,
                     portfolio_id=portfolio_id,
                     criteria_passing_description=None,
-                    skill_name=rs.name,
+                    skill_name=sh.name,
                     level_rank=0,
                 )
             )
             match_extras.append(
                 {
-                    "criteria_id": None,
+                    "criteria_history_id": None,
                     "confidence": None,
                     "matched_from": None,
                 }
@@ -133,20 +129,21 @@ def _build_ai_rows_per_rubric_skill(
             continue
 
         best = max(cands, key=lambda m: _safe_float(m.get("confidence")) or 0.0)
-        crit_id = _safe_int(best.get("criteria_id"))
-        crit = crit_by_id.get(crit_id) if crit_id is not None else None
+        ch_id = _safe_int(best.get("criteria_history_id"))
+        crit = crit_hist_by_id.get(ch_id) if ch_id is not None else None
         level_rank = 0
         desc: str | None = best.get("matched_text")
-        criteria_id_out = crit_id
+        criteria_history_out = ch_id
 
         if crit is not None:
-            level_rank = crit.level.rank if crit.level else 0
+            if crit.level_history:
+                level_rank = crit.level_history.rank or 0
             if not desc:
                 desc = crit.description
         else:
-            lid = _safe_int(best.get("level_id"))
-            if lid is not None and lid in level_by_id:
-                level_rank = level_by_id[lid].rank or 0
+            lid = _safe_int(best.get("level_history_id"))
+            if lid is not None and lid in level_hist_by_id:
+                level_rank = level_hist_by_id[lid].rank or 0
             if not desc:
                 desc = None
 
@@ -156,13 +153,13 @@ def _build_ai_rows_per_rubric_skill(
                 rubric_score_history_id=rubric_history_id,
                 portfolio_id=portfolio_id,
                 criteria_passing_description=desc,
-                skill_name=rs.name,
+                skill_name=sh.name,
                 level_rank=level_rank,
             )
         )
         match_extras.append(
             {
-                "criteria_id": criteria_id_out,
+                "criteria_history_id": criteria_history_out,
                 "confidence": _safe_float(best.get("confidence")),
                 "matched_from": best.get("matched_from"),
             }
@@ -192,73 +189,22 @@ async def run_portfolio_ai_evaluation(
     if not user:
         raise ValueError(f"user_id {user_id} does not exist")
 
-    rubric_skills = (
-        db.query(models.RubricSkill)
-        .filter(models.RubricSkill.rubric_id == rubric_id)
-        .order_by(models.RubricSkill.display_order, models.RubricSkill.id)
-        .all()
-    )
-    if not rubric_skills:
-        raise ValueError(f"rubric_id {rubric_id} has no rubric skills defined")
-
-    criteria_rows = (
-        db.query(models.Criteria)
-        .options(
-            joinedload(models.Criteria.rubric_skill),
-            joinedload(models.Criteria.level),
-        )
-        .join(models.RubricSkill, models.Criteria.rubric_skill_id == models.RubricSkill.id)
-        .filter(models.RubricSkill.rubric_id == rubric_id)
-        .all()
-    )
-
-    criteria_payload = [
-        {
-            "criteria_id": c.id,
-            "rubric_skill_id": c.rubric_skill_id,
-            "level_id": c.level_id,
-            "description": c.description,
-        }
-        for c in criteria_rows
-        if c.description
-    ]
-
-    if not criteria_payload:
-        raise ValueError(
-            f"rubric_id {rubric_id} has no criteria with descriptions to match against"
-        )
-
-    match_result = await openai_service.match_text_to_criteria(
-        text=text, classification={}, criteria=criteria_payload
-    )
-    classification, matches = _normalize_match_result(match_result)
-
-    crit_by_id = {c.id: c for c in criteria_rows}
-    level_ids = {c.level_id for c in criteria_rows if c.level_id}
-    levels = (
-        db.query(models.Level).filter(models.Level.id.in_(level_ids)).all()
-        if level_ids
-        else []
-    )
-    level_by_id = {lv.id: lv for lv in levels}
-
     now = datetime.utcnow()
 
     if skill_evaluation_id is None:
+        rubric_history = get_current_evaluable_rubric_history(db, rubric_id, now)
+        if not rubric_history:
+            raise ValueError(
+                f"No active rubric snapshot for rubric_id {rubric_id}. "
+                "Create or update the rubric to generate one."
+            )
+
         db_portfolio = models.Portfolio(
             filename=filename or "text_portfolio",
-            classification_json=classification,
+            classification_json=_default_classification(),
             created_at=now,
         )
         db.add(db_portfolio)
-        db.flush()
-
-        rubric_history = models.RubricScoreHistory(
-            created_at=now,
-            status="valid",
-            rubric_score_id=rubric_id,
-        )
-        db.add(rubric_history)
         db.flush()
 
         skill_evaluation = models.SkillEvaluation(
@@ -289,35 +235,108 @@ async def run_portfolio_ai_evaluation(
         if not db_portfolio:
             raise ValueError("portfolio for skill_evaluation not found")
 
-        db_portfolio.classification_json = classification
         if filename:
             db_portfolio.filename = filename
 
-        rubric_history = skill_evaluation.rubric_score_history
-        if rubric_history is None:
+        prev_hist = skill_evaluation.rubric_score_history
+        if prev_hist is None:
             raise ValueError("rubric_score_history missing for skill_evaluation")
-        if rubric_history.rubric_score_id != rubric_id:
-            rubric_history = models.RubricScoreHistory(
-                created_at=now,
-                status="valid",
-                rubric_score_id=rubric_id,
-            )
-            db.add(rubric_history)
-            db.flush()
+
+        if prev_hist.rubric_score_id != rubric_id:
+            rubric_history = get_current_evaluable_rubric_history(db, rubric_id, now)
+            if not rubric_history:
+                raise ValueError(
+                    f"No active rubric snapshot for rubric_id {rubric_id}."
+                )
             skill_evaluation.rubric_score_history_id = rubric_history.id
+            db.flush()
+        else:
+            rubric_history = prev_hist
+
+        apply_time_based_expiry_on_history(db, rubric_history, now)
+        if rubric_history.status == "expired":
+            raise ValueError(
+                "This skill evaluation is tied to an expired rubric snapshot; "
+                "start a new evaluation or switch rubric_id to an active version."
+            )
 
         db.query(models.AIEvaluatedSkill).filter(
             models.AIEvaluatedSkill.skill_evaluation_id == skill_evaluation.id
         ).delete(synchronize_session=False)
         db.flush()
 
-    eval_rows, match_extras = _build_ai_rows_per_rubric_skill(
-        rubric_skills=rubric_skills,
+    rubric_history_id = rubric_history.id
+
+    rubric_skill_histories = (
+        db.query(models.RubricSkillHistory)
+        .filter(models.RubricSkillHistory.rubric_history_id == rubric_history_id)
+        .order_by(
+            models.RubricSkillHistory.display_order,
+            models.RubricSkillHistory.id,
+        )
+        .all()
+    )
+    if not rubric_skill_histories:
+        raise ValueError(
+            f"rubric snapshot {rubric_history_id} has no skills; add skills before evaluation."
+        )
+
+    criteria_rows = (
+        db.query(models.CriteriaHistory)
+        .options(
+            joinedload(models.CriteriaHistory.level_history),
+        )
+        .join(
+            models.RubricSkillHistory,
+            models.CriteriaHistory.rubric_skill_history_id
+            == models.RubricSkillHistory.id,
+        )
+        .filter(models.RubricSkillHistory.rubric_history_id == rubric_history_id)
+        .all()
+    )
+
+    criteria_payload = [
+        {
+            "criteria_history_id": c.id,
+            "rubric_skill_history_id": c.rubric_skill_history_id,
+            "level_history_id": c.level_history_id,
+            "description": c.description,
+        }
+        for c in criteria_rows
+        if c.description
+    ]
+
+    if not criteria_payload:
+        raise ValueError(
+            f"rubric snapshot {rubric_history_id} has no criteria with descriptions to match against"
+        )
+
+    match_result = await openai_service.match_text_to_criteria(
+        text=text, classification={}, criteria=criteria_payload
+    )
+    classification, matches = _normalize_match_result(match_result)
+
+    db_portfolio.classification_json = classification
+    db.flush()
+
+    crit_hist_by_id = {c.id: c for c in criteria_rows}
+    level_hist_ids = {c.level_history_id for c in criteria_rows if c.level_history_id}
+    level_hist_rows = (
+        db.query(models.LevelHistory)
+        .filter(models.LevelHistory.id.in_(level_hist_ids))
+        .all()
+        if level_hist_ids
+        else []
+    )
+    level_hist_by_id = {lv.id: lv for lv in level_hist_rows}
+
+    eval_rows, match_extras = _build_ai_rows_per_snapshot_skill(
+        rubric_skill_histories=rubric_skill_histories,
         matches=matches,
-        crit_by_id=crit_by_id,
-        level_by_id=level_by_id,
+        crit_hist_by_id=crit_hist_by_id,
+        level_hist_by_id=level_hist_by_id,
         skill_evaluation_id=skill_evaluation.id,
-        rubric_history_id=rubric_history.id,
+        rubric_history_id=rubric_history_id,
         portfolio_id=db_portfolio.id,
     )
 
@@ -343,7 +362,7 @@ async def run_portfolio_ai_evaluation(
                 skill_name=row.skill_name or "",
                 level_rank=row.level_rank or 0,
                 criteria_passing_description=row.criteria_passing_description,
-                criteria_id=extra["criteria_id"],
+                criteria_history_id=extra["criteria_history_id"],
                 confidence=extra["confidence"],
                 matched_from=extra["matched_from"],
             )
@@ -352,7 +371,7 @@ async def run_portfolio_ai_evaluation(
     return PortfolioAIEvaluationResult(
         portfolio_id=db_portfolio.id,
         skill_evaluation_id=skill_evaluation.id,
-        rubric_score_history_id=rubric_history.id,
+        rubric_score_history_id=rubric_history_id,
         classification=classification,
         evaluations=persisted,
     )
