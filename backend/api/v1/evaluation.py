@@ -260,6 +260,8 @@ async def list_skill_evaluations(
         q = q.filter(models.SkillEvaluation.user_id == user_id)
     if portfolio_id is not None:
         q = q.filter(models.SkillEvaluation.portfolio_id == portfolio_id)
+    # Defensive: avoid FastAPI response validation errors for legacy rows with NULL rubric snapshots.
+    q = q.filter(models.SkillEvaluation.rubric_score_history_id.isnot(None))
     return q.order_by(models.SkillEvaluation.id.desc()).offset(skip).limit(limit).all()
 
 
@@ -285,6 +287,12 @@ async def read_skill_evaluation_full(
             status_code=404,
             detail=f"skill_evaluation_id {skill_evaluation_id} not found",
         )
+    # Defensive: schema requires `rubric_score_history_id` to be an int.
+    if se.rubric_score_history_id is None:
+        raise HTTPException(
+            status_code=500,
+            detail=f"skill_evaluation_id {skill_evaluation_id} has no rubric_score_history_id",
+        )
     return SkillEvaluationFullModel(
         id=se.id,
         rubric_score_history_id=se.rubric_score_history_id,
@@ -304,7 +312,14 @@ async def read_skill_evaluation_full(
 
 @router.get("/skill_evaluation/{skill_evaluation_id}", response_model=SkillEvaluationModel)
 async def read_skill_evaluation(skill_evaluation_id: int, db: db_dependency):
-    return _get_skill_evaluation_or_404(db, skill_evaluation_id)
+    se = _get_skill_evaluation_or_404(db, skill_evaluation_id)
+    # Defensive: schema requires `rubric_score_history_id` to be an int.
+    if se.rubric_score_history_id is None:
+        raise HTTPException(
+            status_code=500,
+            detail=f"skill_evaluation_id {skill_evaluation_id} has no rubric_score_history_id",
+        )
+    return se
 
 
 @router.put("/skill_evaluation/{skill_evaluation_id}", response_model=SkillEvaluationModel)
