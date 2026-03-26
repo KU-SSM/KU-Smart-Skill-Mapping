@@ -105,7 +105,8 @@ class PortfolioEvaluateRequest(BaseModel):
         description=(
             "If set, refresh AI results for this SkillEvaluation: update portfolio "
             "classification, replace all AIEvaluatedSkill rows (student/teacher unchanged). "
-            "New RubricScoreHistory if rubric_id differs from the previous snapshot."
+            "If rubric_id differs from the evaluation's snapshot, re-link to the current active "
+            "snapshot for that rubric."
         ),
     )
 
@@ -120,7 +121,11 @@ class AIEvaluationItemResponse(BaseModel):
     skill_name: str
     level_rank: int
     criteria_passing_description: Optional[str] = None
-    criteria_id: Optional[int] = None
+    criteria_history_id: Optional[int] = None
+    criteria_id: Optional[int] = Field(
+        None,
+        description="Deprecated: same as criteria_history_id when using snapshot rubrics.",
+    )
     confidence: Optional[float] = None
     matched_from: Optional[str] = None
 

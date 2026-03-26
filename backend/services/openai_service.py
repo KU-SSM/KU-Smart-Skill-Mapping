@@ -95,7 +95,7 @@ class OpenAIService:
                 full_text = ""
                 
             # 2) Evaluate quality: if too short or mostly whitespace, fallback to OCR
-            quality_ok = len(full_text) > 100  # simple threshold; tune as needed
+            quality_ok = len(full_text) > 10 # simple threshold; tune as needed
             if not quality_ok:
                 logger.info("Low-quality text detected; running OCR fallback")
                 ocr_text = await asyncio.to_thread(self._ocr_from_pdf, temp_file_path)
