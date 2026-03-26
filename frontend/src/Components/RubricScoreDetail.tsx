@@ -69,6 +69,8 @@ const RubricScoreDetail: React.FC = () => {
     rows: [],
   });
   const [showFormerExpirationModal, setShowFormerExpirationModal] = useState<boolean>(false);
+  const [showSaveExpirationModal, setShowSaveExpirationModal] = useState<boolean>(false);
+  const [pendingSaveTitle, setPendingSaveTitle] = useState<string>('');
   const [hasHydratedFormerVersions, setHasHydratedFormerVersions] = useState<boolean>(false);
   /** Bumped after each successful save so history refetches even when title is unchanged. */
   const [historyRefreshNonce, setHistoryRefreshNonce] = useState(0);
@@ -315,6 +317,8 @@ const RubricScoreDetail: React.FC = () => {
   };
 
   const handleSaveChanges = () => {
+    void (async () => {
+      if (!id) return;
     const effectiveTitle = isEditingTitle ? editingTitle.trim() : title.trim();
     if (isEditingTitle) {
       setTitle(effectiveTitle || title);
@@ -324,7 +328,30 @@ const RubricScoreDetail: React.FC = () => {
     const defaultExpirationTime = '23:59:59';
     setExpirationDate(defaultExpirationDate);
     setExpirationTime(defaultExpirationTime);
-    performSave(defaultExpirationDate, defaultExpirationTime, effectiveTitle || title);
+      let isFirstSave = false;
+      try {
+        const histories = await getRubricScoreHistoryByRubric(id);
+        isFirstSave = (histories || []).length === 0;
+      } catch {
+        // If history lookup fails, keep safer explicit flow with popup.
+        isFirstSave = false;
+      }
+
+      if (isFirstSave) {
+        performSave(defaultExpirationDate, defaultExpirationTime, effectiveTitle || title);
+        return;
+      }
+
+      setPendingSaveTitle(effectiveTitle || title);
+      setShowSaveExpirationModal(true);
+    })();
+  };
+
+  const handleConfirmSaveWithExpiration = () => {
+    const saveDate = expirationDate || getDefaultExpirationDate();
+    const saveTime = expirationTime || '23:59:59';
+    setShowSaveExpirationModal(false);
+    performSave(saveDate, saveTime, pendingSaveTitle || title);
   };
 
   const handleOpenFormerRubrics = () => {
@@ -375,7 +402,7 @@ const RubricScoreDetail: React.FC = () => {
     setShowFormerExpirationModal(true);
   };
 
-  const handleConfirmFormerExpirationAndSaveMock = () => {
+  const handleConfirmFormerExpirationAndSave = () => {
     if (!selectedFormerVersion) return;
     const nextExpiresAt = `${expirationDate} ${expirationTime}`.trim();
     if (!nextExpiresAt) return;
@@ -760,7 +787,59 @@ const RubricScoreDetail: React.FC = () => {
               <button
                 type="button"
                 className="modal-button modal-button-apply"
-                onClick={handleConfirmFormerExpirationAndSaveMock}
+                onClick={handleConfirmFormerExpirationAndSave}
+              >
+                Set and Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Set expiration date before saving current teacher rubric changes */}
+      {showSaveExpirationModal && (
+        <div className="modal-overlay rubric-expiration-overlay" onClick={() => setShowSaveExpirationModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2 className="modal-title">Set expiration date before saving</h2>
+            <div className="modal-form">
+              <div className="modal-field">
+                <label className="modal-label" htmlFor="save-expiration-date">
+                  Date
+                </label>
+                <input
+                  id="save-expiration-date"
+                  type="date"
+                  className="modal-input"
+                  value={expirationDate}
+                  onChange={(e) => setExpirationDate(e.target.value)}
+                />
+              </div>
+              <div className="modal-field">
+                <label className="modal-label" htmlFor="save-expiration-time">
+                  Time
+                </label>
+                <input
+                  id="save-expiration-time"
+                  type="time"
+                  step="1"
+                  className="modal-input"
+                  value={expirationTime}
+                  onChange={(e) => setExpirationTime(e.target.value)}
+                />
+              </div>
+            </div>
+            <div className="modal-buttons">
+              <button
+                type="button"
+                className="modal-button modal-button-cancel"
+                onClick={() => setShowSaveExpirationModal(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="modal-button modal-button-apply"
+                onClick={handleConfirmSaveWithExpiration}
               >
                 Set and Save
               </button>

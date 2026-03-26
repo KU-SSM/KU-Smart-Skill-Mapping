@@ -5,7 +5,13 @@ import { AiOutlineClose, AiOutlineDelete, AiOutlineInfoCircle } from 'react-icon
 import { FaBriefcase } from 'react-icons/fa';
 import { FaArrowLeft } from 'react-icons/fa';
 import { evaluatePortfolio, importPortfolio } from '../services/portfolioApi';
-import { getRubricScores, getRubricScore, RubricScoreDetail } from '../services/rubricScoreApi';
+import {
+  getRubricScores,
+  getRubricScore,
+  getRubricScoreHistoryByRubric,
+  getRubricScoreHistorySnapshot,
+  RubricScoreDetail,
+} from '../services/rubricScoreApi';
 import {
   deleteSkillEvaluation,
   updateSkillEvaluation,
@@ -640,6 +646,38 @@ const Profile2: React.FC = () => {
       }
       setIsAiEvaluating(true);
       const resolvedUserId = await resolveValidUserId();
+      if (typeof savedSkillEvaluationId === 'number' && savedSkillEvaluationId > 0) {
+        const histories = await getRubricScoreHistoryByRubric(confirmedRubricId);
+        const now = new Date();
+        const sorted = [...histories].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+        let resolvedRubricHistoryId: number | null = null;
+        for (const h of sorted) {
+          if (!Number.isInteger(h.id) || h.id <= 0) continue;
+          if (h.status !== 'valid') continue;
+          if (h.expired_at) {
+            const expiresAt = new Date(h.expired_at);
+            if (!Number.isNaN(expiresAt.getTime()) && expiresAt <= now) continue;
+          }
+          try {
+            const snapshot = await getRubricScoreHistorySnapshot(h.id);
+            const hasSkills = snapshot.rows.length > 0;
+            const hasCriteriaDescriptions = snapshot.rows.some((row) =>
+              (row.values || []).some((cell) => (cell || '').trim() !== '')
+            );
+            if (hasSkills && hasCriteriaDescriptions) {
+              resolvedRubricHistoryId = h.id;
+              break;
+            }
+          } catch {
+            // Skip malformed history rows.
+          }
+        }
+        if (resolvedRubricHistoryId) {
+          await updateSkillEvaluation(savedSkillEvaluationId, {
+            rubric_score_history_id: resolvedRubricHistoryId,
+          });
+        }
+      }
 
       const [skillsRes, levelsRes, evalRes] = await Promise.all([
         api.get<BackendRubricSkill[]>(`rubric/${confirmedRubricId}/rubric_skills`),
@@ -983,13 +1021,28 @@ const Profile2: React.FC = () => {
       throw new Error(`Invalid rubric id: ${rubricId}`);
     }
 
-    const existing = await api.get<RubricScoreHistoryResponse[]>(
-      `rubric_score_history/by_rubric/${parsedRubricId}`,
-      { params: { limit: 1 } }
-    );
-    const existingId = existing.data?.[0]?.id;
-    if (Number.isInteger(existingId) && existingId > 0) {
-      return existingId;
+    const histories = await getRubricScoreHistoryByRubric(String(parsedRubricId));
+    const now = new Date();
+    const sorted = [...histories].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+    for (const h of sorted) {
+      if (!Number.isInteger(h.id) || h.id <= 0) continue;
+      if (h.status !== 'valid') continue;
+      if (h.expired_at) {
+        const expiresAt = new Date(h.expired_at);
+        if (!Number.isNaN(expiresAt.getTime()) && expiresAt <= now) continue;
+      }
+      try {
+        const snapshot = await getRubricScoreHistorySnapshot(h.id);
+        const hasSkills = snapshot.rows.length > 0;
+        const hasCriteriaDescriptions = snapshot.rows.some((row) =>
+          (row.values || []).some((cell) => (cell || '').trim() !== '')
+        );
+        if (hasSkills && hasCriteriaDescriptions) {
+          return h.id;
+        }
+      } catch {
+        // Skip malformed history rows and continue searching.
+      }
     }
 
     const created = await api.post<RubricScoreHistoryResponse>('rubric_score_history/', {

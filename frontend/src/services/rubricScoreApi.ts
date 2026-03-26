@@ -477,6 +477,12 @@ export interface RubricHistorySnapshot {
   rows: { skillArea: string; values: string[] }[];
 }
 
+interface CreateRubricHistoryPayload {
+  rubric_score_id: number;
+  status?: string;
+  expired_at?: string;
+}
+
 export const getRubricScoreHistoryByRubric = async (
   rubricId: string
 ): Promise<BackendRubricScoreHistory[]> => {
@@ -556,3 +562,34 @@ export const getRubricScoreHistorySnapshot = async (
     );
   }
 };
+
+export const createRubricScoreHistoryWithExpiration = async (
+  rubricId: string,
+  expiredAtIso: string
+): Promise<BackendRubricScoreHistory> => {
+  const parsedRubricId = Number(rubricId);
+  if (!Number.isInteger(parsedRubricId) || parsedRubricId <= 0) {
+    throw new Error(`Invalid rubric id: ${rubricId}`);
+  }
+  if (!expiredAtIso || Number.isNaN(new Date(expiredAtIso).getTime())) {
+    throw new Error('Invalid expiration datetime');
+  }
+
+  try {
+    const payload: CreateRubricHistoryPayload = {
+      rubric_score_id: parsedRubricId,
+      status: 'valid',
+      expired_at: expiredAtIso,
+    };
+    const res = await api.post<BackendRubricScoreHistory>('rubric_score_history/', payload);
+    return res.data;
+  } catch (error: any) {
+    console.error('Error creating rubric score history with expiration:', error);
+    throw new Error(
+      error?.response?.data?.detail ||
+      error?.message ||
+      'Failed to set rubric expiration'
+    );
+  }
+};
+

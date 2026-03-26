@@ -356,6 +356,7 @@ const RubricScoreDetailStudent: React.FC = () => {
           </div>
         </div>
       )}
+
     </div>
   );
 };
