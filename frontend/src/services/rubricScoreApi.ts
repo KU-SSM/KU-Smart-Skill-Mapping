@@ -444,3 +444,121 @@ export const deleteRubricScore = async (id: string): Promise<void> => {
     throw new Error(errorMessage);
   }
 };
+
+// --- Rubric snapshot history (backend snapshots) ---
+export interface BackendRubricScoreHistory {
+  id: number;
+  created_at: string;
+  expired_at: string | null;
+  status: string; // valid, outdated, expired
+  rubric_score_id: number;
+}
+
+interface BackendRubricSkillHistory {
+  id: number;
+  rubric_history_id: number;
+  name: string;
+  display_order: number;
+  created_at: string;
+}
+
+interface BackendLevelHistory {
+  id: number;
+  rubric_history_id: number;
+  rank: number;
+  description: string | null;
+  created_at: string;
+}
+
+interface BackendCriteriaHistory {
+  id: number;
+  rubric_skill_history_id: number;
+  level_history_id: number;
+  description: string | null;
+  created_at: string;
+}
+
+export interface RubricHistorySnapshot {
+  headers: string[];
+  rows: { skillArea: string; values: string[] }[];
+}
+
+export const getRubricScoreHistoryByRubric = async (
+  rubricId: string
+): Promise<BackendRubricScoreHistory[]> => {
+  try {
+    const rubricHistory = await api.get<BackendRubricScoreHistory[]>(
+      `rubric_score_history/by_rubric/${rubricId}`
+    );
+    return rubricHistory.data || [];
+  } catch (error: any) {
+    console.error('Error fetching rubric score history by rubric:', error);
+    throw new Error(
+      error?.response?.data?.detail ||
+        error?.message ||
+        'Failed to fetch rubric score history'
+    );
+  }
+};
+
+// Fetch one snapshot table (headers + values) from backend.
+export const getRubricScoreHistorySnapshot = async (
+  rubricHistoryId: number
+): Promise<RubricHistorySnapshot> => {
+  try {
+    const [skillsRes, levelsRes, criteriaRes] = await Promise.all([
+      api.get<BackendRubricSkillHistory[]>(
+        `rubric_score_history/${rubricHistoryId}/rubric_skills`
+      ),
+      api.get<BackendLevelHistory[]>(
+        `rubric_score_history/${rubricHistoryId}/levels`
+      ),
+      api.get<BackendCriteriaHistory[]>(
+        `rubric_score_history/${rubricHistoryId}/criteria`
+      ),
+    ]);
+
+    const skills = skillsRes.data || [];
+    const levels = levelsRes.data || [];
+    const criteria = criteriaRes.data || [];
+
+    const sortedLevels = [...levels].sort((a, b) => (a.rank ?? 0) - (b.rank ?? 0));
+    const headers = sortedLevels.map((lv) => {
+      const desc = lv.description;
+      if (desc === null || desc === undefined || desc === 'None' || String(desc).trim() === '') {
+        return `Level ${lv.rank}`;
+      }
+      return desc;
+    });
+
+    const criteriaBySkillAndLevel: Record<string, string> = {};
+    for (const c of criteria) {
+      const key = `${c.rubric_skill_history_id}:${c.level_history_id}`;
+      criteriaBySkillAndLevel[key] = c.description ?? '';
+    }
+
+    const sortedSkills = [...skills].sort(
+      (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
+    );
+
+    const rows = sortedSkills.map((skill) => {
+      const values = sortedLevels.map((lv) => {
+        const key = `${skill.id}:${lv.id}`;
+        return criteriaBySkillAndLevel[key] ?? '';
+      });
+      return {
+        skillArea: skill.name || '',
+        values,
+      };
+    });
+
+    return { headers, rows };
+  } catch (error: any) {
+    console.error('Error fetching rubric score history snapshot:', error);
+    throw new Error(
+      error?.response?.data?.detail ||
+        error?.message ||
+        'Failed to fetch rubric score history snapshot'
+    );
+  }
+};

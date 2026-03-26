@@ -217,6 +217,22 @@
   margin-top: 4px;
 }
 
+.rubric-history-empty {
+  width: 100%;
+  min-height: 220px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 16px;
+  border: 1px dashed #e0e0e0;
+  border-radius: 8px;
+  background: #fafafa;
+  color: #666;
+  font-size: 14px;
+  font-weight: 600;
+}
+
 .rubric-history-item {
   border: 1px solid #e0e0e0;
   border-radius: 8px;
@@ -247,6 +263,14 @@
 .rubric-history-item-button {
   appearance: none;
   border: 1px solid #e0e0e0;
+}
+
+.rubric-history-detail-body {
+  width: 100%;
+  max-height: 50vh;
+  overflow-y: auto;
+  overflow-x: auto;
+  padding-right: 4px;
 }
 
 .rubric-history-detail-meta {

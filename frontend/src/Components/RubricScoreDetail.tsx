@@ -1,9 +1,15 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AiOutlineDelete, AiOutlineArrowLeft, AiOutlineHistory } from 'react-icons/ai';
 import { FiSave, FiX } from 'react-icons/fi';
 import RubricScoreTable from './RubricScoreTable';
-import { getRubricScore, updateRubricScore, deleteRubricScore } from '../services/rubricScoreApi';
+import {
+  getRubricScore,
+  updateRubricScore,
+  deleteRubricScore,
+  getRubricScoreHistoryByRubric,
+  getRubricScoreHistorySnapshot,
+} from '../services/rubricScoreApi';
 import './RubricScore.css';
 
 const DeleteIcon = AiOutlineDelete as React.ComponentType;
@@ -21,6 +27,12 @@ interface FormerRubricVersion {
   version: string;
   createdAt: string;
   expiresAt: string;
+  title: string;
+  headers: string[];
+  rows: TableData[];
+}
+
+interface CurrentPopupSnapshot {
   title: string;
   headers: string[];
   rows: TableData[];
@@ -48,8 +60,18 @@ const RubricScoreDetail: React.FC = () => {
   const [expirationTime, setExpirationTime] = useState<string>('23:59:59');
   const [isFormerRubricsOpen, setIsFormerRubricsOpen] = useState<boolean>(false);
   const [selectedFormerVersion, setSelectedFormerVersion] = useState<FormerRubricVersion | null>(null);
+  const [isViewingCurrentVersion, setIsViewingCurrentVersion] = useState<boolean>(false);
   const [savedFormerRubricVersions, setSavedFormerRubricVersions] = useState<FormerRubricVersion[]>([]);
+  const [backendFormerRubricVersions, setBackendFormerRubricVersions] = useState<FormerRubricVersion[]>([]);
+  const [currentPopupSnapshot, setCurrentPopupSnapshot] = useState<CurrentPopupSnapshot>({
+    title: '',
+    headers: [],
+    rows: [],
+  });
   const [showFormerExpirationModal, setShowFormerExpirationModal] = useState<boolean>(false);
+  const [hasHydratedFormerVersions, setHasHydratedFormerVersions] = useState<boolean>(false);
+  /** Bumped after each successful save so history refetches even when title is unchanged. */
+  const [historyRefreshNonce, setHistoryRefreshNonce] = useState(0);
 
   const getDefaultExpirationDate = () => {
     const d = new Date();
@@ -64,6 +86,7 @@ const RubricScoreDetail: React.FC = () => {
 
   // Load persisted former rubric versions (frontend-only mock).
   useEffect(() => {
+    setHasHydratedFormerVersions(false);
     if (!historyStorageKey) {
       setSavedFormerRubricVersions([]);
       return;
@@ -72,64 +95,58 @@ const RubricScoreDetail: React.FC = () => {
       const raw = localStorage.getItem(historyStorageKey);
       if (!raw) {
         setSavedFormerRubricVersions([]);
+        setHasHydratedFormerVersions(true);
         return;
       }
       const parsed = JSON.parse(raw) as FormerRubricVersion[];
       setSavedFormerRubricVersions(Array.isArray(parsed) ? parsed : []);
+      setHasHydratedFormerVersions(true);
     } catch {
       setSavedFormerRubricVersions([]);
+      setHasHydratedFormerVersions(true);
     }
   }, [historyStorageKey]);
 
   // Persist whenever former versions change.
   useEffect(() => {
     if (!historyStorageKey) return;
+    if (!hasHydratedFormerVersions) return;
     try {
       localStorage.setItem(historyStorageKey, JSON.stringify(savedFormerRubricVersions));
     } catch {
       // Ignore quota/localStorage errors
     }
-  }, [historyStorageKey, savedFormerRubricVersions]);
+  }, [historyStorageKey, savedFormerRubricVersions, hasHydratedFormerVersions]);
 
-  const mockFormerRubricVersions = useMemo<FormerRubricVersion[]>(() => {
-    // Mock data (no backend yet)
-    const now = new Date();
-    const iso = (d: Date) => d.toISOString().replace('T', ' ').slice(0, 19);
-    const d1 = new Date(now);
-    d1.setDate(d1.getDate() + 2);
-    d1.setHours(23, 59, 59, 0);
-    const d2 = new Date(now);
-    d2.setDate(d2.getDate() + 10);
-    d2.setHours(23, 59, 59, 0);
-    return [
-      {
-        version: 'v1',
-        title: `${title || 'Rubric'} (v1)`,
-        createdAt: iso(new Date(now.getTime() - 20 * 24 * 60 * 60 * 1000)),
-        expiresAt: iso(d1),
-        headers: ['Level 1', 'Level 2', 'Level 3'],
-        rows: [
-          { skillArea: 'Communication', values: ['Basic', 'Good', 'Excellent'] },
-          { skillArea: 'Teamwork', values: ['Basic', 'Good', 'Excellent'] },
-        ],
-      },
-      {
-        version: 'v2',
-        title: `${title || 'Rubric'} (v2)`,
-        createdAt: iso(new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)),
-        expiresAt: iso(d2),
-        headers: ['Level 1', 'Level 2', 'Level 3', 'Level 4'],
-        rows: [
-          { skillArea: 'Communication', values: ['Basic', 'Good', 'Great', 'Exceptional'] },
-          { skillArea: 'Teamwork', values: ['Basic', 'Good', 'Great', 'Exceptional'] },
-          { skillArea: 'Problem Solving', values: ['Basic', 'Good', 'Great', 'Exceptional'] },
-        ],
-      },
-    ];
+  // Prefer the richer source when backend/local snapshot counts diverge.
+  const formerRubricVersionsRaw =
+    backendFormerRubricVersions.length >= savedFormerRubricVersions.length
+      ? backendFormerRubricVersions
+      : savedFormerRubricVersions;
+  const formerRubricVersions = formerRubricVersionsRaw.filter((v) => {
+    if (v.headers.length > 0) return true;
+    return v.rows.some(
+      (r) => (r.skillArea || '').trim() !== '' || r.values.some((c) => (c || '').trim() !== '')
+    );
+  });
+
+  // "Current" in history popup uses only the snapshot taken when opening (last saved = original*).
+  // Never fall back to live title/headers/rows or the modal will update while editing behind it.
+  const currentHistoryTitle = currentPopupSnapshot.title || 'Untitled Rubric';
+  const currentHistoryHeaders = currentPopupSnapshot.headers;
+  const currentHistoryRows = currentPopupSnapshot.rows;
+
+  // Keep backend snapshot titles synced with whatever the user currently renamed the rubric to.
+  useEffect(() => {
+    if (!title) return;
+    setBackendFormerRubricVersions((prev) => prev.map((v) => ({ ...v, title })));
   }, [title]);
 
-  const formerRubricVersions =
-    savedFormerRubricVersions.length > 0 ? savedFormerRubricVersions : mockFormerRubricVersions;
+  // If we fall back to localStorage snapshots, keep their displayed title synced too.
+  useEffect(() => {
+    if (!title) return;
+    setSavedFormerRubricVersions((prev) => prev.map((v) => ({ ...v, title })));
+  }, [title]);
 
   useEffect(() => {
     const loadRubricScore = async () => {
@@ -175,6 +192,48 @@ const RubricScoreDetail: React.FC = () => {
     loadRubricScore();
   }, [id]);
 
+  const loadBackendFormerSnapshots = useCallback(async () => {
+    if (!id || !title) return;
+    try {
+      const histories = await getRubricScoreHistoryByRubric(id);
+      const former = histories
+        .filter((h) => !(h.status === 'valid' && h.expired_at === null))
+        .sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+
+      if (former.length === 0) {
+        setBackendFormerRubricVersions([]);
+        return;
+      }
+
+      const converted: FormerRubricVersion[] = [];
+      for (const h of former) {
+        const snapshot = await getRubricScoreHistorySnapshot(h.id);
+        const isEmptySnapshot =
+          snapshot.headers.length === 0 && snapshot.rows.length === 0;
+        if (isEmptySnapshot) {
+          continue;
+        }
+        converted.push({
+          version: `h${h.id}`,
+          createdAt: h.created_at,
+          expiresAt: h.expired_at ?? '',
+          title,
+          headers: snapshot.headers,
+          rows: snapshot.rows,
+        });
+      }
+      setBackendFormerRubricVersions(converted);
+    } catch (e) {
+      console.warn('Failed to load backend rubric history; using localStorage fallback.', e);
+      setBackendFormerRubricVersions([]);
+    }
+  }, [id, title]);
+
+  // Load former snapshots from backend (backend source of truth; localStorage only as fallback).
+  useEffect(() => {
+    void loadBackendFormerSnapshots();
+  }, [loadBackendFormerSnapshots, historyRefreshNonce]);
+
   const performSave = async (saveExpirationDate?: string, saveExpirationTime?: string) => {
     if (!id) {
       console.error('Cannot save: No rubric ID');
@@ -198,12 +257,12 @@ const RubricScoreDetail: React.FC = () => {
 
       // Save former rubric history (frontend-only).
       // If backend save fails, we won't reach this code because it's inside `try`.
-      const effectiveExpirationDate = saveExpirationDate ?? expirationDate;
-      const effectiveExpirationTime = saveExpirationTime ?? expirationTime;
+      const effectiveExpirationDate = saveExpirationDate ?? expirationDate ?? getDefaultExpirationDate();
+      const effectiveExpirationTime = saveExpirationTime ?? expirationTime ?? '23:59:59';
       const expiresAt = `${effectiveExpirationDate} ${effectiveExpirationTime}`.trim();
-      if (historyStorageKey && originalTitle && originalHeaders.length > 0 && originalRows.length > 0 && expiresAt) {
+      if (historyStorageKey) {
         const snapshotBase = {
-          title: `${originalTitle} (snapshot)`,
+          title: originalTitle || title || 'Untitled Rubric',
           createdAt: new Date().toISOString().replace('T', ' ').slice(0, 19),
           expiresAt,
           headers: originalHeaders.map((h) => h),
@@ -239,6 +298,8 @@ const RubricScoreDetail: React.FC = () => {
         values: row.values.map(v => v)
       })));
 
+      setHistoryRefreshNonce((n) => n + 1);
+
     } catch (error: any) {
       console.error('Error saving rubric score:', error);
       const errorMessage = error?.message || 'Failed to save rubric score. Please check the console for details.';
@@ -257,18 +318,38 @@ const RubricScoreDetail: React.FC = () => {
   };
 
   const handleOpenFormerRubrics = () => {
-    setIsFormerRubricsOpen(true);
-    setSelectedFormerVersion(null);
+    void (async () => {
+      await loadBackendFormerSnapshots();
+      const snapshot: CurrentPopupSnapshot = {
+        title: originalTitle || 'Untitled Rubric',
+        headers: originalHeaders.map((h) => h),
+        rows: originalRows.map((r) => ({
+          skillArea: r.skillArea,
+          values: r.values.map((v) => v),
+        })),
+      };
+      setCurrentPopupSnapshot(snapshot);
+      setIsFormerRubricsOpen(true);
+      setSelectedFormerVersion(null);
+      setIsViewingCurrentVersion(false);
+    })();
   };
 
   const handleCloseFormerRubrics = () => {
     setIsFormerRubricsOpen(false);
     setSelectedFormerVersion(null);
+    setIsViewingCurrentVersion(false);
     setShowFormerExpirationModal(false);
   };
 
   const handleOpenFormerVersion = (item: FormerRubricVersion) => {
     setSelectedFormerVersion(item);
+    setIsViewingCurrentVersion(false);
+  };
+
+  const handleOpenCurrentVersion = () => {
+    setSelectedFormerVersion(null);
+    setIsViewingCurrentVersion(true);
   };
 
   const handleOpenFormerExpirationModal = () => {
@@ -290,8 +371,7 @@ const RubricScoreDetail: React.FC = () => {
     if (!nextExpiresAt) return;
 
     setSavedFormerRubricVersions((prev) => {
-      const base = prev.length > 0 ? prev : mockFormerRubricVersions;
-      const updated = base.map((v) =>
+      const updated = prev.map((v) =>
         v.version === selectedFormerVersion.version ? { ...v, expiresAt: nextExpiresAt } : v
       );
       return updated;
@@ -488,7 +568,11 @@ const RubricScoreDetail: React.FC = () => {
           <div className="rubric-modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="rubric-modal-header">
               <h2 className="rubric-modal-title">
-                {selectedFormerVersion ? 'Former rubric detail' : 'Former rubric versions'}
+                {isViewingCurrentVersion
+                  ? 'Current rubric detail'
+                  : selectedFormerVersion
+                    ? 'Former rubric detail'
+                    : 'Rubric versions'}
               </h2>
               <button
                 type="button"
@@ -500,20 +584,54 @@ const RubricScoreDetail: React.FC = () => {
                 {React.createElement(CancelIcon)}
               </button>
             </div>
-            {selectedFormerVersion ? (
+            {isViewingCurrentVersion ? (
               <>
                 <div className="rubric-history-detail-meta">
-                  <div>Name: {selectedFormerVersion.version}</div>
+                  <div>Title: {currentHistoryTitle}</div>
+                  <div>Status: Current version</div>
+                </div>
+                <div className="rubric-history-detail-body">
+                  <RubricScoreTable
+                    headers={currentHistoryHeaders}
+                    rows={currentHistoryRows}
+                    onHeadersChange={() => {}}
+                    onRowsChange={() => {}}
+                    readOnly={true}
+                  />
+                </div>
+                <div className="rubric-modal-actions">
+                  <button
+                    type="button"
+                    className="rubric-modal-button secondary"
+                    onClick={() => setIsViewingCurrentVersion(false)}
+                  >
+                    Back to versions
+                  </button>
+                  <button
+                    type="button"
+                    className="rubric-modal-button"
+                    onClick={handleCloseFormerRubrics}
+                  >
+                    Close
+                  </button>
+                </div>
+              </>
+            ) : selectedFormerVersion ? (
+              <>
+                <div className="rubric-history-detail-meta">
+                  <div>Title: {selectedFormerVersion.title || selectedFormerVersion.version}</div>
                   <div>Created: {selectedFormerVersion.createdAt}</div>
                   <div>Expires: {selectedFormerVersion.expiresAt}</div>
                 </div>
-                <RubricScoreTable
-                  headers={selectedFormerVersion.headers}
-                  rows={selectedFormerVersion.rows}
-                  onHeadersChange={() => {}}
-                  onRowsChange={() => {}}
-                  readOnly={true}
-                />
+                <div className="rubric-history-detail-body">
+                  <RubricScoreTable
+                    headers={selectedFormerVersion.headers}
+                    rows={selectedFormerVersion.rows}
+                    onHeadersChange={() => {}}
+                    onRowsChange={() => {}}
+                    readOnly={true}
+                  />
+                </div>
                 <div className="rubric-modal-actions">
                   <button
                     type="button"
@@ -541,6 +659,20 @@ const RubricScoreDetail: React.FC = () => {
             ) : (
               <>
                 <div className="rubric-history-list">
+                  <button
+                    type="button"
+                    className="rubric-history-item rubric-history-item-button"
+                    onClick={handleOpenCurrentVersion}
+                  >
+                    <div className="rubric-history-left">
+                      <div className="rubric-history-version">Current</div>
+                      <div className="rubric-history-meta">{currentHistoryTitle}</div>
+                    </div>
+                    <div className="rubric-history-right">
+                      <div className="rubric-history-exp">Now</div>
+                    </div>
+                  </button>
+
                   {formerRubricVersions.map((item) => (
                     <button
                       key={item.version}
@@ -549,8 +681,10 @@ const RubricScoreDetail: React.FC = () => {
                       onClick={() => handleOpenFormerVersion(item)}
                     >
                       <div className="rubric-history-left">
-                        <div className="rubric-history-version">{item.version}</div>
-                        <div className="rubric-history-meta">Created: {item.createdAt}</div>
+                        <div className="rubric-history-version">{item.title || item.version}</div>
+                        <div className="rubric-history-meta">
+                          Created: {item.createdAt} · {item.version}
+                        </div>
                       </div>
                       <div className="rubric-history-right">
                         <div className="rubric-history-exp">Expires: {item.expiresAt}</div>
