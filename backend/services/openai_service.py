@@ -95,7 +95,7 @@ class OpenAIService:
                 full_text = ""
                 
             # 2) Evaluate quality: if too short or mostly whitespace, fallback to OCR
-            quality_ok = len(full_text) > 100 # simple threshold; tune as needed
+            quality_ok = len(full_text) > 100  # simple threshold; tune as needed
             if not quality_ok:
                 logger.info("Low-quality text detected; running OCR fallback")
                 ocr_text = await asyncio.to_thread(self._ocr_from_pdf, temp_file_path)
@@ -218,9 +218,9 @@ class OpenAIService:
         Ask the model to match the provided text/classification to rubric criteria.
 
         Returns a list of match objects with keys:
-          - criteria_id (int)
-          - rubric_skill_id (int)
-          - level_id (int)
+          - criteria_history_id (int, optional but recommended)
+          - rubric_skill_history_id (int, required)
+          - level_history_id (int, optional; can be inferred from criteria_history_id)
           - matched_text (string)  # snippet or summary that matched
           - confidence (float 0.0-1.0)
           - matched_from (string)  # e.g., skill name or 'text'
@@ -234,7 +234,7 @@ class OpenAIService:
             "Given the portfolio text and a list of rubric criteria, find which parts of the text or extracted skills match each criteria.\n"
             "Return a JSON object with keys: \n"
             "  - classification: { skills: [...], categories: [...], summary: '...' }\n"
-            "  - matches: an array of objects with keys: criteria_id, rubric_skill_id, level_id, matched_text, confidence (0-1), matched_from\n"
+            "  - matches: an array of objects with keys: criteria_history_id, rubric_skill_history_id, level_history_id, matched_text, confidence (0-1), matched_from\n"
             "If multiple criteria match the same text, include multiple objects. If nothing matches, return an object with empty arrays.\n\n"
             f"Classification hint (if available):\n{json.dumps(classification, ensure_ascii=False, indent=2)}\n\n"
             f"Criteria list:\n{json.dumps(criteria, ensure_ascii=False, indent=2)}\n\n"
@@ -262,28 +262,59 @@ class OpenAIService:
 
         # Parse JSON
         try:
+            def _is_int_like(value) -> bool:
+                if value is None:
+                    return False
+                try:
+                    int(value)
+                    return True
+                except Exception:
+                    return False
+
+            def _normalize_confidence(item: dict) -> None:
+                if "confidence" in item:
+                    try:
+                        item["confidence"] = float(item["confidence"])
+                    except Exception:
+                        item["confidence"] = 0.0
+
+            def _validate_history_match_items(items: list) -> list[dict]:
+                valid_items: list[dict] = []
+                dropped = 0
+                for item in items:
+                    if not isinstance(item, dict):
+                        dropped += 1
+                        continue
+                    _normalize_confidence(item)
+
+                    has_skill_history = _is_int_like(item.get("rubric_skill_history_id"))
+                    has_criteria_history = _is_int_like(item.get("criteria_history_id"))
+                    has_level_history = _is_int_like(item.get("level_history_id"))
+
+                    # Strict history-id contract: skill history is required and at
+                    # least one of criteria/level history ids must be present.
+                    if not has_skill_history or not (has_criteria_history or has_level_history):
+                        dropped += 1
+                        continue
+                    valid_items.append(item)
+                if dropped:
+                    logger.warning(
+                        "Dropped %s invalid match items that did not satisfy history-id contract",
+                        dropped,
+                    )
+                return valid_items
+
             parsed = json.loads(content)
             # Expect top-level object with 'classification' and 'matches'
             if isinstance(parsed, dict):
                 matches = parsed.get("matches") or []
-                # normalize confidence
-                for item in matches:
-                    if "confidence" in item:
-                        try:
-                            item["confidence"] = float(item["confidence"])
-                        except Exception:
-                            item["confidence"] = 0.0
+                matches = _validate_history_match_items(matches)
                 classification_out = parsed.get("classification") or {"skills": [], "categories": [], "summary": ""}
                 return {"classification": classification_out, "matches": matches}
             # older fallback: if model returned array directly
             if isinstance(parsed, list):
-                for item in parsed:
-                    if "confidence" in item:
-                        try:
-                            item["confidence"] = float(item["confidence"])
-                        except Exception:
-                            item["confidence"] = 0.0
-                return {"classification": {"skills": [], "categories": [], "summary": ""}, "matches": parsed}
+                matches = _validate_history_match_items(parsed)
+                return {"classification": {"skills": [], "categories": [], "summary": ""}, "matches": matches}
             # otherwise wrap it
             logger.warning("match_text_to_criteria returned unexpected JSON; wrapping into object")
             return {"classification": {"skills": [], "categories": [], "summary": ""}, "matches": [parsed]}
