@@ -36,15 +36,30 @@ const RubricScoreTable: React.FC<RubricScoreTableProps> = ({
 
   const handleCellChange = (rowIndex: number, colIndex: number, value: string) => {
     if (readOnly) return;
-    const newRows = [...rows];
-    newRows[rowIndex].values[colIndex] = value;
+    const newRows = rows.map((row, idx) => {
+      if (idx !== rowIndex) {
+        return row;
+      }
+      const newValues = [...row.values];
+      newValues[colIndex] = value;
+      return {
+        ...row,
+        values: newValues,
+      };
+    });
     onRowsChange(newRows);
   };
 
   const handleSkillAreaChange = (rowIndex: number, value: string) => {
     if (readOnly) return;
-    const newRows = [...rows];
-    newRows[rowIndex].skillArea = value;
+    const newRows = rows.map((row, idx) => (
+      idx === rowIndex
+        ? {
+            ...row,
+            skillArea: value,
+          }
+        : row
+    ));
     onRowsChange(newRows);
   };
 

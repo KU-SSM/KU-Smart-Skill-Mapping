@@ -616,6 +616,15 @@ const Profile2: React.FC = () => {
       alert('Please upload and import a portfolio first before running AI evaluation.');
       return;
     }
+    const hasAtLeastOneCriteriaDescription = selectedRubricData.rows.some((row) =>
+      (row.values || []).some((cell) => (cell || '').trim() !== '')
+    );
+    if (!hasAtLeastOneCriteriaDescription) {
+      alert(
+        'This rubric has no criteria descriptions yet. Please add at least one non-empty criteria cell before AI evaluation.'
+      );
+      return;
+    }
 
     try {
       // Mark AI results as “preview” until the student clicks Save Evaluation.

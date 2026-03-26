@@ -234,7 +234,11 @@ const RubricScoreDetail: React.FC = () => {
     void loadBackendFormerSnapshots();
   }, [loadBackendFormerSnapshots, historyRefreshNonce]);
 
-  const performSave = async (saveExpirationDate?: string, saveExpirationTime?: string) => {
+  const performSave = async (
+    saveExpirationDate?: string,
+    saveExpirationTime?: string,
+    titleOverride?: string
+  ) => {
     if (!id) {
       console.error('Cannot save: No rubric ID');
       return;
@@ -243,11 +247,12 @@ const RubricScoreDetail: React.FC = () => {
     setIsSaving(true);
 
     try {
-      console.log('Saving rubric score:', { id, title, headers, rows });
+      const effectiveTitle = (titleOverride ?? title).trim();
+      console.log('Saving rubric score:', { id, title: effectiveTitle, headers, rows });
       console.log('Previous version expiration:', expirationDate, expirationTime);
 
       const rubricData = await updateRubricScore(id, {
-        title,
+        title: effectiveTitle,
         headers,
         rows,
       });
@@ -310,11 +315,16 @@ const RubricScoreDetail: React.FC = () => {
   };
 
   const handleSaveChanges = () => {
+    const effectiveTitle = isEditingTitle ? editingTitle.trim() : title.trim();
+    if (isEditingTitle) {
+      setTitle(effectiveTitle || title);
+      setIsEditingTitle(false);
+    }
     const defaultExpirationDate = getDefaultExpirationDate();
     const defaultExpirationTime = '23:59:59';
     setExpirationDate(defaultExpirationDate);
     setExpirationTime(defaultExpirationTime);
-    performSave(defaultExpirationDate, defaultExpirationTime);
+    performSave(defaultExpirationDate, defaultExpirationTime, effectiveTitle || title);
   };
 
   const handleOpenFormerRubrics = () => {

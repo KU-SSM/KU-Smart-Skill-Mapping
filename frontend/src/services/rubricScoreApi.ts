@@ -156,16 +156,10 @@ export const getRubricScore = async (id: string): Promise<RubricScoreDetail> => 
     // This will return empty arrays for levels/criteria if they fail to load
     const { skills, levels, criteria } = await fetchRubricData(rubric.id);
     
-    // If we have no skills, return empty rubric structure instead of throwing
-    // This allows the UI to show the rubric exists but has no skills yet
+    // A rubric may intentionally have only level headers before skills are added.
+    // Preserve headers from backend levels even when no skills exist.
     if (skills.length === 0) {
-      console.warn('No skills found for this rubric. Returning empty rubric structure.');
-      return {
-        id: String(rubric.id),
-        title: rubric.name || 'Untitled Rubric',
-        headers: [],
-        rows: [],
-      };
+      console.warn('No skills found for this rubric. Preserving level headers.');
     }
     
     // If we have no levels, log a warning but continue (skills are more important)
@@ -173,8 +167,8 @@ export const getRubricScore = async (id: string): Promise<RubricScoreDetail> => 
       console.warn('No levels found for this rubric. Continuing with skills only.');
     }
     
-    // Transform backend data to frontend format
-    // This will work even with empty levels - rows will be created from skills
+    // Transform backend data to frontend format.
+    // This also supports: levels-only rubric (headers with zero rows).
     return transformBackendToFrontend(rubric, skills, levels, criteria);
   } catch (error: any) {
     console.error('Error fetching rubric score:', error);
