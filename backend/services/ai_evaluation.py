@@ -16,7 +16,9 @@ from sqlalchemy.orm import Session, joinedload
 import models
 from services.rubric_snapshot import (
     apply_time_based_expiry_on_history,
+    close_active_histories_for_rubric,
     get_current_evaluable_rubric_history,
+    snapshot_live_rubric_to_history,
 )
 
 logger = logging.getLogger(__name__)
@@ -277,9 +279,38 @@ async def run_portfolio_ai_evaluation(
         .all()
     )
     if not rubric_skill_histories:
-        raise ValueError(
-            f"rubric snapshot {rubric_history_id} has no skills; add skills before evaluation."
+        # Self-heal: snapshots are only regenerated via `PUT /rubric/{rubric_id}`, but rubric
+        # edits can happen via nested endpoints. If the "current" snapshot is empty, regenerate
+        # it from the live rubric and continue evaluation against the new history.
+        #
+        # This keeps the system robust even if the frontend missed triggering snapshot regen.
+        close_active_histories_for_rubric(db, rubric_id)
+        new_rh = snapshot_live_rubric_to_history(db, rubric_id)
+        db.flush()
+
+        # Update local references so we re-query the new history content below.
+        rubric_history_id = new_rh.id
+        rubric_history = new_rh
+
+        if skill_evaluation_id is not None:
+            # Keep the skill_evaluation linked to the fresh snapshot.
+            skill_evaluation.rubric_score_history_id = rubric_history_id
+            db.flush()
+
+        rubric_skill_histories = (
+            db.query(models.RubricSkillHistory)
+            .filter(models.RubricSkillHistory.rubric_history_id == rubric_history_id)
+            .order_by(
+                models.RubricSkillHistory.display_order,
+                models.RubricSkillHistory.id,
+            )
+            .all()
         )
+
+        if not rubric_skill_histories:
+            raise ValueError(
+                f"rubric snapshot {rubric_history_id} has no skills; add skills before evaluation."
+            )
 
     criteria_rows = (
         db.query(models.CriteriaHistory)
