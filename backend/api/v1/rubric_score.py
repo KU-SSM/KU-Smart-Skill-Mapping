@@ -38,7 +38,6 @@ async def create_rubric(rubric: RubricScoreBase, db: db_dependency):
     db_rubric = models.RubricScore(**rubric.model_dump())
     db.add(db_rubric)
     db.flush()
-    snapshot_live_rubric_to_history(db, db_rubric.id)
     db.commit()
     db.refresh(db_rubric)
     return db_rubric
@@ -92,9 +91,9 @@ async def update_rubric(rubric_id: int, rubric: RubricScoreBase, db: db_dependen
         setattr(db_rubric, key, value)
 
     close_active_histories_for_rubric(db, rubric_id)
+    db.refresh(db_rubric)
     snapshot_live_rubric_to_history(db, rubric_id)
     db.commit()
-    db.refresh(db_rubric)
     return db_rubric
 
 
