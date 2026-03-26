@@ -9,7 +9,9 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
-import models
+import models, logging
+
+logger = logging.getLogger(__name__)
 
 
 def apply_time_based_expiry_on_history(
@@ -96,7 +98,8 @@ def snapshot_live_rubric_to_history(
         db.add(sh)
         db.flush()
         skill_map[s.id] = sh.id
-
+        logger.info(f"Created RubricSkillHistory row for rubric_id {rubric_score_id} and skill_id {s.id}")
+        
     levels = (
         db.query(models.Level)
         .filter(models.Level.rubric_id == rubric_score_id)
@@ -158,6 +161,6 @@ def get_current_evaluable_rubric_history(
     db.flush()
 
     for h in rows:
-        if h.status == "valid" and (h.expired_at is None or h.expired_at > now):
+        if h.status == "valid" and (h.expired_at is None or h.expired_at >= now):
             return h
     return None
