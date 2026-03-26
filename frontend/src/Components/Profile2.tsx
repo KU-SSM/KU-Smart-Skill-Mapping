@@ -94,6 +94,8 @@ interface SkillEvaluationFullResponse {
 interface RubricScoreHistoryResponse {
   id: number;
   rubric_score_id: number;
+  expired_at?: string | null;
+  status?: string | null;
 }
 
 interface TeacherEvaluatedSkillApiRow {
@@ -295,8 +297,11 @@ const Profile2: React.FC = () => {
   const hasEphemeralEvaluationRef = useRef<boolean>(false);
   const isAiPreviewDirtyRef = useRef<boolean>(false);
   const savedSkillEvaluationIdRef = useRef<number | null>(null);
+  /** Rubric history id actually used by the backend AI evaluation. */
+  const latestBackendRubricHistoryIdRef = useRef<number | null>(null);
   const [isImportingPortfolio, setIsImportingPortfolio] = useState<boolean>(false);
   const [extractedPortfolioText, setExtractedPortfolioText] = useState<string>('');
+  const [importedPortfolioFileToken, setImportedPortfolioFileToken] = useState<string>('');
   const [isAiEvaluating, setIsAiEvaluating] = useState<boolean>(false);
   const [savedSkillEvaluationId, setSavedSkillEvaluationId] = useState<number | null>(null);
   const [skillEvaluationStatus, setSkillEvaluationStatus] = useState<string>('draft');
@@ -321,10 +326,11 @@ const Profile2: React.FC = () => {
     isStudent &&
     (skillEvaluationStatus === 'pending' ||
       skillEvaluationStatus === 'completed' ||
-      skillEvaluationStatus === 'approved');
+      skillEvaluationStatus === 'approved' ||
+      skillEvaluationStatus === 'expired');
   /** Delete from list is allowed for draft / completed / approved; not while a teacher review is in progress. */
   const canStudentDeleteEvaluation =
-    isStudent && skillEvaluationStatus !== 'pending';
+    isStudent && skillEvaluationStatus !== 'pending' && skillEvaluationStatus !== 'expired';
   const isStudentEvaluationCompleted =
     isStudent &&
     (skillEvaluationStatus === 'completed' ||
@@ -381,6 +387,11 @@ const Profile2: React.FC = () => {
         const rh = await api.get<RubricScoreHistoryResponse>(
           `rubric_score_history/${se.data.rubric_score_history_id}`
         );
+        const isRubricHistoryExpired = rh.data.status === 'expired';
+        if (isRubricHistoryExpired && se.data.status !== 'expired') {
+          await updateSkillEvaluation(se.data.id, { status: 'expired' });
+          se.data.status = 'expired';
+        }
         const [studentRowsRes, teacherRowsRes] = await Promise.all([
           api.get<StudentEvaluatedSkillApiRow[]>(
             `skill_evaluation/${parsedId}/student_evaluated_skills`
@@ -544,6 +555,7 @@ const Profile2: React.FC = () => {
         // New rubric selection requires an explicit "Evaluate with AI" click.
         setHasRunAiEvaluation(false);
         setIsAiPreviewDirty(false);
+        latestBackendRubricHistoryIdRef.current = null;
         
         if (pendingHydratedScores) {
           const baseSkillSet = new Set(skillsFromRubric.map((s) => s.skillArea));
@@ -618,6 +630,8 @@ const Profile2: React.FC = () => {
     // Only students use this (teachers have no Evaluate with AI button).
     if (!isStudent) return;
     if (isStudentEvaluationLocked) return;
+    // Reset; we'll set it again from the backend response.
+    latestBackendRubricHistoryIdRef.current = null;
     if (!extractedPortfolioText.trim()) {
       alert('Please upload and import a portfolio first before running AI evaluation.');
       return;
@@ -648,16 +662,11 @@ const Profile2: React.FC = () => {
       const resolvedUserId = await resolveValidUserId();
       if (typeof savedSkillEvaluationId === 'number' && savedSkillEvaluationId > 0) {
         const histories = await getRubricScoreHistoryByRubric(confirmedRubricId);
-        const now = new Date();
         const sorted = [...histories].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
         let resolvedRubricHistoryId: number | null = null;
         for (const h of sorted) {
           if (!Number.isInteger(h.id) || h.id <= 0) continue;
           if (h.status !== 'valid') continue;
-          if (h.expired_at) {
-            const expiresAt = new Date(h.expired_at);
-            if (!Number.isNaN(expiresAt.getTime()) && expiresAt <= now) continue;
-          }
           try {
             const snapshot = await getRubricScoreHistorySnapshot(h.id);
             const hasSkills = snapshot.rows.length > 0;
@@ -687,9 +696,14 @@ const Profile2: React.FC = () => {
           confirmedRubricId,
           uploadedFiles[0]?.name || 'portfolio.pdf',
           resolvedUserId,
-          savedSkillEvaluationId ?? undefined
+          savedSkillEvaluationId ?? undefined,
+          importedPortfolioFileToken || undefined
         ),
       ]);
+
+      if (typeof (evalRes as any)?.rubric_score_history_id === 'number') {
+        latestBackendRubricHistoryIdRef.current = (evalRes as any).rubric_score_history_id;
+      }
 
       const sortedSkills = [...skillsRes.data].sort(
         (a, b) => (a.display_order ?? 0) - (b.display_order ?? 0)
@@ -780,6 +794,7 @@ const Profile2: React.FC = () => {
     confirmedRubricId,
     selectedRubricData,
     extractedPortfolioText,
+    importedPortfolioFileToken,
     uploadedFiles,
     isStudent,
     isStudentEvaluationLocked,
@@ -1022,15 +1037,10 @@ const Profile2: React.FC = () => {
     }
 
     const histories = await getRubricScoreHistoryByRubric(String(parsedRubricId));
-    const now = new Date();
     const sorted = [...histories].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
     for (const h of sorted) {
       if (!Number.isInteger(h.id) || h.id <= 0) continue;
       if (h.status !== 'valid') continue;
-      if (h.expired_at) {
-        const expiresAt = new Date(h.expired_at);
-        if (!Number.isNaN(expiresAt.getTime()) && expiresAt <= now) continue;
-      }
       try {
         const snapshot = await getRubricScoreHistorySnapshot(h.id);
         const hasSkills = snapshot.rows.length > 0;
@@ -1045,15 +1055,47 @@ const Profile2: React.FC = () => {
       }
     }
 
-    const created = await api.post<RubricScoreHistoryResponse>('rubric_score_history/', {
-      rubric_score_id: parsedRubricId,
-      status: 'valid',
+    // No usable snapshot exists yet. Trigger backend snapshot regeneration for this rubric
+    // by calling the existing rubric update endpoint, which internally creates a new
+    // RubricScoreHistory tree via `snapshot_live_rubric_to_history`.
+    //
+    // This avoids creating empty rubric_score_history rows from the frontend.
+    const rubricRes = await api.get<{
+      id: number;
+      name: string;
+      created_at: string;
+      updated_at: string;
+    }>(`rubric/${parsedRubricId}`);
+
+    const rubric = rubricRes.data;
+    await api.put(`rubric/${parsedRubricId}`, {
+      name: rubric.name,
+      created_at: rubric.created_at,
+      updated_at: new Date().toISOString(),
     });
-    const createdId = created.data?.id;
-    if (!Number.isInteger(createdId) || createdId <= 0) {
-      throw new Error('Failed to create rubric score history.');
+
+    const refreshedHistories = await getRubricScoreHistoryByRubric(String(parsedRubricId));
+    const refreshedSorted = [...refreshedHistories].sort((a, b) => (b.id ?? 0) - (a.id ?? 0));
+    for (const h of refreshedSorted) {
+      if (!Number.isInteger(h.id) || h.id <= 0) continue;
+      if (h.status !== 'valid') continue;
+      try {
+        const snapshot = await getRubricScoreHistorySnapshot(h.id);
+        const hasSkills = snapshot.rows.length > 0;
+        const hasCriteriaDescriptions = snapshot.rows.some((row) =>
+          (row.values || []).some((cell) => (cell || '').trim() !== '')
+        );
+        if (hasSkills && hasCriteriaDescriptions) {
+          return h.id;
+        }
+      } catch {
+        // Skip malformed rows and continue.
+      }
     }
-    return createdId;
+
+    throw new Error(
+      'No usable rubric history snapshot found after refreshing the backend snapshot. Please ensure the rubric has skills and criteria descriptions.'
+    );
   }, []);
 
   const revertAiPreviewOnBackend = useCallback(async () => {
@@ -1127,8 +1169,13 @@ const Profile2: React.FC = () => {
           extractedPortfolioText,
           confirmedRubricId,
           uploadedFiles[0]?.name || portfolioDisplayName || 'portfolio.pdf',
-          resolvedUserId
+          resolvedUserId,
+          undefined,
+          importedPortfolioFileToken || undefined
         );
+        if (typeof (evalRes as any)?.rubric_score_history_id === 'number') {
+          latestBackendRubricHistoryIdRef.current = (evalRes as any).rubric_score_history_id;
+        }
         if (
           typeof evalRes.skill_evaluation_id === 'number' &&
           Number.isInteger(evalRes.skill_evaluation_id) &&
@@ -1140,10 +1187,15 @@ const Profile2: React.FC = () => {
       }
 
       if (typeof skillEvaluationIdToSave === 'number' && skillEvaluationIdToSave > 0) {
-        const resolvedRubricHistoryId =
-          await resolveRubricHistoryIdForRubric(confirmedRubricId);
+        let resolvedRubricHistoryId = latestBackendRubricHistoryIdRef.current;
+        if (!Number.isInteger(resolvedRubricHistoryId) || (resolvedRubricHistoryId as number) <= 0) {
+          resolvedRubricHistoryId = await resolveRubricHistoryIdForRubric(confirmedRubricId);
+        }
+        if (!Number.isInteger(resolvedRubricHistoryId) || (resolvedRubricHistoryId as number) <= 0) {
+          throw new Error('Failed to resolve a usable rubric history snapshot for this rubric.');
+        }
         await updateSkillEvaluation(skillEvaluationIdToSave, {
-          rubric_score_history_id: resolvedRubricHistoryId,
+          rubric_score_history_id: resolvedRubricHistoryId as number,
         });
 
         let committedAiEvaluations = draftAiEvaluations
@@ -1213,6 +1265,7 @@ const Profile2: React.FC = () => {
     uploadedFiles,
     portfolioDisplayName,
     extractedPortfolioText,
+    importedPortfolioFileToken,
     selectedRubricData,
     savedSkillEvaluationId,
     persistStudentEvaluations,
@@ -1322,6 +1375,7 @@ const Profile2: React.FC = () => {
       return next;
     });
     setExtractedPortfolioText('');
+    setImportedPortfolioFileToken('');
     setDraftAiEvaluations(null);
     setHasRunAiEvaluation(false);
     setAiEvaluations((prev) => {
@@ -1342,6 +1396,7 @@ const Profile2: React.FC = () => {
       console.log('Portfolio import successful:', result);
       const importedText = result.text || '';
       setExtractedPortfolioText(importedText);
+      setImportedPortfolioFileToken(result.file_token || '');
       if (typeof savedSkillEvaluationId === 'number' && savedSkillEvaluationId > 0) {
         writeEvaluationExtractedText(String(savedSkillEvaluationId), importedText);
       }
@@ -1363,6 +1418,7 @@ const Profile2: React.FC = () => {
     } catch (error: any) {
       console.error('Error importing portfolio:', error);
       setExtractedPortfolioText('');
+      setImportedPortfolioFileToken('');
     } finally {
       setIsImportingPortfolio(false);
     }

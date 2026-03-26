@@ -9,7 +9,9 @@ import {
   deleteRubricScore,
   getRubricScoreHistoryByRubric,
   getRubricScoreHistorySnapshot,
+  updateRubricScoreHistoryExpiration,
 } from '../services/rubricScoreApi';
+import { localDateAndTimeToUtcIso } from '../utils/dateTime';
 import './RubricScore.css';
 
 const DeleteIcon = AiOutlineDelete as React.ComponentType;
@@ -258,6 +260,25 @@ const RubricScoreDetail: React.FC = () => {
         headers,
         rows,
       });
+
+      // After save, backend closes previous valid history as "outdated".
+      // Apply teacher-selected expiration datetime to the latest outdated history.
+      if (saveExpirationDate || saveExpirationTime) {
+        try {
+          const histories = await getRubricScoreHistoryByRubric(id);
+          const latestOutdated = [...histories]
+            .filter((h) => h.status === 'outdated' && Number.isInteger(h.id) && h.id > 0)
+            .sort((a, b) => (b.id ?? 0) - (a.id ?? 0))[0];
+          if (latestOutdated) {
+            const targetDate = saveExpirationDate || expirationDate || getDefaultExpirationDate();
+            const targetTime = saveExpirationTime || expirationTime || '23:59:59';
+            const expiredAtIso = localDateAndTimeToUtcIso(targetDate, targetTime);
+            await updateRubricScoreHistoryExpiration(latestOutdated.id, expiredAtIso);
+          }
+        } catch (e) {
+          console.warn('Failed to persist expiration datetime to outdated history row.', e);
+        }
+      }
 
       console.log('Successfully saved rubric score!');
       console.log('Returned data:', rubricData);

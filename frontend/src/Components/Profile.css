@@ -1684,6 +1684,16 @@
   color: #155724;
 }
 
+.status-badge.expired {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-badge.outdated {
+  background-color: #dbeafe;
+  color: #1e3a8a;
+}
+
 .student-request-details {
   display: flex;
   flex-direction: column;

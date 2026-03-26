@@ -100,6 +100,7 @@ class PortfolioEvaluateRequest(BaseModel):
     rubric_id: int
     user_id: int
     filename: Optional[str] = None
+    file_token: Optional[str] = None
     skill_evaluation_id: Optional[int] = Field(
         None,
         description=(
