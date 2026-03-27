@@ -1,9 +1,11 @@
 import logging
+import uuid
 from datetime import datetime
+from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from sqlalchemy.orm import Session, joinedload
 
 import models
@@ -13,6 +15,7 @@ from schemas import (
     AIEvaluatedSkillPlaceholderCreate,
     AIEvaluatedSkillPlaceholderUpdate,
     AIEvaluationItemResponse,
+    PortfolioModel,
     PortfolioEvaluateRequest,
     PortfolioEvaluateResponse,
     SkillEvaluationCreate,
@@ -28,6 +31,10 @@ from services.openai_service import get_openai_service
 from services.ai_evaluation import run_portfolio_ai_evaluation, PortfolioAIEvaluationResult
 
 logger = logging.getLogger(__name__)
+PORTFOLIO_FILE_STORAGE_DIR = (
+    Path(__file__).resolve().parents[2] / "storage" / "portfolio_files"
+)
+PORTFOLIO_FILE_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Manual CRUD for ai_evaluated_skill uses teacher-shaped bodies until AI owns criteria text.
 AI_EVALUATED_SKILL_CRITERIA_PLACEHOLDER = (
@@ -53,10 +60,21 @@ async def extract_document(file: UploadFile = File(...)):
         text = extracted["text"]
         logger.info("Extracted text: %s...", text[:100])
         metadata = extracted["metadata"]
+        await file.seek(0)
+        file_bytes = await file.read()
+        file_token = f"{uuid.uuid4().hex}.pdf"
+        save_path = PORTFOLIO_FILE_STORAGE_DIR / file_token
+        save_path.write_bytes(file_bytes)
 
         return JSONResponse(
             status_code=200,
-            content={"success": True, "metadata": metadata, "text": text},
+            content={
+                "success": True,
+                "metadata": metadata,
+                "text": text,
+                "file_token": file_token,
+                "original_filename": file.filename,
+            },
         )
     except ValueError as e:
         logger.error("Validation error: %s", e)
@@ -67,6 +85,39 @@ async def extract_document(file: UploadFile = File(...)):
             status_code=500,
             detail=f"Failed to extract text from PDF: {str(e)}",
         ) from e
+
+
+@router.get("/portfolio/{portfolio_id}", response_model=PortfolioModel)
+async def read_portfolio(portfolio_id: int, db: db_dependency):
+    row = db.query(models.Portfolio).filter(models.Portfolio.id == portfolio_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"portfolio_id {portfolio_id} not found")
+    return row
+
+
+@router.get("/portfolio/{portfolio_id}/file")
+async def read_portfolio_file(portfolio_id: int, db: db_dependency):
+    row = db.query(models.Portfolio).filter(models.Portfolio.id == portfolio_id).first()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"portfolio_id {portfolio_id} not found")
+
+    classification = row.classification_json if isinstance(row.classification_json, dict) else {}
+    file_token = classification.get("__file_token")
+    if not isinstance(file_token, str) or not file_token.strip():
+        raise HTTPException(status_code=404, detail="portfolio file is not stored")
+
+    file_path = PORTFOLIO_FILE_STORAGE_DIR / file_token
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="portfolio file not found on server")
+
+    download_name = row.filename or "portfolio.pdf"
+    if not download_name.lower().endswith(".pdf"):
+        download_name = f"{download_name}.pdf"
+    return FileResponse(
+        path=str(file_path),
+        media_type="application/pdf",
+        filename=download_name,
+    )
 
 
 def _portfolio_evaluate_response_from_result(
@@ -114,6 +165,7 @@ async def evaluate_and_save(
             rubric_id=rubric_id,
             user_id=user_id,
             filename=filename,
+            file_token=None,
             openai_service=openai_service,
             skill_evaluation_id=skill_evaluation_id,
         )
@@ -138,6 +190,7 @@ async def ai_evaluation_run(body: PortfolioEvaluateRequest, db: db_dependency):
             rubric_id=body.rubric_id,
             user_id=body.user_id,
             filename=body.filename,
+            file_token=body.file_token,
             openai_service=openai_service,
             skill_evaluation_id=body.skill_evaluation_id,
         )

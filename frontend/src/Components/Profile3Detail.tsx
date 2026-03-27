@@ -50,6 +50,11 @@ interface RubricHistoryResponse {
   rubric_score_id: number;
 }
 
+interface PortfolioResponse {
+  id: number;
+  filename?: string;
+}
+
 interface TableData {
   skillArea: string;
   values: string[];
@@ -135,6 +140,7 @@ const Profile3Detail: React.FC = () => {
   const [isSavingEvaluation, setIsSavingEvaluation] = useState<boolean>(false);
   const [isRubricHistoryOpen, setIsRubricHistoryOpen] = useState<boolean>(false);
   const [selectedFormerVersion, setSelectedFormerVersion] = useState<FormerRubricVersion | null>(null);
+  const [selectedPortfolioId, setSelectedPortfolioId] = useState<number | null>(null);
 
   const toScoreMap = useCallback((rows: { skill_name: string; level_rank: number }[]) => {
     const out: { [skillArea: string]: string } = {};
@@ -161,21 +167,25 @@ const Profile3Detail: React.FC = () => {
         const rh = await api.get<RubricHistoryResponse>(`rubric_score_history/${ev.rubric_score_history_id}`);
         const rubricRes = await api.get<{ id: number; name?: string }>(`rubric/${rh.data.rubric_score_id}`);
         const userRes = await api.get<{ id: number; name?: string }>(`user/${ev.user_id}`);
+        const portfolioRes = await api.get<PortfolioResponse>(`portfolio/${ev.portfolio_id}`);
 
         const rubricId = String(rh.data.rubric_score_id);
         const studentName = userRes.data.name || `Student #${ev.user_id}`;
         const rubricTitle = rubricRes.data.name || `Rubric #${rubricId}`;
+        const portfolioFileName =
+          (portfolioRes.data.filename || '').trim() || `Portfolio #${ev.portfolio_id}`;
 
         setSelectedRequest({
           id: String(ev.id),
           studentName,
           studentId: String(ev.user_id),
-          portfolioFileName: `Portfolio #${ev.portfolio_id}`,
+          portfolioFileName,
           rubricId,
           rubricTitle,
           requestedAt: ev.created_at || '',
           status: ev.status === 'pending' ? 'pending' : 'completed',
         });
+        setSelectedPortfolioId(ev.portfolio_id);
         setSelectedRubricId(rubricId);
         setConfirmedRubricId(rubricId);
         setAiEvaluations(toScoreMap(ev.ai_evaluated_skills || []));
@@ -440,6 +450,17 @@ const Profile3Detail: React.FC = () => {
   const handleCloseRubricHistory = () => {
     setIsRubricHistoryOpen(false);
     setSelectedFormerVersion(null);
+  };
+
+  const handleOpenPortfolio = () => {
+    if (!selectedPortfolioId) return;
+    try {
+      const fileUrl = api.getUri({ url: `portfolio/${selectedPortfolioId}/file` });
+      window.open(fileUrl, '_blank', 'noopener,noreferrer');
+    } catch (error) {
+      console.error('Failed to load portfolio for teacher view:', error);
+      alert(`Failed to load portfolio: ${getApiErrorDetail(error)}`);
+    }
   };
 
   const handleEditRubricFromInfo = () => {
@@ -801,10 +822,7 @@ const Profile3Detail: React.FC = () => {
               </div>
               <button
                 className="portfolio-view-button"
-                onClick={() => {
-                  // TODO: Open portfolio file
-                  alert('Portfolio viewer will open here');
-                }}
+                onClick={() => void handleOpenPortfolio()}
               >
                 View Portfolio
               </button>

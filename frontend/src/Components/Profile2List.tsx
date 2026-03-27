@@ -7,6 +7,7 @@ import { getCurrentUserId } from '../utils/currentUser';
 import api from '../api/index';
 import {
   deleteSkillEvaluation,
+  updateSkillEvaluation,
   getSkillEvaluationsByUser,
   type SkillEvaluationRecord,
 } from '../services/skillEvaluationApi';
@@ -21,12 +22,14 @@ interface StudentEvaluationItem {
   rubricTitle: string;
   portfolioFileName: string;
   requestedAt: string;
-  status: 'drafted' | 'pending' | 'completed';
+  status: 'drafted' | 'pending' | 'completed' | 'outdated' | 'expired';
 }
 
 interface RubricHistoryResponse {
   id: number;
   rubric_score_id: number;
+  expired_at?: string | null;
+  status?: string | null;
 }
 
 interface RubricResponse {
@@ -60,11 +63,16 @@ const Profile2List: React.FC = () => {
   const [isDeletingIds, setIsDeletingIds] = useState<Set<string>>(new Set());
   const [evaluations, setEvaluations] = useState<StudentEvaluationItem[]>([]);
   const rubricTitleByHistoryIdRef = useRef<Map<number, string>>(new Map());
+  const rubricExpiredByHistoryIdRef = useRef<Map<number, boolean>>(new Map());
+  const rubricOutdatedByHistoryIdRef = useRef<Map<number, boolean>>(new Map());
 
   const mapBackendEvaluation = async (ev: SkillEvaluationRecord): Promise<StudentEvaluationItem> => {
     const id = String(ev.id);
     const meta = readEvaluationMeta(id);
     let rubricTitle = meta?.rubricTitle || `History #${ev.rubric_score_history_id}`;
+    const isRubricHistoryExpired = rubricExpiredByHistoryIdRef.current.get(ev.rubric_score_history_id) || false;
+    const isRubricHistoryOutdated =
+      rubricOutdatedByHistoryIdRef.current.get(ev.rubric_score_history_id) || false;
 
     // Fallback to backend rubric name when local meta is missing (cached by history id).
     if (!meta?.rubricTitle && !rubricTitleByHistoryIdRef.current.has(ev.rubric_score_history_id)) {
@@ -83,11 +91,15 @@ const Profile2List: React.FC = () => {
       rubricTitleByHistoryIdRef.current.get(ev.rubric_score_history_id) || rubricTitle;
 
     const mappedStatus: StudentEvaluationItem['status'] =
-      ev.status === 'completed' || ev.status === 'approved'
-        ? 'completed'
-        : ev.status === 'pending'
-          ? 'pending'
-          : 'drafted';
+      isRubricHistoryExpired
+        ? 'expired'
+        : isRubricHistoryOutdated
+          ? 'outdated'
+        : ev.status === 'completed' || ev.status === 'approved'
+          ? 'completed'
+          : ev.status === 'pending'
+            ? 'pending'
+            : 'drafted';
 
     return {
       id,
@@ -95,7 +107,10 @@ const Profile2List: React.FC = () => {
       rubricTitle,
       portfolioFileName: meta?.portfolioFileName || `Portfolio #${ev.portfolio_id}`,
       // Draft means teacher request has not been sent yet.
-      requestedAt: mappedStatus === 'drafted' ? '' : (ev.created_at || ''),
+      requestedAt:
+        mappedStatus === 'drafted' || mappedStatus === 'outdated' || mappedStatus === 'expired'
+          ? ''
+          : (ev.created_at || ''),
       status: mappedStatus,
     };
   };
@@ -110,7 +125,12 @@ const Profile2List: React.FC = () => {
       const idsNeedingRubric = Array.from(
         new Set(
           rows
-            .filter((row) => !rubricTitleByHistoryIdRef.current.has(row.rubric_score_history_id))
+            .filter(
+              (row) =>
+                !rubricTitleByHistoryIdRef.current.has(row.rubric_score_history_id) ||
+                !rubricExpiredByHistoryIdRef.current.has(row.rubric_score_history_id) ||
+                !rubricOutdatedByHistoryIdRef.current.has(row.rubric_score_history_id)
+            )
             .map((row) => row.rubric_score_history_id)
         )
       );
@@ -118,6 +138,10 @@ const Profile2List: React.FC = () => {
         idsNeedingRubric.map(async (historyId) => {
           try {
             const rh = await api.get<RubricHistoryResponse>(`rubric_score_history/${historyId}`);
+            const isExpired = rh.data.status === 'expired';
+            rubricExpiredByHistoryIdRef.current.set(historyId, isExpired);
+            rubricOutdatedByHistoryIdRef.current.set(historyId, rh.data.status === 'outdated');
+
             const rubric = await api.get<RubricResponse>(`rubric/${rh.data.rubric_score_id}`);
             rubricTitleByHistoryIdRef.current.set(
               historyId,
@@ -130,6 +154,28 @@ const Profile2List: React.FC = () => {
       );
 
       const enriched = await Promise.all(rows.map((row) => mapBackendEvaluation(row)));
+      // Persist snapshot-driven statuses so detail pages can reliably lock/disable.
+      const rowsToExpire = rows.filter((row) => {
+        const shouldExpire =
+          rubricExpiredByHistoryIdRef.current.get(row.rubric_score_history_id) || false;
+        return shouldExpire && row.status !== 'expired';
+      });
+      const rowsToOutdate = rows.filter((row) => {
+        const shouldOutdate =
+          rubricOutdatedByHistoryIdRef.current.get(row.rubric_score_history_id) || false;
+        if (row.status === 'expired' || row.status === 'completed' || row.status === 'approved') {
+          return false;
+        }
+        return shouldOutdate && row.status !== 'outdated';
+      });
+      await Promise.all([
+        ...rowsToExpire.map((row) =>
+          updateSkillEvaluation(row.id, { status: 'expired' }).catch(() => {})
+        ),
+        ...rowsToOutdate.map((row) =>
+          updateSkillEvaluation(row.id, { status: 'outdated' }).catch(() => {})
+        ),
+      ]);
       setEvaluations(enriched);
     } catch (error) {
       console.error('Error loading evaluations:', error);
@@ -233,6 +279,33 @@ const Profile2List: React.FC = () => {
             )}
           </div>
 
+          <div
+            className="rubric-score-add-box profile2-yevaluation-add-box"
+            onClick={handleAddEvaluationItem}
+            title="Add Evaluation"
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleAddEvaluationItem();
+              }
+            }}
+          >
+            <span className="rubric-score-add-box-spacer" />
+            <button
+              className="rubric-score-add-box-button"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAddEvaluationItem();
+              }}
+              title="Add Evaluation"
+            >
+              {React.createElement(PlusIcon)}
+            </button>
+          </div>
+
           <div className="profile2-yevaluation-stack">
             {filteredEvaluations.length === 0 ? (
               <div className="profile2-yevaluation-empty">
@@ -249,9 +322,18 @@ const Profile2List: React.FC = () => {
                 {filteredEvaluations.map((item) => (
                   <div
                     key={item.id}
-                    className={`student-request-card ${item.status === 'completed' ? 'completed' : ''}`}
-                    onClick={() => navigate(`/profile2/${item.id}`)}
-                    style={{ position: 'relative' }}
+                    className={`student-request-card ${item.status === 'completed' ? 'completed' : ''} ${
+                      item.status === 'expired' ? 'expired' : ''
+                    }`}
+                    onClick={() => {
+                      if (item.status === 'expired') return;
+                      navigate(`/profile2/${item.id}`);
+                    }}
+                    style={{
+                      position: 'relative',
+                      cursor: item.status === 'expired' ? 'not-allowed' : 'pointer',
+                      opacity: item.status === 'expired' ? 0.6 : 1,
+                    }}
                   >
                     <button
                       type="button"
@@ -283,14 +365,24 @@ const Profile2List: React.FC = () => {
                       <div className="student-request-status">
                         <span
                           className={`status-badge ${
-                            item.status === 'completed' ? 'completed' : 'pending'
+                            item.status === 'expired'
+                              ? 'expired'
+                              : item.status === 'outdated'
+                                ? 'outdated'
+                              : item.status === 'completed'
+                                ? 'completed'
+                                : 'pending'
                           }`}
                         >
-                          {item.status === 'completed'
-                            ? 'Completed'
-                            : item.status === 'pending'
-                              ? 'Pending'
-                              : 'Drafted'}
+                          {item.status === 'expired'
+                            ? 'Expired'
+                            : item.status === 'outdated'
+                              ? 'Outdated'
+                            : item.status === 'completed'
+                              ? 'Completed'
+                              : item.status === 'pending'
+                                ? 'Pending'
+                                : 'Drafted'}
                         </span>
                       </div>
                     </div>
@@ -327,32 +419,6 @@ const Profile2List: React.FC = () => {
               </div>
             )}
 
-            <div
-              className="rubric-score-add-box profile2-yevaluation-add-box"
-              onClick={handleAddEvaluationItem}
-              title="Add Evaluation"
-              role="button"
-              tabIndex={0}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  handleAddEvaluationItem();
-                }
-              }}
-            >
-              <span className="rubric-score-add-box-spacer" />
-              <button
-                className="rubric-score-add-box-button"
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAddEvaluationItem();
-                }}
-                title="Add Evaluation"
-              >
-                {React.createElement(PlusIcon)}
-              </button>
-            </div>
           </div>
       </div>
     </div>
