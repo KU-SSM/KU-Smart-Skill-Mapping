@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AiOutlineClose, AiOutlinePlus, AiOutlineEdit, AiOutlineCheck } from 'react-icons/ai';
+import { AiOutlineClose, AiOutlinePlus, AiOutlineEdit } from 'react-icons/ai';
 import { FiSave, FiX } from 'react-icons/fi';
 import './RubricScore.css';
 import { getRubricScores, createRubricScore, deleteRubricScore, updateRubricName } from '../services/rubricScoreApi';
@@ -8,7 +8,6 @@ import { getRubricScores, createRubricScore, deleteRubricScore, updateRubricName
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const PlusIcon = AiOutlinePlus as React.ComponentType;
 const EditIcon = AiOutlineEdit as React.ComponentType;
-const CheckIcon = AiOutlineCheck as React.ComponentType;
 const SaveIcon = FiSave as React.ComponentType;
 const CancelIcon = FiX as React.ComponentType;
 
@@ -60,21 +59,6 @@ const RubricScoreList: React.FC = () => {
     return rubricScores.some(rubric => rubric.isNew === true) || deletedRubricIds.size > 0 || renamedRubrics.size > 0;
   }, [rubricScores, deletedRubricIds, renamedRubrics]);
 
-  // Used to control the Cancel button disabled state (should be disabled when there's nothing to cancel)
-  const hasUnsavedEdits = useMemo(() => {
-    // Any tracked changes (new/deleted/renamed)
-    if (hasNewRubricScores) return true;
-
-    // If user is currently editing a title, consider it "unsaved edits" even before blur happens
-    if (editingId) {
-      const current = rubricScores.find(r => r.id === editingId);
-      const currentTitle = current?.title ?? '';
-      return editingTitle.trim() !== '' && editingTitle !== currentTitle;
-    }
-
-    return false;
-  }, [hasNewRubricScores, editingId, editingTitle, rubricScores]);
-
   const filteredRubricScores = useMemo(() => {
     if (!searchQuery.trim()) {
       return rubricScores;
@@ -99,35 +83,10 @@ const RubricScoreList: React.FC = () => {
   };
 
   const handleEditMode = () => {
-    if (isEditMode) {
-      // Exiting edit mode - check if we should restore original state
-      // Only restore if there are new rubric scores, deletions, or renames that weren't saved
-      const hasUnsavedChanges = rubricScores.some(rubric => rubric.isNew === true) || deletedRubricIds.size > 0 || renamedRubrics.size > 0;
-      
-      if (hasUnsavedChanges) {
-        // Restore original state, removing any newly added rubric scores and restoring deleted/renamed ones
-        setRubricScores(originalRubricScores);
-        setDeletedRubricIds(new Set());
-        setRenamedRubrics(new Map());
-      } else {
-        // Save any ongoing edits before exiting edit mode
-        if (editingId && editingTitle.trim()) {
-          setRubricScores(rubricScores.map(rubric =>
-            rubric.id === editingId
-              ? { ...rubric, title: editingTitle.trim() }
-              : rubric
-          ));
-        }
-      }
-      
-      setEditingId(null);
-      setEditingTitle('');
-      setOriginalRubricScores([]); // Clear the stored original state
-    } else {
-      // Entering edit mode - save current state as original
-      setOriginalRubricScores([...rubricScores]);
-    }
-    setIsEditMode(!isEditMode);
+    if (isEditMode) return;
+    // Entering edit mode - save current state as original
+    setOriginalRubricScores([...rubricScores]);
+    setIsEditMode(true);
   };
 
   const handleDeleteRubric = (e: React.MouseEvent, id: string) => {
@@ -279,16 +238,15 @@ const RubricScoreList: React.FC = () => {
   };
 
   const handleCancel = () => {
-    // Cancel changes without saving - restore original state but stay in edit mode
+    // Cancel changes without saving: restore original state and leave edit mode
     const restoredScores = [...originalRubricScores];
-    setRubricScores(restoredScores); // Remove any newly added rubric scores
-    setDeletedRubricIds(new Set()); // Clear deleted IDs
-    setRenamedRubrics(new Map()); // Clear renamed rubrics
+    setRubricScores(restoredScores);
+    setDeletedRubricIds(new Set());
+    setRenamedRubrics(new Map());
     setEditingId(null);
     setEditingTitle('');
-    // Update originalRubricScores to the restored state so cancel can be used again
-    setOriginalRubricScores(restoredScores);
-    // Stay in edit mode - don't call setIsEditMode(false)
+    setOriginalRubricScores([]);
+    setIsEditMode(false);
   };
 
   const handleAddNew = () => {
@@ -460,29 +418,24 @@ const RubricScoreList: React.FC = () => {
               <button 
                 className="cancel-rubric-score-button"
                 onClick={handleCancel}
-                disabled={!hasUnsavedEdits || isSaving}
+                disabled={isSaving}
               >
                 {React.createElement(CancelIcon)}
                 <span>Cancel</span>
               </button>
             </>
           )}
-          <button 
-            className="edit-rubric-score-button"
-            onClick={handleEditMode}
-          >
-            {isEditMode ? (
-              <>
-                {React.createElement(CheckIcon)}
-                <span>Done Editing</span>
-              </>
-            ) : (
+          {!isEditMode && (
+            <button 
+              className="edit-rubric-score-button"
+              onClick={handleEditMode}
+            >
               <>
                 {React.createElement(EditIcon)}
                 <span>Edit Rubric Score</span>
               </>
-            )}
-          </button>
+            </button>
+          )}
         </div>
       </div>
     </div>

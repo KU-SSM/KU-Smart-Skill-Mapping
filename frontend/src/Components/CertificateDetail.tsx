@@ -538,6 +538,10 @@ const CertificateDetail: React.FC = () => {
                     </table>
                   </div>
                 </div>
+                <div className="certificate-signature-block" aria-hidden="true">
+                  <div className="certificate-signature-line" />
+                  <div className="certificate-signature-label">Signature</div>
+                </div>
               </div>
             </div>
           </div>
