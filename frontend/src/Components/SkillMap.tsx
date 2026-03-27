@@ -53,6 +53,11 @@ interface SkillMapEvaluation {
   rubricHint: string;
   status: 'pending' | 'completed';
   rows: SkillMapRadarRow[];
+  aiCriteriaParsingRows: {
+    skillName: string;
+    levelRank: number;
+    criteriaPassingDescription: string;
+  }[];
   rubricScore: RubricScoreSession;
 }
 
@@ -63,7 +68,11 @@ interface SkillEvaluationFullResponse {
   user_id: number;
   created_at?: string;
   status: string;
-  ai_evaluated_skills: { skill_name: string; level_rank: number }[];
+  ai_evaluated_skills: {
+    skill_name: string;
+    level_rank: number;
+    criteria_passing_description?: string | null;
+  }[];
   student_evaluated_skills: { skill_name: string; level_rank: number }[];
   teacher_evaluated_skills: { skill_name: string; level_rank: number }[];
 }
@@ -323,6 +332,11 @@ const SkillMap: React.FC = () => {
           ai: aiScoreMap[s.name] ?? 0,
           teacher: teacherScoreMap[s.name] ?? 0,
         }));
+        const aiCriteriaParsingRows = (full.ai_evaluated_skills || []).map((row) => ({
+          skillName: row.skill_name,
+          levelRank: toPositiveInt(row.level_rank),
+          criteriaPassingDescription: (row.criteria_passing_description || '').trim(),
+        }));
 
         const rubricRows: RubricTableData[] = skills.map((s) => {
           const perSkill = criteriaBySkillId.get(s.id) || new Map<number, string>();
@@ -339,6 +353,7 @@ const SkillMap: React.FC = () => {
               ? 'completed'
               : 'completed',
           rows: radarRows,
+          aiCriteriaParsingRows,
           rubricScore: {
             title: rubricTitle,
             headers,
@@ -532,14 +547,14 @@ const SkillMap: React.FC = () => {
         </aside>
       </div>
 
-      {evaluation?.rubricScore && (
+      {evaluation && (
         <section className="skill-map-rubric-session" aria-labelledby="skill-map-rubric-session-title">
           <div className="skill-map-rubric-session-head">
             <h2 id="skill-map-rubric-session-title" className="skill-map-title">
-              Rubric Score
+              Criteria Parsing Description by AI
               <span className="skill-map-rubric-session-title-name">
                 {' '}
-                - {evaluation.rubricScore.title}
+                - {evaluation.title}
               </span>
             </h2>
           </div>
@@ -550,24 +565,24 @@ const SkillMap: React.FC = () => {
                   <th scope="col" className="skill-map-rubric-th-skill">
                     Skill area
                   </th>
-                  {evaluation.rubricScore.headers.map((header, i) => (
-                    <th key={i} scope="col" className="skill-map-rubric-th-level">
-                      {header}
-                    </th>
-                  ))}
+                  <th scope="col" className="skill-map-rubric-th-level">AI level</th>
+                  <th scope="col">Criteria parsing description</th>
                 </tr>
               </thead>
               <tbody>
-                {evaluation.rubricScore.rows.map((row, rowIndex) => (
+                {evaluation.aiCriteriaParsingRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="skill-map-rubric-cell">
+                      No AI criteria parsing descriptions for this evaluation.
+                    </td>
+                  </tr>
+                ) : evaluation.aiCriteriaParsingRows.map((row, rowIndex) => (
                   <tr key={rowIndex}>
                     <th scope="row" className="skill-map-rubric-row-skill">
-                      {row.skillArea}
+                      {row.skillName || '—'}
                     </th>
-                    {evaluation.rubricScore.headers.map((_, colIndex) => (
-                      <td key={colIndex} className="skill-map-rubric-cell">
-                        {row.values[colIndex] ?? '—'}
-                      </td>
-                    ))}
+                    <td className="skill-map-rubric-cell">{row.levelRank > 0 ? row.levelRank : '—'}</td>
+                    <td className="skill-map-rubric-cell">{row.criteriaPassingDescription || '—'}</td>
                   </tr>
                 ))}
               </tbody>
