@@ -177,6 +177,7 @@ async def run_portfolio_ai_evaluation(
     rubric_id: int,
     user_id: int,
     filename: str | None,
+    file_token: str | None,
     openai_service: OpenAIMatchProtocol,
     skill_evaluation_id: int | None = None,
 ) -> PortfolioAIEvaluationResult:
@@ -201,9 +202,12 @@ async def run_portfolio_ai_evaluation(
                 "Create or update the rubric to generate one."
             )
 
+        initial_classification = _default_classification()
+        if file_token:
+            initial_classification["__file_token"] = file_token
         db_portfolio = models.Portfolio(
             filename=filename or "text_portfolio",
-            classification_json=_default_classification(),
+            classification_json=initial_classification,
             created_at=now,
         )
         db.add(db_portfolio)
@@ -239,6 +243,14 @@ async def run_portfolio_ai_evaluation(
 
         if filename:
             db_portfolio.filename = filename
+        if file_token:
+            existing = (
+                db_portfolio.classification_json
+                if isinstance(db_portfolio.classification_json, dict)
+                else {}
+            )
+            existing["__file_token"] = file_token
+            db_portfolio.classification_json = existing
 
         prev_hist = skill_evaluation.rubric_score_history
         if prev_hist is None:
@@ -347,7 +359,18 @@ async def run_portfolio_ai_evaluation(
     )
     classification, matches = _normalize_match_result(match_result)
 
-    db_portfolio.classification_json = classification
+    # Preserve internal metadata keys (e.g. stored PDF token) across AI refresh.
+    existing_meta = (
+        db_portfolio.classification_json
+        if isinstance(db_portfolio.classification_json, dict)
+        else {}
+    )
+    meta = {
+        k: v
+        for k, v in existing_meta.items()
+        if isinstance(k, str) and k.startswith("__")
+    }
+    db_portfolio.classification_json = {**classification, **meta}
     db.flush()
 
     crit_hist_by_id = {c.id: c for c in criteria_rows}

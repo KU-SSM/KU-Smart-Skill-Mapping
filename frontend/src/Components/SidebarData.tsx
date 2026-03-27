@@ -23,22 +23,26 @@ export const SideBarData: SidebarItem[] = [
     {
         title: "Courses & Skills",
         link:"/courses_and_skills",
-        icon: TbCertificate
+        icon: TbCertificate,
+        audience: 'none',
     },
     {
         title: "Jobs & Skills",
         link:"/jobs_and_skills",
-        icon: VscGraph
+        icon: VscGraph,
+        audience: 'none',
     },
     {
         title: "Recommend Course",
         link:"/recommend_course",
-        icon: VscBook
+        icon: VscBook,
+        audience: 'none',
     },
     {
         title: "Export Chart",
         link:"/export_chart",
-        icon: LuChartLine
+        icon: LuChartLine,
+        audience: 'none',
     },
     {
         title: "Your Profile (Old)",
@@ -62,7 +66,7 @@ export const SideBarData: SidebarItem[] = [
         title: "Skill Map",
         link:"/skill_map",
         icon: AiIcons.AiOutlineRadarChart,
-        audience: 'student',
+        audience: 'all',
     },
     {
         title: "Certificate",

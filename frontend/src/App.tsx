@@ -1,9 +1,10 @@
 import './App.css';
 import SideBar from './Components/Sidebar';
 import Navbar from './Components/Navbar';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import Home from './Components/Home';
 import CertificateDetail from './Components/CertificateDetail';
+import CertificateList from './Components/CertificateList';
 import SkillMap from './Components/SkillMap';
 import RubricScoreList from './Components/RubricScoreList';
 import RubricScoreDetail from './Components/RubricScoreDetail';
@@ -31,7 +32,8 @@ const App: React.FC = () => {
           <main className="App-content">
             <Routes>
               <Route path="/" element={<Home />} />
-              <Route path="/certificate" element={<CertificateDetail />} />
+              <Route path="/certificate" element={<CertificateList />} />
+              <Route path="/certificate/:evaluationId" element={<CertificateDetail />} />
               <Route path="/skill_map" element={<SkillMap />} />
               <Route path="/rubric_score" element={<RubricScoreList />} />
               <Route path="/rubric_score/:id" element={<RubricScoreDetail />} />
@@ -43,6 +45,10 @@ const App: React.FC = () => {
               <Route path="/profile3" element={<Profile3 />} />
               <Route path="/profile3/:requestId" element={<Profile3Detail />} />
               <Route path="/rubric_version_detail" element={<RubricVersionEvaluationDetail />} />
+              <Route path="/courses_and_skills" element={<Navigate to="/" replace />} />
+              <Route path="/jobs_and_skills" element={<Navigate to="/" replace />} />
+              <Route path="/recommend_course" element={<Navigate to="/" replace />} />
+              <Route path="/export_chart" element={<Navigate to="/" replace />} />
             </Routes>
           </main>
         </div>
