@@ -21,6 +21,46 @@ export interface SidebarItem {
 
 export const SideBarData: SidebarItem[] = [
     {
+        title: "Home",
+        link:"/",
+        icon: MdHome
+    },
+    {
+        title: "Rubric Score",
+        link:"/rubric_score",
+        icon: AiOutlineCheckSquare,
+        audience: 'teacher',
+    },
+    {
+        title: "Rubric Score",
+        link:"/rubric_score_student",
+        icon: AiOutlineCheckSquare,
+        audience: 'student',
+    },
+    {
+        title: "Evaluation",
+        link:"/profile2",
+        icon: BsPersonLinesFill,
+        audience: 'student',
+    },
+    {
+        title: "Evaluation",
+        link:"/profile3",
+        icon: BsPersonLinesFill,
+        audience: 'teacher',
+    },
+    {
+        title: "Skill Map",
+        link:"/skill_map",
+        icon: AiIcons.AiOutlineRadarChart,
+        audience: 'all',
+    },
+    {
+        title: "Certificate",
+        link:"/certificate",
+        icon: FaCertificate
+    },
+    {
         title: "Courses & Skills",
         link:"/courses_and_skills",
         icon: TbCertificate,
@@ -50,45 +90,5 @@ export const SideBarData: SidebarItem[] = [
         icon: BsPersonLinesFill,
         audience: 'none',
     },
-    {
-        title: "Evaluation",
-        link:"/profile2",
-        icon: BsPersonLinesFill,
-        audience: 'student',
-    },
-    {
-        title: "Evaluation",
-        link:"/profile3",
-        icon: BsPersonLinesFill,
-        audience: 'teacher',
-    },
-    {
-        title: "Skill Map",
-        link:"/skill_map",
-        icon: AiIcons.AiOutlineRadarChart,
-        audience: 'all',
-    },
-    {
-        title: "Certificate",
-        link:"/certificate",
-        icon: FaCertificate
-    },
-    {
-        title: "Rubric Score",
-        link:"/rubric_score",
-        icon: AiOutlineCheckSquare,
-        audience: 'teacher',
-    },
-    {
-        title: "Rubric Score",
-        link:"/rubric_score_student",
-        icon: AiOutlineCheckSquare,
-        audience: 'student',
-    },
-    {
-        title: "Home",
-        link:"/",
-        icon: MdHome
-    }
 ];
 

@@ -222,6 +222,25 @@
   margin: 0 auto;
 }
 
+.certificate-signature-block {
+  width: min(640px, 100%);
+  margin: 14px auto 0;
+  text-align: center;
+}
+
+.certificate-signature-line {
+  width: 180px;
+  border-top: 1px solid #6b7280;
+  margin: 0 auto;
+}
+
+.certificate-signature-label {
+  margin-top: 4px;
+  font-family: 'Roboto', Arial, sans-serif;
+  font-size: 11px;
+  color: #4b5563;
+}
+
 .certificate-evaluation-rubric-table-inner {
   width: calc(100% / var(--cert-rubric-table-scale, 1));
   transform: scale(var(--cert-rubric-table-scale, 1));
