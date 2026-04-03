@@ -17,6 +17,16 @@ export function getApiErrorDetail(error: unknown): string {
           })
           .join('; ');
       }
+      if (detail != null && typeof detail === 'object' && !Array.isArray(detail)) {
+        const o = detail as Record<string, unknown>;
+        if (typeof o.msg === 'string') return o.msg;
+        if (typeof o.message === 'string') return o.message;
+        try {
+          return JSON.stringify(detail);
+        } catch {
+          return 'Request failed';
+        }
+      }
     }
     if (typeof data === 'string' && data.trim()) return data;
     if (error.response?.status) {

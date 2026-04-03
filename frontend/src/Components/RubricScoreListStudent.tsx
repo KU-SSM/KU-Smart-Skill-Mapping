@@ -79,7 +79,7 @@ const RubricScoreListStudent: React.FC = () => {
             </button>
           )}
         </div>
-        <div className="rubric-score-bars-container">
+        <div className="rubric-score-bars-container rubric-score-bars-container--scrollable">
           {filteredRubricScores.map((rubric) => (
             <div
               key={rubric.id}

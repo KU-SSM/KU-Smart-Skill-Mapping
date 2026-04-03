@@ -90,10 +90,11 @@ async def update_rubric(rubric_id: int, rubric: RubricScoreBase, db: db_dependen
     for key, value in rubric.model_dump().items():
         setattr(db_rubric, key, value)
 
+    db.flush()
     close_active_histories_for_rubric(db, rubric_id)
-    db.refresh(db_rubric)
     snapshot_live_rubric_to_history(db, rubric_id)
     db.commit()
+    db.refresh(db_rubric)
     return db_rubric
 
 

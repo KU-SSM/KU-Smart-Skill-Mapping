@@ -30,7 +30,7 @@ interface StudentRequest {
   rubricId: string;
   rubricTitle: string;
   requestedAt: string;
-  status: 'pending' | 'completed';
+  status: 'pending' | 'approved' | 'completed';
 }
 
 interface SkillEvaluationFullResponse {
@@ -104,10 +104,18 @@ const Profile3Detail: React.FC = () => {
 
   const [selectedRequest, setSelectedRequest] = useState<StudentRequest | null>(null);
   const [requestNotFound, setRequestNotFound] = useState<boolean>(false);
-  const isCompletedView = selectedRequest?.status === 'completed';
-  /* Teacher: three panels. Student: two until evaluation is completed, then show Teacher column too. */
-  const evaluationPanelsGridClass =
-    isTeacher || (isStudent && isCompletedView) ? 'profile2-three-panels' : 'profile2-two-panels';
+  const isCompletedView =
+    selectedRequest?.status === 'approved' || selectedRequest?.status === 'completed';
+  const shouldDashStudentRowsForTeacher =
+    isTeacher && selectedRequest?.status === 'approved';
+  /* Teacher: hide Student panel while pending; show it after completion/approval. */
+  const evaluationPanelsGridClass = isTeacher
+    ? isCompletedView
+      ? 'profile2-three-panels'
+      : 'profile2-two-panels'
+    : isStudent && isCompletedView
+      ? 'profile2-three-panels'
+      : 'profile2-two-panels';
 
   // Rubric selection and data
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -183,7 +191,12 @@ const Profile3Detail: React.FC = () => {
           rubricId,
           rubricTitle,
           requestedAt: ev.created_at || '',
-          status: ev.status === 'pending' ? 'pending' : 'completed',
+          status:
+            ev.status === 'pending'
+              ? 'pending'
+              : ev.status === 'completed'
+                ? 'completed'
+                : 'approved',
         });
         setSelectedPortfolioId(ev.portfolio_id);
         setSelectedRubricId(rubricId);
@@ -725,18 +738,18 @@ const Profile3Detail: React.FC = () => {
         teacherExtraSkills.map((s) => s.skillArea)
       );
 
-      await updateSkillEvaluation(skillEvaluationId, { status: 'completed' });
+      await updateSkillEvaluation(skillEvaluationId, { status: 'approved' });
       setOriginalTeacherScores({ ...teacherScores });
       setOriginalTeacherExtraSkills(teacherExtraSkills.map((s) => ({ ...s })));
       setSelectedRequest((prev) =>
         prev
           ? {
               ...prev,
-              status: 'completed',
+              status: 'approved',
             }
           : prev
       );
-      alert('Evaluation submitted successfully and marked as completed.');
+      alert('Evaluation submitted and marked as approved.');
     } catch (error) {
       console.error('Error submitting evaluation:', error);
       alert(`Failed to submit evaluation: ${getApiErrorDetail(error)}`);
@@ -917,6 +930,7 @@ const Profile3Detail: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                  {(isStudent || (isTeacher && isCompletedView)) && (
                   <div className="skills-panel profile2-panel">
                     <h2 className="panel-title">Student</h2>
                     <div className="search-container">
@@ -935,12 +949,27 @@ const Profile3Detail: React.FC = () => {
                     </div>
                     <div className="skills-list">
                       {filteredStudentSkills.map((skill, index) => (
-                        <div key={index} className="skill-item profile2-skill-item">
+                        <div
+                          key={index}
+                          className={`skill-item profile2-skill-item ${
+                            shouldDashStudentRowsForTeacher
+                              ? 'profile3-student-skill-pending-self-eval'
+                              : ''
+                          }`}
+                        >
                           <span className="skill-name">{skill.skillArea}</span>
                           <input
                             type="text"
                             className="profile2-score-input ai-score-input"
-                            value={toRubricLevelLabel(studentEvaluations[skill.skillArea] || '')}
+                            value={(() => {
+                              const raw = (studentEvaluations[skill.skillArea] || '').trim();
+                              // In teacher view before student self-evaluation, legacy 0-values
+                              // should render as blank instead of "No Passing Criteria".
+                              if (shouldDashStudentRowsForTeacher && (raw === '' || raw === '0')) {
+                                return '-';
+                              }
+                              return toRubricLevelLabel(raw);
+                            })()}
                             readOnly
                             placeholder="—"
                           />
@@ -948,6 +977,7 @@ const Profile3Detail: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                  )}
                   {(!isStudent || isCompletedView) && (
                   <div className="skills-panel profile2-panel">
                     <h2 className="panel-title">Teacher</h2>

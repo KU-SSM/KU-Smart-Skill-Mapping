@@ -46,6 +46,16 @@ const toRadarSkillLabel = (skill: string): string => {
   return `${clean.slice(0, 16)}...`;
 };
 
+/** Radar radius max aligned to rubric levels (e.g. Beginner/Intermediate/Advance → 0–3), not a fixed 0–5 scale. */
+const rubricAxisMaxFromLevels = (levels: { rank?: number | null }[]): number => {
+  if (!levels.length) return 1;
+  const ranks = levels.map((l) => toPositiveInt(l.rank));
+  const maxR = Math.max(0, ...ranks);
+  const n = levels.length;
+  if (maxR > 0) return Math.max(maxR, n);
+  return Math.max(1, n);
+};
+
 interface SkillEvaluationFullResponse {
   id: number;
   rubric_score_history_id: number;
@@ -128,6 +138,7 @@ const CertificateDetail: React.FC = () => {
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [evaluationFull, setEvaluationFull] = useState<SkillEvaluationFullResponse | null>(null);
   const [rubricDetail, setRubricDetail] = useState<RubricDetailResponse | null>(null);
+  const [radarAxisMax, setRadarAxisMax] = useState(1);
   const [studentName, setStudentName] = useState<string>('Student');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isExporting, setIsExporting] = useState<boolean>(false);
@@ -137,10 +148,12 @@ const CertificateDetail: React.FC = () => {
       if (!evaluationId) {
         setEvaluationFull(null);
         setRubricDetail(null);
+        setRadarAxisMax(1);
         return;
       }
       try {
         setIsLoading(true);
+        setRadarAxisMax(1);
         const evalId = Number(evaluationId);
         if (!Number.isInteger(evalId) || evalId <= 0) {
           throw new Error('Invalid evaluation id');
@@ -227,6 +240,8 @@ const CertificateDetail: React.FC = () => {
             (toPositiveInt(b.rank) || Number.MAX_SAFE_INTEGER)
         );
 
+        setRadarAxisMax(rubricAxisMaxFromLevels(sortedLevels));
+
         const headers = sortedLevels.map((l, index) => {
           const desc = (l.description || '').trim();
           return desc || `Level ${index + 1}`;
@@ -293,7 +308,7 @@ const CertificateDetail: React.FC = () => {
     [mappedSkillSummary]
   );
 
-  const maxLevel = useMemo(() => Math.max(1, rubricDetail?.headers.length || 1), [rubricDetail]);
+  const maxLevel = useMemo(() => Math.max(1, radarAxisMax), [radarAxisMax]);
 
   const rubricTableLayoutVars = useMemo(() => {
     const rowCount = rubricDetail?.rows.length || 0;
@@ -537,6 +552,10 @@ const CertificateDetail: React.FC = () => {
                       </tbody>
                     </table>
                   </div>
+                </div>
+                <div className="certificate-signature-block" aria-hidden="true">
+                  <div className="certificate-signature-line" />
+                  <div className="certificate-signature-label">Signature</div>
                 </div>
               </div>
             </div>

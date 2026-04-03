@@ -14,7 +14,7 @@ interface StudentRequest {
   portfolioFileName: string;
   rubricTitle: string;
   requestedAt: string;
-  status: 'pending' | 'completed';
+  status: 'pending' | 'approved' | 'completed';
 }
 
 interface RubricHistoryResponse {
@@ -27,7 +27,7 @@ interface RubricResponse {
   name: string;
 }
 
-type TeacherRequestFilter = 'all' | 'pending' | 'completed';
+type TeacherRequestFilter = 'all' | 'pending' | 'approved' | 'completed';
 
 const Profile3: React.FC = () => {
   const navigate = useNavigate();
@@ -42,7 +42,9 @@ const Profile3: React.FC = () => {
     const mappedStatus: StudentRequest['status'] | null =
       ev.status === 'pending'
         ? 'pending'
-        : ev.status === 'completed' || ev.status === 'approved'
+        : ev.status === 'approved'
+          ? 'approved'
+        : ev.status === 'completed'
           ? 'completed'
           : null;
 
@@ -213,6 +215,13 @@ const Profile3: React.FC = () => {
             </button>
             <button
               type="button"
+              className={`profile3-filter-button ${statusFilter === 'approved' ? 'active' : ''}`}
+              onClick={() => setStatusFilter('approved')}
+            >
+              Approved
+            </button>
+            <button
+              type="button"
               className={`profile3-filter-button ${statusFilter === 'completed' ? 'active' : ''}`}
               onClick={() => setStatusFilter('completed')}
             >
@@ -256,7 +265,9 @@ const Profile3: React.FC = () => {
               {filteredRequests.map((request) => (
                 <div
                   key={request.id}
-                  className={`student-request-card ${request.status === 'completed' ? 'completed' : ''}`}
+                  className={`student-request-card ${
+                    request.status === 'completed' || request.status === 'approved' ? 'completed' : ''
+                  }`}
                   onClick={() => handleCardClick(request.id)}
                 >
                   <div className="student-request-header">
@@ -264,8 +275,16 @@ const Profile3: React.FC = () => {
                       <h3 className="student-name">{request.studentName}</h3>
                     </div>
                     <div className="student-request-status">
-                      <span className={`status-badge ${request.status}`}>
-                        {request.status === 'pending' ? 'Pending' : 'Completed'}
+                      <span
+                        className={`status-badge ${
+                          request.status === 'approved' ? 'completed' : request.status
+                        }`}
+                      >
+                        {request.status === 'pending'
+                          ? 'Pending'
+                          : request.status === 'approved'
+                            ? 'Approved'
+                            : 'Completed'}
                       </span>
                     </div>
                   </div>

@@ -49,6 +49,11 @@ const Navbar: React.FC = () => {
     <nav className="Navbar">
       <div className="Navbar-content">
         <div className="Navbar-logo">
+          <img
+            src="/homepage.png"
+            alt="KU logo"
+            className="Navbar-logo-image"
+          />
           <span>KU Smart Skill Mapping</span>
         </div>
         <div className="Navbar-right">

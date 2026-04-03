@@ -572,6 +572,31 @@
   margin: 0 !important;
   flex: 1;
   min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile2-section-help-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0;
+  font-size: 18px;
+}
+
+.profile2-section-help-button:hover {
+  color: rgba(178, 187, 30, 1);
+}
+
+.profile2-section-title-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .profile2-delete-eval-header-button {
@@ -1488,6 +1513,19 @@
   box-shadow: none;
 }
 
+.profile2-ai-evaluate-sticky-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  width: 100%;
+  margin-top: auto;
+  padding: 12px 0 10px 0;
+  background-color: #ffffff;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: center;
+}
+
 .profile2-ai-draft-hint {
   font-family: 'Roboto', sans-serif;
   font-size: 13px;
@@ -2019,6 +2057,12 @@
 
 .student-request-header-info {
   flex: 1;
+}
+
+/* Teacher view: student has not finished self-evaluation yet (status approved). */
+.profile3-student-skill-pending-self-eval {
+  border: 1px dashed #b2bb1e;
+  border-radius: 8px;
 }
 
 @media (max-width: 768px) {

@@ -847,6 +847,36 @@
   min-height: 0;
 }
 
+/* ~Two grid rows’ worth of viewport; cards keep natural height; overflow scrolls inside. */
+.rubric-score-bars-container.rubric-score-bars-container--scrollable,
+.rubric-score-bars-container.profile2-rubric-score-bars-scroll {
+  --rubric-scroll-gap: 16px;
+  --rubric-scroll-row-est: 92px;
+  grid-auto-rows: minmax(auto, auto);
+  max-height: calc(2 * var(--rubric-scroll-row-est) + var(--rubric-scroll-gap));
+  overflow-y: auto;
+  overflow-x: hidden;
+  align-content: start;
+  padding-right: 6px;
+}
+
+.rubric-score-bars-container.rubric-score-bars-container--scrollable::-webkit-scrollbar,
+.rubric-score-bars-container.profile2-rubric-score-bars-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.rubric-score-bars-container.rubric-score-bars-container--scrollable::-webkit-scrollbar-track,
+.rubric-score-bars-container.profile2-rubric-score-bars-scroll::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.rubric-score-bars-container.rubric-score-bars-container--scrollable::-webkit-scrollbar-thumb,
+.rubric-score-bars-container.profile2-rubric-score-bars-scroll::-webkit-scrollbar-thumb {
+  background: #b2bb1e;
+  border-radius: 4px;
+}
+
 .rubric-score-list-button-container {
   display: -webkit-flex;
   display: flex;
