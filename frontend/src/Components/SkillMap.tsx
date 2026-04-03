@@ -52,6 +52,8 @@ interface SkillMapEvaluation {
   title: string;
   rubricHint: string;
   status: 'pending' | 'completed';
+  /** Max value on radar radius axis (same as number of rubric levels / max rank, e.g. 3). */
+  rubricMaxRank: number;
   rows: SkillMapRadarRow[];
   aiCriteriaParsingRows: {
     skillName: string;
@@ -144,11 +146,21 @@ const scoreMapFromRows = (rows: { skill_name: string; level_rank: number }[]) =>
 };
 
 const maxRankForRows = (rows: SkillMapRadarRow[]): number => {
-  let m = 5;
+  let m = 0;
   for (const r of rows) {
     m = Math.max(m, r.student, r.ai, r.teacher);
   }
   return m;
+};
+
+/** Polar radius domain max: matches rubric level count / max rank (e.g. 3 levels → 0–3), not a fixed 0–5 scale. */
+const rubricAxisMaxFromLevels = (levels: { rank?: number | null }[]): number => {
+  if (!levels.length) return 1;
+  const ranks = levels.map((l) => toPositiveInt(l.rank));
+  const maxR = Math.max(0, ...ranks);
+  const n = levels.length;
+  if (maxR > 0) return Math.max(maxR, n);
+  return Math.max(1, n);
 };
 
 const toRadarAxisLabel = (value: string): string => {
@@ -181,7 +193,16 @@ const SkillMap: React.FC = () => {
     [evaluation]
   );
 
-  const radiusMax = useMemo(() => maxRankForRows(chartData), [chartData]);
+  const radiusMax = useMemo(() => {
+    const fromData = maxRankForRows(chartData);
+    const fromRubric =
+      evaluation?.rubricMaxRank ??
+      (evaluation?.rubricScore?.headers?.length
+        ? Math.max(1, evaluation.rubricScore.headers.length)
+        : 0);
+    if (fromRubric > 0) return Math.max(fromRubric, fromData);
+    return Math.max(1, fromData);
+  }, [chartData, evaluation?.rubricMaxRank, evaluation?.rubricScore?.headers]);
 
   const filteredModalEvaluations = useMemo(() => {
     const q = modalSearch.trim().toLowerCase();
@@ -352,6 +373,7 @@ const SkillMap: React.FC = () => {
             full.status === 'pending' ? 'pending' : full.status === 'completed' || full.status === 'approved'
               ? 'completed'
               : 'completed',
+          rubricMaxRank: rubricAxisMaxFromLevels(levels),
           rows: radarRows,
           aiCriteriaParsingRows,
           rubricScore: {
