@@ -1,4 +1,5 @@
 import api from '../api/index';
+import { getApiErrorDetail } from '../utils/apiErrors';
 
 export interface TableData {
   skillArea: string;
@@ -53,10 +54,9 @@ export const getRubricScores = async (): Promise<RubricScoreListItem[]> => {
       id: String(item.id),
       title: item.name || 'Untitled Rubric',
     }));
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching rubric scores:', error);
-    const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to fetch rubric scores';
-    throw new Error(errorMessage);
+    throw new Error(getApiErrorDetail(error) || 'Failed to fetch rubric scores');
   }
 };
 
@@ -170,10 +170,9 @@ export const getRubricScore = async (id: string): Promise<RubricScoreDetail> => 
     // Transform backend data to frontend format.
     // This also supports: levels-only rubric (headers with zero rows).
     return transformBackendToFrontend(rubric, skills, levels, criteria);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching rubric score:', error);
-    const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to fetch rubric score';
-    throw new Error(errorMessage);
+    throw new Error(getApiErrorDetail(error) || 'Failed to fetch rubric score');
   }
 };
 
@@ -265,10 +264,9 @@ export const createRubricScore = async (
     }
     
     return transformBackendToFrontend(rubric, skills, levels, criteria);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating rubric score:', error);
-    const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to create rubric score';
-    throw new Error(errorMessage);
+    throw new Error(getApiErrorDetail(error) || 'Failed to create rubric score');
   }
 };
 
@@ -291,10 +289,9 @@ export const updateRubricName = async (
 
     const response = await api.put<BackendRubric>(`rubric/${id}`, payload);
     return response.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating rubric name:', error);
-    const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to update rubric name';
-    throw new Error(errorMessage);
+    throw new Error(getApiErrorDetail(error) || 'Failed to update rubric name');
   }
 };
 
@@ -308,12 +305,8 @@ export const updateRubricScore = async (
       throw new Error(`Invalid rubric ID: ${id}`);
     }
 
-    // First, update the rubric name if it changed
-    try {
-      await updateRubricName(id, rubricScore.title);
-    } catch (error) {
-      // Continue even if name update fails
-    }
+    // First, update rubric name. If this fails, stop and surface the error.
+    await updateRubricName(id, rubricScore.title);
 
     // Strictly replace rubric internals to avoid duplicates on revisit.
     const [skillsResponse, levelsResponse, criteriaResponse] = await Promise.all([
@@ -360,7 +353,7 @@ export const updateRubricScore = async (
         createdLevels.push(level);
       } catch (error: any) {
         console.error(`Failed to create level ${i + 1}:`, error.response?.data || error.message);
-        throw new Error(`Failed to create level ${i + 1}: ${error.response?.data?.detail || error.message || 'Unknown error'}`);
+        throw new Error(`Failed to create level ${i + 1}: ${getApiErrorDetail(error)}`);
       }
     }
 
@@ -384,7 +377,7 @@ export const updateRubricScore = async (
         createdSkills.push(skill);
       } catch (error: any) {
         console.error(`Failed to create skill ${i + 1}:`, error.response?.data || error.message);
-        throw new Error(`Failed to create skill ${i + 1}: ${error.response?.data?.detail || error.message || 'Unknown error'}`);
+        throw new Error(`Failed to create skill ${i + 1}: ${getApiErrorDetail(error)}`);
       }
 
       // Create criteria for each cell value (save ALL cells, including empty ones)
@@ -412,9 +405,7 @@ export const updateRubricScore = async (
             error.response?.data || error.message
           );
           throw new Error(
-            `Failed to create criteria for skill ${skill.id}, level ${createdLevels[j].id}: ${
-              error.response?.data?.detail || error.message || 'Unknown error'
-            }`
+            `Failed to create criteria for skill ${skill.id}, level ${createdLevels[j].id}: ${getApiErrorDetail(error)}`
           );
         }
       }
@@ -422,20 +413,18 @@ export const updateRubricScore = async (
 
     // Return canonical backend state after save.
     return await getRubricScore(id);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating rubric score:', error);
-    const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to update rubric score';
-    throw new Error(errorMessage);
+    throw new Error(getApiErrorDetail(error) || 'Failed to update rubric score');
   }
 };
 
 export const deleteRubricScore = async (id: string): Promise<void> => {
   try {
     await api.delete(`rubric/${id}`);
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error deleting rubric score:', error);
-    const errorMessage = error?.response?.data?.detail || error?.message || 'Failed to delete rubric score';
-    throw new Error(errorMessage);
+    throw new Error(getApiErrorDetail(error) || 'Failed to delete rubric score');
   }
 };
 
@@ -496,13 +485,9 @@ export const getRubricScoreHistoryByRubric = async (
       `rubric_score_history/by_rubric/${rubricId}`
     );
     return rubricHistory.data || [];
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching rubric score history by rubric:', error);
-    throw new Error(
-      error?.response?.data?.detail ||
-        error?.message ||
-        'Failed to fetch rubric score history'
-    );
+    throw new Error(getApiErrorDetail(error) || 'Failed to fetch rubric score history');
   }
 };
 
@@ -558,13 +543,9 @@ export const getRubricScoreHistorySnapshot = async (
     });
 
     return { headers, rows };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error fetching rubric score history snapshot:', error);
-    throw new Error(
-      error?.response?.data?.detail ||
-        error?.message ||
-        'Failed to fetch rubric score history snapshot'
-    );
+    throw new Error(getApiErrorDetail(error) || 'Failed to fetch rubric score history snapshot');
   }
 };
 
@@ -588,13 +569,9 @@ export const createRubricScoreHistoryWithExpiration = async (
     };
     const res = await api.post<BackendRubricScoreHistory>('rubric_score_history/', payload);
     return res.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error creating rubric score history with expiration:', error);
-    throw new Error(
-      error?.response?.data?.detail ||
-      error?.message ||
-      'Failed to set rubric expiration'
-    );
+    throw new Error(getApiErrorDetail(error) || 'Failed to set rubric expiration');
   }
 };
 
@@ -616,13 +593,9 @@ export const updateRubricScoreHistoryExpiration = async (
       payload
     );
     return res.data;
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error updating rubric history expiration:', error);
-    throw new Error(
-      error?.response?.data?.detail ||
-      error?.message ||
-      'Failed to update rubric history expiration'
-    );
+    throw new Error(getApiErrorDetail(error) || 'Failed to update rubric history expiration');
   }
 };
 

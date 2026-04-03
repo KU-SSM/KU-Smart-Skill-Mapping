@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import './Profile.css';
 import './RubricScore.css';
-import { AiOutlineClose, AiOutlineDelete, AiOutlineInfoCircle } from 'react-icons/ai';
+import { AiOutlineClose, AiOutlineDelete, AiOutlineInfoCircle, AiOutlineQuestionCircle } from 'react-icons/ai';
 import { FaBriefcase } from 'react-icons/fa';
 import { FaArrowLeft } from 'react-icons/fa';
 import { evaluatePortfolio, importPortfolio } from '../services/portfolioApi';
@@ -26,6 +26,7 @@ import { getApiErrorDetail } from '../utils/apiErrors';
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const BriefcaseIcon = FaBriefcase as React.ComponentType;
 const InfoIcon = AiOutlineInfoCircle as React.ComponentType;
+const HelpIcon = AiOutlineQuestionCircle as React.ComponentType;
 const DeleteOutlineIcon = AiOutlineDelete as React.ComponentType;
 const ArrowLeftIcon = FaArrowLeft as React.ComponentType;
 
@@ -260,6 +261,7 @@ const Profile2: React.FC = () => {
   const [rubricInfoData, setRubricInfoData] = useState<RubricScoreDetail | null>(null);
   const [isRubricInfoLoading, setIsRubricInfoLoading] = useState<boolean>(false);
   const [rubricInfoError, setRubricInfoError] = useState<string | null>(null);
+  const [sectionHelp, setSectionHelp] = useState<{ title: string; body: string } | null>(null);
 
   // Mock: rubric history (restore/expiration UI only; no backend).
   const historySeedRubricIdRef = useRef<string | null>(null);
@@ -322,24 +324,36 @@ const Profile2: React.FC = () => {
       ),
     [teacherEvaluations]
   );
-  const isStudentEvaluationLocked =
+  /** Portfolio, rubric, re-run AI — lock while request is with teacher, or terminal states. */
+  const isStudentPortfolioRubricLocked =
     isStudent &&
-    (skillEvaluationStatus === 'pending' ||
+    ((skillEvaluationStatus === 'pending' && !hasTeacherSubmittedScores) ||
       skillEvaluationStatus === 'completed' ||
       skillEvaluationStatus === 'approved' ||
       skillEvaluationStatus === 'expired');
-  /** Delete from list is allowed for draft / completed / approved; not while a teacher review is in progress. */
-  const canStudentDeleteEvaluation =
-    isStudent && skillEvaluationStatus !== 'pending' && skillEvaluationStatus !== 'expired';
-  const isStudentEvaluationCompleted =
+  const isStudentEvaluationLocked = isStudentPortfolioRubricLocked;
+  /** Student can self-evaluate after teacher has returned/submitted scores. */
+  const canStudentSelfEvaluate =
     isStudent &&
-    (skillEvaluationStatus === 'completed' ||
-      skillEvaluationStatus === 'approved');
+    ((skillEvaluationStatus === 'pending' && hasTeacherSubmittedScores) ||
+      skillEvaluationStatus === 'approved' ||
+      skillEvaluationStatus === 'completed');
+  /** Allow delete whenever there is a persisted evaluation id on this page. */
+  const canStudentDeleteEvaluation =
+    isStudent &&
+    ((Number.isInteger(Number(evaluationId)) && Number(evaluationId) > 0) ||
+      (typeof savedSkillEvaluationId === 'number' && savedSkillEvaluationId > 0));
+  /** Read-only student column after student has saved a fully complete evaluation (status completed). */
+  const isStudentEvaluationCompleted = isStudent && skillEvaluationStatus === 'completed';
   const shouldShowTeacherPanel =
-    !isStudent || skillEvaluationStatus === 'completed' || skillEvaluationStatus === 'approved';
-  const evaluationPanelsGridClass = shouldShowTeacherPanel
-    ? 'profile2-three-panels'
-    : 'profile2-two-panels';
+    !isStudent ||
+    skillEvaluationStatus === 'completed' ||
+    skillEvaluationStatus === 'approved' ||
+    (skillEvaluationStatus === 'pending' && hasTeacherSubmittedScores);
+  const evaluationPanelsGridClass =
+    isTeacher || !shouldShowTeacherPanel
+      ? 'profile2-two-panels'
+      : 'profile2-three-panels';
 
   useEffect(() => {
     const parsedId = Number(evaluationId);
@@ -945,31 +959,33 @@ const Profile2: React.FC = () => {
 
   const handleDeleteEvaluation = () => {
     if (!canStudentDeleteEvaluation) return;
-    if (!evaluationId) {
-      navigate('/profile2');
-      return;
-    }
+    const routeId = Number(evaluationId);
+    const evalIdToDelete =
+      Number.isInteger(routeId) && routeId > 0
+        ? routeId
+        : typeof savedSkillEvaluationId === 'number' && savedSkillEvaluationId > 0
+          ? savedSkillEvaluationId
+          : null;
+    if (!evalIdToDelete) return;
     const isTerminal =
-      skillEvaluationStatus === 'completed' || skillEvaluationStatus === 'approved';
+      skillEvaluationStatus === 'completed' ||
+      skillEvaluationStatus === 'approved';
     const confirmMessage = isTerminal
       ? 'Delete this evaluation? It will be removed from your list and no longer available.'
       : 'Delete this evaluation? This will remove it from your list and discard unsaved work on this page.';
     if (!window.confirm(confirmMessage)) {
       return;
     }
-    const parsedId = Number(evaluationId);
-    if (!Number.isInteger(parsedId) || parsedId <= 0) {
-      navigate('/profile2', { state: { refreshAt: Date.now() } });
-      return;
-    }
     void (async () => {
       try {
-        await deleteSkillEvaluation(parsedId);
-        removeEvaluationMeta(String(parsedId));
-        removeEvaluationExtractedText(String(parsedId));
-        removeStudentCustomSkills(String(parsedId));
-        removeTeacherCustomSkills(String(parsedId));
-        navigate('/profile2', { state: { removeEvaluationId: String(parsedId), refreshAt: Date.now() } });
+        await deleteSkillEvaluation(evalIdToDelete);
+        removeEvaluationMeta(String(evalIdToDelete));
+        removeEvaluationExtractedText(String(evalIdToDelete));
+        removeStudentCustomSkills(String(evalIdToDelete));
+        removeTeacherCustomSkills(String(evalIdToDelete));
+        navigate('/profile2', {
+          state: { removeEvaluationId: String(evalIdToDelete), refreshAt: Date.now() },
+        });
       } catch (error) {
         console.error('Failed to delete evaluation from backend:', error);
         alert(`Failed to delete evaluation: ${getApiErrorDetail(error)}`);
@@ -1218,6 +1234,24 @@ const Profile2: React.FC = () => {
 
         await persistStudentEvaluations(skillEvaluationIdToSave);
         setAiEvaluations(committedAiEvaluations);
+        const isFilledLevelOrNoPassing = (value: string | undefined) =>
+          typeof value === 'string' && /^\d+$/.test(value.trim()) && Number(value.trim()) >= 0;
+        const requiredSkillAreas = (selectedRubricData?.rows || [])
+          .map((row) => row.skillArea?.trim() || '')
+          .filter((name) => name !== '');
+        const hasAllAiScores = requiredSkillAreas.every((skillArea) =>
+          isFilledLevelOrNoPassing(committedAiEvaluations[skillArea])
+        );
+        const hasAllStudentScores = requiredSkillAreas.every((skillArea) =>
+          isFilledLevelOrNoPassing(studentEvaluations[skillArea])
+        );
+        const hasAllTeacherScores = requiredSkillAreas.every((skillArea) =>
+          isFilledLevelOrNoPassing(teacherEvaluations[skillArea])
+        );
+        if (hasAllAiScores && hasAllStudentScores && hasAllTeacherScores) {
+          await updateSkillEvaluation(skillEvaluationIdToSave, { status: 'completed' });
+          setSkillEvaluationStatus('completed');
+        }
         writeEvaluationMeta(String(skillEvaluationIdToSave), {
           rubricId: confirmedRubricId,
           rubricTitle: selectedRubricData?.title || '',
@@ -1272,6 +1306,7 @@ const Profile2: React.FC = () => {
     studentSkills,
     studentExtraSkills,
     studentEvaluations,
+    teacherEvaluations,
     aiEvaluations,
     draftAiEvaluations,
     hasRunAiEvaluation,
@@ -1633,8 +1668,7 @@ const Profile2: React.FC = () => {
       !confirmedRubricId ||
       !selectedRubricData ||
       isSavingEvaluation ||
-      isImportingPortfolio ||
-      isStudentEvaluationLocked
+      isImportingPortfolio
     ) {
       return false;
     }
@@ -1651,7 +1685,14 @@ const Profile2: React.FC = () => {
     if (!selectedRubricData || !confirmedRubricId) return false;
     if (!(typeof savedSkillEvaluationId === 'number' && savedSkillEvaluationId > 0)) return false;
     if (hasUnsavedEvaluationChanges) return false;
-    if (skillEvaluationStatus === 'pending' || skillEvaluationStatus === 'completed') return false;
+    if (
+      skillEvaluationStatus === 'pending' ||
+      skillEvaluationStatus === 'completed' ||
+      skillEvaluationStatus === 'approved' ||
+      skillEvaluationStatus === 'expired'
+    ) {
+      return false;
+    }
 
     const requiredSkillAreas = selectedRubricData.rows
       .map((row) => row.skillArea?.trim() || '')
@@ -1660,21 +1701,18 @@ const Profile2: React.FC = () => {
     const isFilledLevelOrNoPassing = (value: string | undefined) =>
       typeof value === 'string' && /^\d+$/.test(value.trim()) && Number(value.trim()) >= 0;
 
-    const hasAllStudentScores = requiredSkillAreas.every((skillArea) =>
-      isFilledLevelOrNoPassing(studentEvaluations[skillArea])
-    );
     const hasAllAiScores = requiredSkillAreas.every((skillArea) =>
       isFilledLevelOrNoPassing(aiEvaluationsForDisplay[skillArea])
     );
 
-    return hasAllStudentScores && hasAllAiScores;
+    // Student can request teacher once AI has filled required skill scores.
+    return hasAllAiScores;
   }, [
     selectedRubricData,
     confirmedRubricId,
     savedSkillEvaluationId,
     hasUnsavedEvaluationChanges,
     skillEvaluationStatus,
-    studentEvaluations,
     aiEvaluationsForDisplay,
     isStudentEvaluationLocked,
   ]);
@@ -1730,7 +1768,7 @@ const Profile2: React.FC = () => {
   }, [clearPersistedAiEvaluations]);
 
   const handleCancelStudentEdits = async () => {
-    if (isStudentEvaluationLocked) return;
+    if (isStudent && skillEvaluationStatus === 'pending') return;
     await revertAiPreviewOnBackend();
     await cleanupUnsavedInitialEvaluation();
     if (
@@ -1769,7 +1807,22 @@ const Profile2: React.FC = () => {
       <div className="portfolio-container">
         <div className="portfolio-section">
           <div className="profile2-profile-title-row">
-            <h2 className="portfolio-section-title profile2-profile-title">Your Profile</h2>
+            <h2 className="portfolio-section-title profile2-profile-title">
+              Upload Portfolio
+              <button
+                type="button"
+                className="profile2-section-help-button"
+                title="How to use Upload Portfolio"
+                onClick={() =>
+                  setSectionHelp({
+                    title: 'Upload Portfolio',
+                    body: 'Upload your PDF portfolio file, then the system will extract text for AI evaluation.',
+                  })
+                }
+              >
+                {React.createElement(HelpIcon)}
+              </button>
+            </h2>
             {isStudent && (
               <button
                 type="button"
@@ -1829,7 +1882,22 @@ const Profile2: React.FC = () => {
 
       {/* Choose Rubric Score Section */}
       <div className="rubric-score-container">
-        <h2 className="portfolio-section-title" style={{ marginBottom: '20px' }}>Choose Rubric Score</h2>
+        <h2 className="portfolio-section-title profile2-section-title-with-help" style={{ marginBottom: '20px' }}>
+          Choose Rubric Score
+          <button
+            type="button"
+            className="profile2-section-help-button"
+            title="How to use Choose Rubric Score"
+            onClick={() =>
+              setSectionHelp({
+                title: 'Choose Rubric Score',
+                body: 'Select a rubric score from the list and click Confirm Selection before running AI or saving evaluation.',
+              })
+            }
+          >
+            {React.createElement(HelpIcon)}
+          </button>
+        </h2>
         <div className="rubric-score-search-container">
           <input
             type="text"
@@ -1847,7 +1915,7 @@ const Profile2: React.FC = () => {
             </button>
           )}
         </div>
-        <div className="rubric-score-bars-container">
+        <div className="rubric-score-bars-container profile2-rubric-score-bars-scroll">
           {isLoadingRubrics ? (
             <div style={{ padding: '20px', textAlign: 'center' }}>Loading rubrics...</div>
           ) : (
@@ -1903,6 +1971,30 @@ const Profile2: React.FC = () => {
                 </span>
               )}
             </h2>
+            <div className="evaluation-header-actions">
+              {isStudent && selectedRubricData && selectedRubricData.rows.length > 0 && (
+                <button
+                  className="profile2-request-evaluation-button"
+                  type="button"
+                  disabled={
+                    skillEvaluationStatus === 'pending'
+                      ? hasTeacherSubmittedScores
+                      : !canRequestTeacherEvaluation
+                  }
+                  onClick={() =>
+                    skillEvaluationStatus === 'pending'
+                      ? void handleCancelPendingRequest()
+                      : void handleRequestTeacherEvaluation()
+                  }
+                >
+                  {skillEvaluationStatus === 'pending'
+                    ? hasTeacherSubmittedScores
+                      ? 'Teacher Submitted'
+                      : 'Cancel Request'
+                    : 'Request Teacher Evaluation'}
+                </button>
+              )}
+            </div>
           </div>
           
           {isLoadingRubricData ? (
@@ -1974,9 +2066,28 @@ const Profile2: React.FC = () => {
                         />
                       </div>
                     ))}
+                    {isStudent && (
+                      <div className="profile2-ai-evaluate-sticky-footer">
+                        <button
+                          className="profile2-ai-evaluate-button"
+                          type="button"
+                          disabled={!canRunAiEvaluation}
+                          title={
+                            !extractedPortfolioText.trim()
+                              ? 'Upload and import a portfolio first'
+                              : !confirmedRubricId || !selectedRubricData
+                                ? 'Confirm a rubric first'
+                                : 'Run AI evaluation — click Save below to keep results'
+                          }
+                          onClick={() => runAiEvaluation()}
+                        >
+                          {isAiEvaluating ? 'Evaluating…' : 'Evaluate with AI'}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
-                {!isTeacher && (
+                {isStudent && shouldShowTeacherPanel && (
                 <div className="skills-panel profile2-panel">
                   <h2 className="panel-title">
                     Student
@@ -2019,9 +2130,9 @@ const Profile2: React.FC = () => {
                           <select
                             className="profile2-score-input student-score-input"
                             value={studentSelectValue}
-                            disabled={!isStudent || isStudentEvaluationLocked}
+                            disabled={!isStudent || !canStudentSelfEvaluate}
                             onChange={
-                              !isStudent || isStudentEvaluationLocked
+                              !isStudent || !canStudentSelfEvaluate
                                 ? undefined
                                 : (e) => {
                                     const value = e.target.value;
@@ -2089,47 +2200,6 @@ const Profile2: React.FC = () => {
                 )}
               </div>
 
-              {isStudent && (
-                <div className="profile2-bottom-actions">
-                  <div className="profile2-bottom-actions-left">
-                    <button
-                      className="profile2-ai-evaluate-button"
-                      type="button"
-                      disabled={!canRunAiEvaluation}
-                      title={
-                        !extractedPortfolioText.trim()
-                          ? 'Upload and import a portfolio first'
-                          : !confirmedRubricId || !selectedRubricData
-                            ? 'Confirm a rubric first'
-                            : 'Run AI evaluation — click Save below to keep results'
-                      }
-                      onClick={() => runAiEvaluation()}
-                    >
-                      {isAiEvaluating ? 'Evaluating…' : 'Evaluate with AI'}
-                    </button>
-                  </div>
-                  <div className="profile2-bottom-actions-right">
-                    <button
-                      className="profile2-request-evaluation-button"
-                      type="button"
-                      disabled={
-                        skillEvaluationStatus === 'pending'
-                          ? hasTeacherSubmittedScores
-                          : !canRequestTeacherEvaluation
-                      }
-                      onClick={() =>
-                        skillEvaluationStatus === 'pending'
-                          ? void handleCancelPendingRequest()
-                          : void handleRequestTeacherEvaluation()
-                      }
-                    >
-                      {skillEvaluationStatus === 'pending'
-                        ? 'Cancel Request'
-                        : 'Request Teacher Evaluation'}
-                    </button>
-                  </div>
-                </div>
-              )}
             </>
           ) : (
             <div className="evaluation-content">
@@ -2167,7 +2237,10 @@ const Profile2: React.FC = () => {
               className="profile2-request-evaluation-button"
               type="button"
               onClick={() => void handleCancelStudentEdits()}
-              disabled={!hasUnsavedAnySectionChanges || isStudentEvaluationLocked}
+              disabled={
+                !hasUnsavedAnySectionChanges ||
+                (isStudent && skillEvaluationStatus === 'pending')
+              }
             >
               Cancel
             </button>
@@ -2340,6 +2413,24 @@ const Profile2: React.FC = () => {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {sectionHelp && (
+        <div className="modal-overlay" onClick={() => setSectionHelp(null)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2 className="modal-title">{sectionHelp.title}</h2>
+            <p className="evaluation-submessage">{sectionHelp.body}</p>
+            <div className="modal-buttons">
+              <button
+                type="button"
+                className="modal-button modal-button-cancel"
+                onClick={() => setSectionHelp(null)}
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

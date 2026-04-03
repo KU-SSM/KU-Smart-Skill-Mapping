@@ -1,11 +1,10 @@
 import logging
-import uuid
+import base64
 from datetime import datetime
-from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy.orm import Session, joinedload
 
 import models
@@ -31,10 +30,6 @@ from services.openai_service import get_openai_service
 from services.ai_evaluation import run_portfolio_ai_evaluation, PortfolioAIEvaluationResult
 
 logger = logging.getLogger(__name__)
-PORTFOLIO_FILE_STORAGE_DIR = (
-    Path(__file__).resolve().parents[2] / "storage" / "portfolio_files"
-)
-PORTFOLIO_FILE_STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 
 # Manual CRUD for ai_evaluated_skill uses teacher-shaped bodies until AI owns criteria text.
 AI_EVALUATED_SKILL_CRITERIA_PLACEHOLDER = (
@@ -62,9 +57,9 @@ async def extract_document(file: UploadFile = File(...)):
         metadata = extracted["metadata"]
         await file.seek(0)
         file_bytes = await file.read()
-        file_token = f"{uuid.uuid4().hex}.pdf"
-        save_path = PORTFOLIO_FILE_STORAGE_DIR / file_token
-        save_path.write_bytes(file_bytes)
+        # Store payload in DB later via ai_evaluation/run request body.
+        # Keep field name "file_token" for frontend compatibility.
+        file_token = base64.b64encode(file_bytes).decode("ascii")
 
         return JSONResponse(
             status_code=200,
@@ -102,21 +97,21 @@ async def read_portfolio_file(portfolio_id: int, db: db_dependency):
         raise HTTPException(status_code=404, detail=f"portfolio_id {portfolio_id} not found")
 
     classification = row.classification_json if isinstance(row.classification_json, dict) else {}
-    file_token = classification.get("__file_token")
-    if not isinstance(file_token, str) or not file_token.strip():
+    file_blob_b64 = classification.get("__file_token")
+    if not isinstance(file_blob_b64, str) or not file_blob_b64.strip():
         raise HTTPException(status_code=404, detail="portfolio file is not stored")
-
-    file_path = PORTFOLIO_FILE_STORAGE_DIR / file_token
-    if not file_path.exists():
-        raise HTTPException(status_code=404, detail="portfolio file not found on server")
+    try:
+        file_bytes = base64.b64decode(file_blob_b64, validate=True)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="stored portfolio file is corrupted") from e
 
     download_name = row.filename or "portfolio.pdf"
     if not download_name.lower().endswith(".pdf"):
         download_name = f"{download_name}.pdf"
-    return FileResponse(
-        path=str(file_path),
+    return Response(
+        content=file_bytes,
         media_type="application/pdf",
-        filename=download_name,
+        headers={"Content-Disposition": f'inline; filename="{download_name}"'},
     )
 
 

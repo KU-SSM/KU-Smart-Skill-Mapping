@@ -22,7 +22,7 @@ interface StudentEvaluationItem {
   rubricTitle: string;
   portfolioFileName: string;
   requestedAt: string;
-  status: 'drafted' | 'pending' | 'completed' | 'outdated' | 'expired';
+  status: 'drafted' | 'pending' | 'approved' | 'completed' | 'outdated' | 'expired';
 }
 
 interface RubricHistoryResponse {
@@ -95,7 +95,9 @@ const Profile2List: React.FC = () => {
         ? 'expired'
         : isRubricHistoryOutdated
           ? 'outdated'
-        : ev.status === 'completed' || ev.status === 'approved'
+        : ev.status === 'approved'
+          ? 'approved'
+        : ev.status === 'completed'
           ? 'completed'
           : ev.status === 'pending'
             ? 'pending'
@@ -141,7 +143,6 @@ const Profile2List: React.FC = () => {
             const isExpired = rh.data.status === 'expired';
             rubricExpiredByHistoryIdRef.current.set(historyId, isExpired);
             rubricOutdatedByHistoryIdRef.current.set(historyId, rh.data.status === 'outdated');
-
             const rubric = await api.get<RubricResponse>(`rubric/${rh.data.rubric_score_id}`);
             rubricTitleByHistoryIdRef.current.set(
               historyId,
@@ -322,7 +323,7 @@ const Profile2List: React.FC = () => {
                 {filteredEvaluations.map((item) => (
                   <div
                     key={item.id}
-                    className={`student-request-card ${item.status === 'completed' ? 'completed' : ''} ${
+                    className={`student-request-card ${item.status === 'completed' || item.status === 'approved' ? 'completed' : ''} ${
                       item.status === 'expired' ? 'expired' : ''
                     }`}
                     onClick={() => {
@@ -369,6 +370,8 @@ const Profile2List: React.FC = () => {
                               ? 'expired'
                               : item.status === 'outdated'
                                 ? 'outdated'
+                              : item.status === 'approved'
+                                ? 'completed'
                               : item.status === 'completed'
                                 ? 'completed'
                                 : 'pending'
@@ -378,6 +381,8 @@ const Profile2List: React.FC = () => {
                             ? 'Expired'
                             : item.status === 'outdated'
                               ? 'Outdated'
+                            : item.status === 'approved'
+                              ? 'Approved'
                             : item.status === 'completed'
                               ? 'Completed'
                               : item.status === 'pending'

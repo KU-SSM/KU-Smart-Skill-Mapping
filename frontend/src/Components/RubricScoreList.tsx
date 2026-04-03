@@ -1,13 +1,13 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AiOutlineClose, AiOutlinePlus, AiOutlineEdit } from 'react-icons/ai';
+import { AiOutlineClose, AiOutlinePlus } from 'react-icons/ai';
 import { FiSave, FiX } from 'react-icons/fi';
 import './RubricScore.css';
-import { getRubricScores, createRubricScore, deleteRubricScore, updateRubricName } from '../services/rubricScoreApi';
+import { getRubricScores, createRubricScore, deleteRubricScore } from '../services/rubricScoreApi';
+import { getApiErrorDetail } from '../utils/apiErrors';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const PlusIcon = AiOutlinePlus as React.ComponentType;
-const EditIcon = AiOutlineEdit as React.ComponentType;
 const SaveIcon = FiSave as React.ComponentType;
 const CancelIcon = FiX as React.ComponentType;
 
@@ -20,16 +20,11 @@ interface RubricScore {
 const RubricScoreList: React.FC = () => {
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [isEditMode, setIsEditMode] = useState<boolean>(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingTitle, setEditingTitle] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isSaving, setIsSaving] = useState<boolean>(false);
-  const inputRef = useRef<HTMLInputElement>(null);
   const [rubricScores, setRubricScores] = useState<RubricScore[]>([]);
-  const [originalRubricScores, setOriginalRubricScores] = useState<RubricScore[]>([]); // Store original state when entering edit mode
+  const [originalRubricScores, setOriginalRubricScores] = useState<RubricScore[]>([]); // Store original state for cancel
   const [deletedRubricIds, setDeletedRubricIds] = useState<Set<string>>(new Set()); // Track deleted rubric IDs
-  const [renamedRubrics, setRenamedRubrics] = useState<Map<string, string>>(new Map()); // Track renamed rubrics: id -> newTitle
 
   // Load rubric scores from API on component mount
   useEffect(() => {
@@ -39,11 +34,12 @@ const RubricScoreList: React.FC = () => {
         console.log('📥 Loading rubric scores from API...');
         const scores = await getRubricScores();
         console.log('✅ Loaded rubric scores:', scores);
-        setRubricScores(scores.map(score => ({ ...score, isNew: false })));
-      } catch (error: any) {
+        const normalized = scores.map(score => ({ ...score, isNew: false }));
+        setRubricScores(normalized);
+        setOriginalRubricScores(normalized);
+      } catch (error: unknown) {
         console.error('❌ Error loading rubric scores:', error);
-        const errorMessage = error?.message || 'Failed to load rubric scores';
-        alert(`Error: ${errorMessage}`);
+        alert(`Error: ${getApiErrorDetail(error) || 'Failed to load rubric scores'}`);
         // If API fails, start with empty array
         setRubricScores([]);
       } finally {
@@ -56,8 +52,8 @@ const RubricScoreList: React.FC = () => {
 
   // Check if there are any new (unsaved) rubric scores, deleted items, or renamed items
   const hasNewRubricScores = useMemo(() => {
-    return rubricScores.some(rubric => rubric.isNew === true) || deletedRubricIds.size > 0 || renamedRubrics.size > 0;
-  }, [rubricScores, deletedRubricIds, renamedRubrics]);
+    return rubricScores.some(rubric => rubric.isNew === true) || deletedRubricIds.size > 0;
+  }, [rubricScores, deletedRubricIds]);
 
   const filteredRubricScores = useMemo(() => {
     if (!searchQuery.trim()) {
@@ -70,23 +66,7 @@ const RubricScoreList: React.FC = () => {
   }, [rubricScores, searchQuery]);
 
   const handleBarClick = (id: string) => {
-    if (!isEditMode) {
-      navigate(`/rubric_score/${id}`);
-    } else {
-      // Enable editing mode for this item
-      const rubric = rubricScores.find(r => r.id === id);
-      if (rubric) {
-        setEditingId(id);
-        setEditingTitle(rubric.title);
-      }
-    }
-  };
-
-  const handleEditMode = () => {
-    if (isEditMode) return;
-    // Entering edit mode - save current state as original
-    setOriginalRubricScores([...rubricScores]);
-    setIsEditMode(true);
+    navigate(`/rubric_score/${id}`);
   };
 
   const handleDeleteRubric = (e: React.MouseEvent, id: string) => {
@@ -103,9 +83,8 @@ const RubricScoreList: React.FC = () => {
   const handleSave = async () => {
     const newRubricScores = rubricScores.filter(rubric => rubric.isNew === true);
     const deletedIds = Array.from(deletedRubricIds);
-    const renamedIds = Array.from(renamedRubrics.keys());
     
-    if (newRubricScores.length === 0 && deletedIds.length === 0 && renamedIds.length === 0) {
+    if (newRubricScores.length === 0 && deletedIds.length === 0) {
       console.log('ℹ️ No changes to save');
       return;
     }
@@ -118,32 +97,13 @@ const RubricScoreList: React.FC = () => {
       console.log('═══════════════════════════════════════════════════════');
       console.log(`Found ${newRubricScores.length} new rubric score(s) to save`);
       console.log(`Found ${deletedIds.length} rubric score(s) to delete`);
-      console.log(`Found ${renamedIds.length} rubric score(s) to rename`);
       console.log('───────────────────────────────────────────────────────');
 
       const savedScores: RubricScore[] = [];
       const errors: string[] = [];
       const deletedCount: number[] = [];
-      const updatedCount: number[] = [];
 
-      // First, update renamed items
-      for (let i = 0; i < renamedIds.length; i++) {
-        const id = renamedIds[i];
-        const newTitle = renamedRubrics.get(id);
-        if (!newTitle) continue;
-        
-        try {
-          console.log(`\n[${i + 1}/${renamedIds.length}] Updating rubric ID: ${id} to "${newTitle}"`);
-          await updateRubricName(id, newTitle);
-          updatedCount.push(1);
-          console.log(`Successfully updated rubric ID: ${id}`);
-        } catch (error: any) {
-          console.error(`Failed to update rubric ID ${id}:`, error);
-          errors.push(`Update ${id}: ${error?.message || 'Unknown error'}`);
-        }
-      }
-
-      // Then, delete items from backend
+      // First, delete items from backend
       for (let i = 0; i < deletedIds.length; i++) {
         const id = deletedIds[i];
         try {
@@ -151,13 +111,13 @@ const RubricScoreList: React.FC = () => {
           await deleteRubricScore(id);
           deletedCount.push(1);
           console.log(`Successfully deleted rubric ID: ${id}`);
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error(`Failed to delete rubric ID ${id}:`, error);
-          errors.push(`Delete ${id}: ${error?.message || 'Unknown error'}`);
+          errors.push(`Delete ${id}: ${getApiErrorDetail(error) || 'Unknown error'}`);
         }
       }
 
-      // Finally, create new items
+      // Then, create new items
       for (let i = 0; i < newRubricScores.length; i++) {
         const rubric = newRubricScores[i];
         try {
@@ -172,16 +132,15 @@ const RubricScoreList: React.FC = () => {
 
           console.log(`Successfully created rubric ID: ${result.id}`);
           savedScores.push({ ...rubric, id: result.id, isNew: false });
-        } catch (error: any) {
+        } catch (error: unknown) {
           console.error(`Failed to save "${rubric.title}":`, error);
-          errors.push(`${rubric.title}: ${error?.message || 'Unknown error'}`);
+          errors.push(`${rubric.title}: ${getApiErrorDetail(error) || 'Unknown error'}`);
         }
       }
 
       console.log('───────────────────────────────────────────────────────');
       console.log('SAVE SUMMARY:');
       console.log(`   Successfully saved: ${savedScores.length}`);
-      console.log(`   Successfully updated: ${updatedCount.length}`);
       console.log(`   Successfully deleted: ${deletedCount.length}`);
       console.log(`   Failed: ${errors.length}`);
       if (errors.length > 0) {
@@ -221,14 +180,13 @@ const RubricScoreList: React.FC = () => {
         setOriginalRubricScores(updatedScores);
       }
       
-      // Clear deleted IDs and renamed rubrics since we've attempted to save them
+      // Clear deleted IDs since we've attempted to save them
       setDeletedRubricIds(new Set());
-      setRenamedRubrics(new Map());
 
       if (errors.length === 0) {
-        console.log(`Successfully saved ${savedScores.length} rubric score(s), updated ${updatedCount.length} rubric score(s), and deleted ${deletedCount.length} rubric score(s)!`);
+        console.log(`Successfully saved ${savedScores.length} rubric score(s) and deleted ${deletedCount.length} rubric score(s)!`);
       } else {
-        console.warn(`Saved ${savedScores.length}, updated ${updatedCount.length}, and deleted ${deletedCount.length}, but ${errors.length} failed. Check console for details.`);
+        console.warn(`Saved ${savedScores.length} and deleted ${deletedCount.length}, but ${errors.length} failed. Check console for details.`);
       }
     } catch (error: any) {
       console.error('Error saving rubric scores:', error);
@@ -238,15 +196,10 @@ const RubricScoreList: React.FC = () => {
   };
 
   const handleCancel = () => {
-    // Cancel changes without saving: restore original state and leave edit mode
+    // Cancel changes without saving: restore original state
     const restoredScores = [...originalRubricScores];
     setRubricScores(restoredScores);
     setDeletedRubricIds(new Set());
-    setRenamedRubrics(new Map());
-    setEditingId(null);
-    setEditingTitle('');
-    setOriginalRubricScores([]);
-    setIsEditMode(false);
   };
 
   const handleAddNew = () => {
@@ -257,54 +210,7 @@ const RubricScoreList: React.FC = () => {
       isNew: true // Mark as new (not yet saved to backend)
     };
     setRubricScores([...rubricScores, newRubric]);
-    setEditingId(newId);
-    setEditingTitle('New Rubric Score');
   };
-
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEditingTitle(e.target.value);
-  };
-
-  const handleTitleBlur = () => {
-    if (editingId && editingTitle.trim()) {
-      const rubric = rubricScores.find(r => r.id === editingId);
-      const newTitle = editingTitle.trim();
-      
-      // Update the display
-      setRubricScores(rubricScores.map(rubric =>
-        rubric.id === editingId
-          ? { ...rubric, title: newTitle }
-          : rubric
-      ));
-      
-      // Track rename if it's an existing (non-new) item and the title changed
-      if (rubric && !rubric.isNew && rubric.title !== newTitle) {
-        setRenamedRubrics(prev => {
-          const newMap = new Map(prev);
-          newMap.set(editingId, newTitle);
-          return newMap;
-        });
-      }
-    }
-    setEditingId(null);
-    setEditingTitle('');
-  };
-
-  const handleTitleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.currentTarget.blur();
-    } else if (e.key === 'Escape') {
-      setEditingId(null);
-      setEditingTitle('');
-    }
-  };
-
-  useEffect(() => {
-    if (editingId && inputRef.current) {
-      inputRef.current.focus();
-      inputRef.current.select();
-    }
-  }, [editingId]);
 
   if (isLoading) {
     return (
@@ -340,48 +246,24 @@ const RubricScoreList: React.FC = () => {
             </button>
           )}
         </div>
-        <div className="rubric-score-bars-container">
+        <div className="rubric-score-bars-container rubric-score-bars-container--scrollable">
           {filteredRubricScores.map((rubric) => (
             <div
               key={rubric.id}
               className="rubric-score-bar"
-              onClick={() => !isEditMode && handleBarClick(rubric.id)}
+              onClick={() => handleBarClick(rubric.id)}
             >
-              {isEditMode && (
-                <button
-                  className="rubric-score-bar-delete-button"
-                  onClick={(e) => handleDeleteRubric(e, rubric.id)}
-                >
-                  {React.createElement(CloseIcon)}
-                </button>
-              )}
-              {editingId === rubric.id ? (
-                <input
-                  ref={inputRef}
-                  type="text"
-                  className="rubric-score-bar-title-input"
-                  value={editingTitle}
-                  onChange={handleTitleChange}
-                  onBlur={handleTitleBlur}
-                  onKeyDown={handleTitleKeyDown}
-                  onClick={(e) => e.stopPropagation()}
-                />
-              ) : (
-                <span 
-                  className="rubric-score-bar-title"
-                  onClick={(e) => {
-                    if (isEditMode) {
-                      e.stopPropagation();
-                      handleBarClick(rubric.id);
-                    }
-                  }}
-                >
-                  {rubric.title}
-                </span>
-              )}
+              <button
+                className="rubric-score-bar-delete-button"
+                onClick={(e) => handleDeleteRubric(e, rubric.id)}
+                title="Delete rubric score"
+              >
+                {React.createElement(CloseIcon)}
+              </button>
+              <span className="rubric-score-bar-title">{rubric.title}</span>
             </div>
           ))}
-          {isEditMode && !searchQuery.trim() && (
+          {!searchQuery.trim() && (
             <div 
               className="rubric-score-add-box"
               onClick={handleAddNew}
@@ -401,41 +283,26 @@ const RubricScoreList: React.FC = () => {
           )}
         </div>
         <div className="rubric-score-list-button-container">
-          {isEditMode && (
-            <>
-              <button 
-                className="save-rubric-score-button"
-                onClick={handleSave}
-                disabled={!hasNewRubricScores || isSaving}
-                style={{
-                  opacity: (!hasNewRubricScores || isSaving) ? 0.5 : 1,
-                  cursor: (!hasNewRubricScores || isSaving) ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {React.createElement(SaveIcon)}
-                <span>{isSaving ? 'Saving...' : 'Save'}</span>
-              </button>
-              <button 
-                className="cancel-rubric-score-button"
-                onClick={handleCancel}
-                disabled={isSaving}
-              >
-                {React.createElement(CancelIcon)}
-                <span>Cancel</span>
-              </button>
-            </>
-          )}
-          {!isEditMode && (
-            <button 
-              className="edit-rubric-score-button"
-              onClick={handleEditMode}
-            >
-              <>
-                {React.createElement(EditIcon)}
-                <span>Edit Rubric Score</span>
-              </>
-            </button>
-          )}
+          <button 
+            className="save-rubric-score-button"
+            onClick={handleSave}
+            disabled={!hasNewRubricScores || isSaving}
+            style={{
+              opacity: (!hasNewRubricScores || isSaving) ? 0.5 : 1,
+              cursor: (!hasNewRubricScores || isSaving) ? 'not-allowed' : 'pointer'
+            }}
+          >
+            {React.createElement(SaveIcon)}
+            <span>{isSaving ? 'Saving...' : 'Save'}</span>
+          </button>
+          <button 
+            className="cancel-rubric-score-button"
+            onClick={handleCancel}
+            disabled={isSaving || !hasNewRubricScores}
+          >
+            {React.createElement(CancelIcon)}
+            <span>Cancel</span>
+          </button>
         </div>
       </div>
     </div>

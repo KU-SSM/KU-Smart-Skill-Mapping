@@ -12,6 +12,7 @@ import {
   updateRubricScoreHistoryExpiration,
 } from '../services/rubricScoreApi';
 import { localDateAndTimeToUtcIso } from '../utils/dateTime';
+import { getApiErrorDetail } from '../utils/apiErrors';
 import './RubricScore.css';
 
 const DeleteIcon = AiOutlineDelete as React.ComponentType;
@@ -177,10 +178,9 @@ const RubricScoreDetail: React.FC = () => {
           skillArea: row.skillArea,
           values: row.values.map(v => v) // Deep copy of values array
         })));
-      } catch (error: any) {
+      } catch (error: unknown) {
         console.error('Error loading rubric score:', error);
-        const errorMessage = error?.message || 'Failed to load rubric score';
-        alert(`Error: ${errorMessage}`);
+        alert(`Error: ${getApiErrorDetail(error) || 'Failed to load rubric score'}`);
         // Set default empty rubric on error
         setTitle('Rubric Score Not Found');
         setHeaders([]);
@@ -328,10 +328,11 @@ const RubricScoreDetail: React.FC = () => {
 
       setHistoryRefreshNonce((n) => n + 1);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error saving rubric score:', error);
-      const errorMessage = error?.message || 'Failed to save rubric score. Please check the console for details.';
-      alert(`Error: ${errorMessage}`);
+      alert(
+        `Error: ${getApiErrorDetail(error) || 'Failed to save rubric score. Please check the console for details.'}`
+      );
     } finally {
       setIsSaving(false);
     }
