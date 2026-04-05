@@ -50,8 +50,8 @@ const Navbar: React.FC = () => {
       <div className="Navbar-content">
         <div className="Navbar-logo">
           <img
-            src="/homepage.png"
-            alt="KU logo"
+            src={`${process.env.PUBLIC_URL}/ku-logo.png`}
+            alt="Kasetsart University"
             className="Navbar-logo-image"
           />
           <span>KU Smart Skill Mapping</span>

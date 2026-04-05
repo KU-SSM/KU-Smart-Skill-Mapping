@@ -80,7 +80,7 @@ const RubricScoreDetail: React.FC = () => {
 
   const getDefaultExpirationDate = () => {
     const d = new Date();
-    d.setDate(d.getDate() + 3);
+    d.setFullYear(d.getFullYear() + 1);
     return d.toISOString().slice(0, 10);
   };
 
@@ -822,7 +822,9 @@ const RubricScoreDetail: React.FC = () => {
       {showSaveExpirationModal && (
         <div className="modal-overlay rubric-expiration-overlay" onClick={() => setShowSaveExpirationModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal-title">Set expiration date before saving</h2>
+            <h2 className="modal-title rubric-save-expiration-modal-title">
+              Set expiration date before saving
+            </h2>
             <div className="modal-form">
               <div className="modal-field">
                 <label className="modal-label" htmlFor="save-expiration-date">

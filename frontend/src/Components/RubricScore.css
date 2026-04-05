@@ -32,6 +32,19 @@
   min-height: 0;
 }
 
+.rubric-score-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.rubric-score-title-row .rubric-score-title {
+  margin: 0;
+}
+
 .rubric-score-title-container {
   display: flex;
   align-items: center;
@@ -708,6 +721,13 @@
   gap: 8px;
 }
 
+.rubric-save-expiration-modal-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
 .save-changes-button {
   padding: 8px 20px;
   background-color: #b2bb1e;
@@ -1076,6 +1096,66 @@
   border-color: rgba(178, 187, 30, 0.5);
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   transform: translateY(-2px);
+}
+
+/* Teacher list: inline rename, delete, open — no whole-card navigation */
+.rubric-score-bar.rubric-score-bar--manage {
+  -webkit-justify-content: flex-start;
+  justify-content: flex-start;
+  -webkit-gap: 12px;
+  gap: 12px;
+  cursor: default;
+  text-align: left;
+  padding: 12px 14px;
+  padding-right: 12px;
+}
+
+.rubric-score-bar.rubric-score-bar--manage:hover {
+  transform: translateY(-2px);
+}
+
+.rubric-score-bar--manage .rubric-score-bar-delete-button {
+  position: static;
+  top: auto;
+  right: auto;
+  flex-shrink: 0;
+  align-self: center;
+}
+
+.rubric-score-bar-title-input--manage {
+  text-align: left;
+  -webkit-flex: 1 1 auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
+
+.rubric-score-bar-open-button {
+  flex-shrink: 0;
+  padding: 8px 14px;
+  background-color: #f5f5f5;
+  color: #333;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  white-space: nowrap;
+}
+
+.rubric-score-bar-open-button:hover:not(:disabled) {
+  background-color: #e8e8e8;
+  border-color: rgba(178, 187, 30, 0.5);
+  color: rgba(178, 187, 30, 1);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.rubric-score-bar-open-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
 }
 
 .rubric-score-add-box {

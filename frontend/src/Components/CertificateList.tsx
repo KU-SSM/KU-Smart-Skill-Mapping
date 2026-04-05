@@ -5,6 +5,9 @@ import './RubricScore.css';
 import { getCurrentUserId } from '../utils/currentUser';
 import api from '../api/index';
 import { getSkillEvaluationsByUser, type SkillEvaluationRecord } from '../services/skillEvaluationApi';
+import { useAppRole } from '../context/AppRoleContext';
+import InstructionHelpBubble from './InstructionHelpBubble';
+import { instructionStudentCertificate, instructionTeacherCertificate } from './instructionHelpContent';
 
 interface CertificateEvaluationItem {
   id: string;
@@ -43,6 +46,7 @@ const readEvaluationMeta = (evaluationId: string): EvaluationDisplayMeta | null 
 };
 
 const CertificateList: React.FC = () => {
+  const { isTeacher } = useAppRole();
   const navigate = useNavigate();
   const [searchTitle, setSearchTitle] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -144,7 +148,13 @@ const CertificateList: React.FC = () => {
   return (
     <div className="rubric-score-wrapper">
       <div className="rubric-score-container">
-        <h1 className="rubric-score-title">Select Completed Evaluation</h1>
+        <div className="rubric-score-title-row">
+          <h1 className="rubric-score-title">Select Completed Evaluation</h1>
+          <InstructionHelpBubble
+            content={isTeacher ? instructionTeacherCertificate : instructionStudentCertificate}
+            ariaLabel="Certificate page help"
+          />
+        </div>
 
         <div className="rubric-score-search-container" style={{ marginBottom: '16px' }}>
           <input

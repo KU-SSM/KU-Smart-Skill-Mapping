@@ -116,6 +116,13 @@
   margin: 0 0 16px 0;
 }
 
+.profile3-detail-title-with-help {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
 .add-new-skill-container {
   display: flex;
   gap: 8px;

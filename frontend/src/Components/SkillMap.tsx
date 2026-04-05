@@ -17,6 +17,8 @@ import {
 } from '../services/skillEvaluationApi';
 import { getCurrentUserId } from '../utils/currentUser';
 import { useAppRole } from '../context/AppRoleContext';
+import InstructionHelpBubble from './InstructionHelpBubble';
+import { instructionStudentSkillMap, instructionTeacherSkillMap } from './instructionHelpContent';
 
 const PolarAngleAxisComponent = PolarAngleAxis as React.ComponentType<any>;
 const PolarRadiusAxisComponent = PolarRadiusAxis as React.ComponentType<any>;
@@ -427,7 +429,13 @@ const SkillMap: React.FC = () => {
     <div className="skill-map-wrapper">
       <div className="skill-map-container">
         <div className="skill-map-chart-container">
-          <h1 className="skill-map-title">Skill Map</h1>
+          <div className="skill-map-title-row">
+            <h1 className="skill-map-title">Skill Map</h1>
+            <InstructionHelpBubble
+              content={isTeacher ? instructionTeacherSkillMap : instructionStudentSkillMap}
+              ariaLabel="Skill map page help"
+            />
+          </div>
           <div className="radar-chart-wrapper">
             {!anyPartyVisible ? (
               <div className="skill-map-chart-empty">
@@ -436,11 +444,19 @@ const SkillMap: React.FC = () => {
             ) : isLoadingEvaluations || isLoadingSelected ? (
               <div className="skill-map-chart-empty">Loading evaluation...</div>
             ) : !selectedEvalId ? (
-              <div className="skill-map-chart-empty">
-                {availableEvaluations.length === 0
-                  ? 'No evaluations found.'
-                  : 'Please choose an evaluation.'}
-              </div>
+              availableEvaluations.length === 0 ? (
+                <div className="skill-map-chart-empty">No evaluations found.</div>
+              ) : (
+                <button
+                  type="button"
+                  className="skill-map-chart-empty skill-map-chart-empty--select"
+                  onClick={openEvalModal}
+                  aria-haspopup="dialog"
+                  aria-expanded={evalModalOpen}
+                >
+                  Please choose an evaluation.
+                </button>
+              )
             ) : chartData.length === 0 ? (
               <div className="skill-map-chart-empty">No skills for this evaluation.</div>
             ) : (

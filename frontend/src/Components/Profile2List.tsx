@@ -11,6 +11,8 @@ import {
   getSkillEvaluationsByUser,
   type SkillEvaluationRecord,
 } from '../services/skillEvaluationApi';
+import InstructionHelpBubble from './InstructionHelpBubble';
+import { instructionStudentEvaluationOverview } from './instructionHelpContent';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const DeleteIcon = AiOutlineDelete as React.ComponentType;
@@ -257,7 +259,13 @@ const Profile2List: React.FC = () => {
   return (
     <div className="rubric-score-wrapper">
       <div className="rubric-score-container">
-        <h1 className="rubric-score-title">Your Evaluation</h1>
+        <div className="rubric-score-title-row">
+          <h1 className="rubric-score-title">Your Evaluation</h1>
+          <InstructionHelpBubble
+            content={instructionStudentEvaluationOverview}
+            ariaLabel="Evaluation page help"
+          />
+        </div>
 
           <div className="rubric-score-search-container" style={{ marginBottom: '16px' }}>
             <input

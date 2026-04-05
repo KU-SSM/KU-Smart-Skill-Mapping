@@ -22,6 +22,11 @@ const SignUp: React.FC = () => {
     <div className="auth-wrapper">
       <div className="auth-container">
         <div className="auth-logo">
+          <img
+            src={`${process.env.PUBLIC_URL}/ku-logo.png`}
+            alt="Kasetsart University"
+            className="auth-logo-image"
+          />
           <span>KU Smart Skill Mapping</span>
         </div>
         <h1 className="auth-title">Sign Up</h1>

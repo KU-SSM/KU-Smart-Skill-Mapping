@@ -1,7 +1,7 @@
 import React, { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import './Profile.css';
 import './RubricScore.css';
-import { AiOutlineClose, AiOutlineDelete, AiOutlineInfoCircle, AiOutlineQuestionCircle } from 'react-icons/ai';
+import { AiOutlineClose, AiOutlineDelete, AiOutlineInfoCircle } from 'react-icons/ai';
 import { FaBriefcase } from 'react-icons/fa';
 import { FaArrowLeft } from 'react-icons/fa';
 import { evaluatePortfolio, importPortfolio } from '../services/portfolioApi';
@@ -26,7 +26,6 @@ import { getApiErrorDetail } from '../utils/apiErrors';
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const BriefcaseIcon = FaBriefcase as React.ComponentType;
 const InfoIcon = AiOutlineInfoCircle as React.ComponentType;
-const HelpIcon = AiOutlineQuestionCircle as React.ComponentType;
 const DeleteOutlineIcon = AiOutlineDelete as React.ComponentType;
 const ArrowLeftIcon = FaArrowLeft as React.ComponentType;
 
@@ -261,7 +260,6 @@ const Profile2: React.FC = () => {
   const [rubricInfoData, setRubricInfoData] = useState<RubricScoreDetail | null>(null);
   const [isRubricInfoLoading, setIsRubricInfoLoading] = useState<boolean>(false);
   const [rubricInfoError, setRubricInfoError] = useState<string | null>(null);
-  const [sectionHelp, setSectionHelp] = useState<{ title: string; body: string } | null>(null);
 
   // Mock: rubric history (restore/expiration UI only; no backend).
   const historySeedRubricIdRef = useRef<string | null>(null);
@@ -1809,19 +1807,6 @@ const Profile2: React.FC = () => {
           <div className="profile2-profile-title-row">
             <h2 className="portfolio-section-title profile2-profile-title">
               Upload Portfolio
-              <button
-                type="button"
-                className="profile2-section-help-button"
-                title="How to use Upload Portfolio"
-                onClick={() =>
-                  setSectionHelp({
-                    title: 'Upload Portfolio',
-                    body: 'Upload your PDF portfolio file, then the system will extract text for AI evaluation.',
-                  })
-                }
-              >
-                {React.createElement(HelpIcon)}
-              </button>
             </h2>
             {isStudent && (
               <button
@@ -1884,19 +1869,6 @@ const Profile2: React.FC = () => {
       <div className="rubric-score-container">
         <h2 className="portfolio-section-title profile2-section-title-with-help" style={{ marginBottom: '20px' }}>
           Choose Rubric Score
-          <button
-            type="button"
-            className="profile2-section-help-button"
-            title="How to use Choose Rubric Score"
-            onClick={() =>
-              setSectionHelp({
-                title: 'Choose Rubric Score',
-                body: 'Select a rubric score from the list and click Confirm Selection before running AI or saving evaluation.',
-              })
-            }
-          >
-            {React.createElement(HelpIcon)}
-          </button>
         </h2>
         <div className="rubric-score-search-container">
           <input
@@ -2020,9 +1992,7 @@ const Profile2: React.FC = () => {
               {/* AI + Student (student role) or AI + Teacher (teacher role); feature flag until login */}
               <div className={`skills-panels-container ${evaluationPanelsGridClass}`}>
                 <div className="skills-panel profile2-panel">
-                  <h2 className="panel-title">
-                    AI
-                  </h2>
+                  <h2 className="panel-title">AI</h2>
                   {isStudent && draftAiEvaluations && (
                     <p className="profile2-ai-draft-hint" role="status">
                       Preview only — click <strong>Save</strong> to keep these AI scores.
@@ -2413,24 +2383,6 @@ const Profile2: React.FC = () => {
                 </div>
               </>
             )}
-          </div>
-        </div>
-      )}
-
-      {sectionHelp && (
-        <div className="modal-overlay" onClick={() => setSectionHelp(null)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal-title">{sectionHelp.title}</h2>
-            <p className="evaluation-submessage">{sectionHelp.body}</p>
-            <div className="modal-buttons">
-              <button
-                type="button"
-                className="modal-button modal-button-cancel"
-                onClick={() => setSectionHelp(null)}
-              >
-                Close
-              </button>
-            </div>
           </div>
         </div>
       )}

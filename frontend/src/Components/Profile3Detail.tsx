@@ -10,6 +10,8 @@ import { useAppRole } from '../context/AppRoleContext';
 import api from '../api/index';
 import { updateSkillEvaluation } from '../services/skillEvaluationApi';
 import { getApiErrorDetail } from '../utils/apiErrors';
+import InstructionHelpBubble from './InstructionHelpBubble';
+import { instructionTeacherEvaluation } from './instructionHelpContent';
 
 const PdfIcon = FaFilePdf as React.ComponentType;
 const ArrowLeftIcon = FaArrowLeft as React.ComponentType;
@@ -810,8 +812,16 @@ const Profile3Detail: React.FC = () => {
       <div className="portfolio-container">
         <div className="portfolio-section" style={{ textAlign: 'left' }}>
           <div className="student-request-header-info" style={{ textAlign: 'left', width: '100%' }}>
-            <h2 className="portfolio-section-title" style={{ margin: 0, textAlign: 'left', width: '100%' }}>
-              {selectedRequest.studentName}
+            <h2
+              className="portfolio-section-title profile3-detail-title-with-help"
+              style={{ margin: 0, textAlign: 'left', width: '100%' }}
+            >
+              <span>{selectedRequest.studentName}</span>
+              <InstructionHelpBubble
+                content={instructionTeacherEvaluation}
+                ariaLabel="Teacher evaluation steps help"
+                triggerClassName="ihb-trigger--section"
+              />
             </h2>
             <p style={{ margin: '4px 0 0 0', color: '#666', fontSize: '14px', paddingLeft: 0, textAlign: 'left', width: '100%' }}>
               Requested: {formatDate(selectedRequest.requestedAt)}
