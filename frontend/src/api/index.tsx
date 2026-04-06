@@ -9,13 +9,10 @@ const api = axios.create({
     },
 });
 
-// Request interceptor to remove Content-Type for FormData
 api.interceptors.request.use((config) => {
-    // If the data is FormData, remove Content-Type header to let browser set it with boundary
     if (config.data instanceof FormData) {
         delete config.headers['Content-Type'];
     }
-    // POST with no body: avoid sending Content-Type: application/json (can confuse some servers)
     if (
         config.method?.toLowerCase() === 'post' &&
         (config.data === undefined || config.data === null)
@@ -27,7 +24,6 @@ api.interceptors.request.use((config) => {
     return Promise.reject(error);
 });
 
-// Response interceptor for better error handling
 api.interceptors.response.use(
     (response) => response,
     (error) => {
@@ -37,10 +33,8 @@ api.interceptors.response.use(
                 code: error.code,
                 config: error.config,
             });
-            // Provide a more helpful error message
             error.message = 'Network Error: Unable to connect to the server. Please check if the backend is running.';
         } else if (error.response) {
-            // Server responded with error status
             console.error('API Error Response:', {
                 status: error.response.status,
                 statusText: error.response.statusText,
@@ -48,7 +42,6 @@ api.interceptors.response.use(
                 url: error.config?.url,
             });
         } else if (error.request) {
-            // Request was made but no response received
             console.error('No Response Received:', {
                 request: error.request,
                 url: error.config?.url,

@@ -1,9 +1,3 @@
-/**
- * Mock skill evaluations for Skill Map radar (replace with API when wired).
- * Scores are rubric-style level ranks (1–5).
- * Each evaluation is built from a single skill definition list so radar `skill`
- * labels always match rubric `skillArea` rows in order.
- */
 
 export interface SkillMapRadarRow {
   skill: string;
@@ -12,14 +6,12 @@ export interface SkillMapRadarRow {
   teacher: number;
 }
 
-/** Mock rubric grid (same shape as RubricScore detail UI) for Skill Map session. */
 export interface MockRubricTableRow {
   skillArea: string;
   values: string[];
 }
 
 export interface MockRubricScoreSession {
-  /** Rubric score title shown in the session */
   title: string;
   headers: string[];
   rows: MockRubricTableRow[];
@@ -30,7 +22,6 @@ export interface MockSkillEvaluation {
   title: string;
   rubricHint: string;
   rows: SkillMapRadarRow[];
-  /** Mock rubric score table for this evaluation (one rubric per evaluation). */
   rubricScore: MockRubricScoreSession;
 }
 
@@ -42,9 +33,7 @@ const LEVEL_HEADERS = [
   'Level 5 — Exemplary',
 ] as const;
 
-/** One skill: same name on radar axis and rubric first column; five level descriptors. */
 interface SkillAxisAndRubric {
-  /** Shown on PolarAngleAxis and as rubric row header (keep concise for radar readability). */
   skillArea: string;
   student: number;
   ai: number;
@@ -351,7 +340,6 @@ export function getMockEvaluationById(id: string): MockSkillEvaluation | undefin
   return MOCK_SKILL_EVALUATIONS.find((e) => e.id === id);
 }
 
-/** Max rank for polar axis (at least 5 for 1–5 rubric). */
 export function maxRankForRows(rows: SkillMapRadarRow[]): number {
   let m = 5;
   for (const r of rows) {

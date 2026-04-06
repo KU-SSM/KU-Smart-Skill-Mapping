@@ -46,7 +46,6 @@ const toRadarSkillLabel = (skill: string): string => {
   return `${clean.slice(0, 16)}...`;
 };
 
-/** Radar radius max aligned to rubric levels (e.g. Beginner/Intermediate/Advance → 0–3), not a fixed 0–5 scale. */
 const rubricAxisMaxFromLevels = (levels: { rank?: number | null }[]): number => {
   if (!levels.length) return 1;
   const ranks = levels.map((l) => toPositiveInt(l.rank));
@@ -179,7 +178,6 @@ const CertificateDetail: React.FC = () => {
           const rubricRes = await api.get<RubricResponse>(`rubric/${rubricId}`);
           rubricTitle = rubricRes.data.name || rubricTitle;
         } catch {
-          // keep fallback title
         }
 
         let skills: { id: number; name: string; display_order?: number | null }[] = [];
@@ -251,7 +249,6 @@ const CertificateDetail: React.FC = () => {
           levelIndexById.set(level.id, idx);
         });
 
-        // Keep certificate rows strictly aligned to the rubric snapshot skills.
         const orderedNames = sortedSkills.map((s) => s.name);
 
         setRubricDetail({
@@ -334,7 +331,6 @@ const CertificateDetail: React.FC = () => {
       );
       return Math.max(max, rowMax);
     }, 0);
-    // Heuristic for very text-heavy rubrics.
     const densityFactor = Math.max(
       1,
       avgCharsPerCell / 45,

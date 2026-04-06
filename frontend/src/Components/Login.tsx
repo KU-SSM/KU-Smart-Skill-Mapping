@@ -7,13 +7,17 @@ const Login: React.FC = () => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('Login:', { email, password });
   };
 
   return (
     <div className="auth-wrapper">
       <div className="auth-container">
         <div className="auth-logo">
+          <img
+            src={`${process.env.PUBLIC_URL}/ku-logo.png`}
+            alt="Kasetsart University"
+            className="auth-logo-image"
+          />
           <span>KU Smart Skill Mapping</span>
         </div>
         <h1 className="auth-title">Log In</h1>

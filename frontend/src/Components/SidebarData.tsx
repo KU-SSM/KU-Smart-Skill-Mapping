@@ -8,14 +8,12 @@ import { MdHome } from 'react-icons/md'
 import { FaCertificate } from 'react-icons/fa'
 import { AiOutlineCheckSquare } from 'react-icons/ai'
 
-/** Who sees this link until real auth exists. Default: everyone. `none` = hidden for all. */
 export type SidebarAudience = 'all' | 'student' | 'teacher' | 'none';
 
 export interface SidebarItem {
     title: string;
     link: string;
     icon: IconType;
-    /** Omit or 'all' = both roles; 'none' = never show */
     audience?: SidebarAudience;
 }
 

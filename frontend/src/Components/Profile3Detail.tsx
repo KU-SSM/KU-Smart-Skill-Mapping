@@ -10,6 +10,8 @@ import { useAppRole } from '../context/AppRoleContext';
 import api from '../api/index';
 import { updateSkillEvaluation } from '../services/skillEvaluationApi';
 import { getApiErrorDetail } from '../utils/apiErrors';
+import InstructionHelpBubble from './InstructionHelpBubble';
+import { instructionTeacherEvaluation } from './instructionHelpContent';
 
 const PdfIcon = FaFilePdf as React.ComponentType;
 const ArrowLeftIcon = FaArrowLeft as React.ComponentType;
@@ -93,7 +95,6 @@ const writeTeacherCustomSkills = (evaluationId: string, skills: string[]): void 
       .filter((s) => s !== '');
     localStorage.setItem(teacherCustomSkillsKey(evaluationId), JSON.stringify(normalized));
   } catch {
-    // ignore localStorage errors
   }
 };
 
@@ -108,7 +109,6 @@ const Profile3Detail: React.FC = () => {
     selectedRequest?.status === 'approved' || selectedRequest?.status === 'completed';
   const shouldDashStudentRowsForTeacher =
     isTeacher && selectedRequest?.status === 'approved';
-  /* Teacher: hide Student panel while pending; show it after completion/approval. */
   const evaluationPanelsGridClass = isTeacher
     ? isCompletedView
       ? 'profile2-three-panels'
@@ -117,7 +117,6 @@ const Profile3Detail: React.FC = () => {
       ? 'profile2-three-panels'
       : 'profile2-two-panels';
 
-  // Rubric selection and data
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [rubricScores, setRubricScores] = useState<{ id: string; title: string }[]>([]);
   const [selectedRubricId, setSelectedRubricId] = useState<string | null>(null);
@@ -132,9 +131,7 @@ const Profile3Detail: React.FC = () => {
   const [teacherScores, setTeacherScores] = useState<{ [skillArea: string]: string }>({});
   const teacherScoresRef = useRef(teacherScores);
   teacherScoresRef.current = teacherScores;
-  /** Teacher-added custom names not yet in localStorage — must not be pruned when syncing student rows. */
   const locallyAddedTeacherCustomRef = useRef<Set<string>>(new Set());
-  /** Tracks student (non-rubric) skill names so we can drop matching teacher rows when the student removes a custom. */
   const prevStudentExtrasRef = useRef<Set<string>>(new Set());
   const [aiEvaluations, setAiEvaluations] = useState<{ [skillArea: string]: string }>({});
   const [studentEvaluations, setStudentEvaluations] = useState<{ [skillArea: string]: string }>({});
@@ -238,7 +235,6 @@ const Profile3Detail: React.FC = () => {
 
         setTeacherScores(hydratedTeacherScores);
         setTeacherExtraSkills([]);
-        /* originalTeacher* aligned after rubric loads — see sync effect. */
       } catch (error) {
         console.error('Failed to load evaluation request:', error);
         setRequestNotFound(true);
@@ -253,7 +249,6 @@ const Profile3Detail: React.FC = () => {
     prevStudentExtrasRef.current.clear();
   }, [requestId]);
 
-  // Load rubric list on mount
   useEffect(() => {
     const loadRubrics = async () => {
       try {
@@ -270,8 +265,6 @@ const Profile3Detail: React.FC = () => {
     loadRubrics();
   }, []);
 
-  // Fetch rubric definition only when the evaluation's rubric id changes — not when the teacher edits scores
-  // (including teacherScores in deps re-ran loading, toggled the panel, and jumped scroll to top).
   useEffect(() => {
     if (!confirmedRubricId) {
       setSelectedRubricData(null);
@@ -303,9 +296,6 @@ const Profile3Detail: React.FC = () => {
     };
   }, [confirmedRubricId]);
 
-  // After rubric + student eval are known: sync teacher rows with current student data.
-  // Drop teacher rows for student customs the student removed (unless they are teacher-listed customs).
-  // Seed missing student customs. Align baseline (original) so Save only lights on real edits.
   useEffect(() => {
     if (!selectedRubricData || !selectedRequest?.id) return;
 
@@ -481,7 +471,6 @@ const Profile3Detail: React.FC = () => {
     navigate(`/rubric_score/${rubricInfoData.id}`);
   };
 
-  // Get skills from selected rubric
   const skills = useMemo((): Skill[] => {
     if (!selectedRubricData) return [];
     return selectedRubricData.rows.map(row => ({
@@ -495,7 +484,6 @@ const Profile3Detail: React.FC = () => {
     [skills]
   );
 
-  /** Rubric rows first, then any non-rubric teacher rows (custom skills from API, localStorage, or in-progress edits). */
   const teacherSkillsAll = useMemo((): Skill[] => {
     if (!selectedRubricData) return [...skills, ...teacherExtraSkills];
     const extraOrdered: Skill[] = [];
@@ -521,7 +509,6 @@ const Profile3Detail: React.FC = () => {
     selectedRequest?.id,
   ]);
 
-  /** Rubric rows first, then current student skills not on the rubric (from API only — no stale order). */
   const studentSkillsAll = useMemo((): Skill[] => {
     const rubricSkillSet = new Set(
       skills.map((s) => (s.skillArea || '').trim()).filter((name) => name !== '')
@@ -633,7 +620,6 @@ const Profile3Detail: React.FC = () => {
 
   const handleScoreChange = (skillArea: string, value: string) => {
     if (isCompletedView) return;
-    // Only allow numbers
     if (value === '' || /^\d+$/.test(value)) {
       setTeacherScores(prev => ({
         ...prev,
@@ -677,7 +663,6 @@ const Profile3Detail: React.FC = () => {
         const trimmedScore = scoreRaw.trim();
         if (skillArea === '') return null;
         const isCustomTeacherRow = !rubricSkillSet.has(skillArea);
-        // Allow blank custom skill to be persisted as "No Passing Criteria" (0).
         const normalizedScore =
           trimmedScore === '' && isCustomTeacherRow ? '0' : trimmedScore;
         if (!/^\d+$/.test(normalizedScore) || Number(normalizedScore) < 0) return null;
@@ -720,7 +705,6 @@ const Profile3Detail: React.FC = () => {
   const handleSubmitEvaluation = async () => {
     if (!selectedRequest || !selectedRubricData) return;
 
-    // Validate that all skills have scores (rubric + teacher extras, including student custom skills)
     const missingScores = teacherSkillsAll.filter(
       (skill) => !teacherScores[skill.skillArea] || teacherScores[skill.skillArea].trim() === ''
     );
@@ -806,12 +790,20 @@ const Profile3Detail: React.FC = () => {
 
   return (
     <div className="profile-wrapper">
-      {/* Header */}
+      
       <div className="portfolio-container">
         <div className="portfolio-section" style={{ textAlign: 'left' }}>
           <div className="student-request-header-info" style={{ textAlign: 'left', width: '100%' }}>
-            <h2 className="portfolio-section-title" style={{ margin: 0, textAlign: 'left', width: '100%' }}>
-              {selectedRequest.studentName}
+            <h2
+              className="portfolio-section-title profile3-detail-title-with-help"
+              style={{ margin: 0, textAlign: 'left', width: '100%' }}
+            >
+              <span>{selectedRequest.studentName}</span>
+              <InstructionHelpBubble
+                content={instructionTeacherEvaluation}
+                ariaLabel="Teacher evaluation steps help"
+                triggerClassName="ihb-trigger--section"
+              />
             </h2>
             <p style={{ margin: '4px 0 0 0', color: '#666', fontSize: '14px', paddingLeft: 0, textAlign: 'left', width: '100%' }}>
               Requested: {formatDate(selectedRequest.requestedAt)}
@@ -820,7 +812,7 @@ const Profile3Detail: React.FC = () => {
         </div>
       </div>
 
-      {/* Portfolio Display Section */}
+      
       <div className="portfolio-container">
         <div className="portfolio-section">
           <h2 className="portfolio-section-title">Student Portfolio</h2>
@@ -844,7 +836,7 @@ const Profile3Detail: React.FC = () => {
         </div>
       </div>
 
-      {/* Evaluation Results Section - AI, Student, Teacher (only Teacher editable) */}
+      
       <div className="evaluation-container">
         <div className="evaluation-section">
           <div className="evaluation-header-container">
@@ -963,8 +955,6 @@ const Profile3Detail: React.FC = () => {
                             className="profile2-score-input ai-score-input"
                             value={(() => {
                               const raw = (studentEvaluations[skill.skillArea] || '').trim();
-                              // In teacher view before student self-evaluation, legacy 0-values
-                              // should render as blank instead of "No Passing Criteria".
                               if (shouldDashStudentRowsForTeacher && (raw === '' || raw === '0')) {
                                 return '-';
                               }
@@ -1102,7 +1092,7 @@ const Profile3Detail: React.FC = () => {
         </div>
       </div>
       
-      {/* Back Button - Outside evaluation container, as direct child of profile-wrapper */}
+      
       <div className="profile3-back-button-container">
         <button
           className="profile3-back-button"
@@ -1127,7 +1117,7 @@ const Profile3Detail: React.FC = () => {
         )}
       </div>
 
-      {/* Rubric info modal - view only */}
+      
       {isRubricInfoOpen && (
         <div className="modal-overlay" onClick={handleCloseRubricInfo}>
           <div
@@ -1202,7 +1192,7 @@ const Profile3Detail: React.FC = () => {
         </div>
       )}
 
-      {/* Rubric history popup (mock UI) */}
+      
       {isRubricHistoryOpen && (
         <div className="rubric-modal-overlay" onClick={handleCloseRubricHistory}>
           <div className="rubric-modal-content" onClick={(e) => e.stopPropagation()}>

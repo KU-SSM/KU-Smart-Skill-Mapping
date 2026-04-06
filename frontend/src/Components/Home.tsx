@@ -1,19 +1,53 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './Home.css';
+import './InstructionHelpBubble.css';
 import { useAppRole } from '../context/AppRoleContext';
 import { useNavigate } from 'react-router-dom';
+import {
+  instructionStudentCertificate,
+  instructionStudentEvaluationOverview,
+  instructionStudentRubricList,
+  instructionStudentSkillMap,
+  instructionTeacherCertificate,
+  instructionTeacherEvaluation,
+  instructionTeacherRubricManage,
+  instructionTeacherSkillMap,
+} from './instructionHelpContent';
+
+type HelpAnchor = {
+  top: number;
+  left: number;
+  width: number;
+  height: number;
+  bottom: number;
+};
 
 type HomeStep = {
   icon?: JSX.Element;
   title: string;
   text: string;
   path: string;
+  helpCloud?: React.ReactNode;
 };
 
 const Home: React.FC = () => {
   const { isStudent } = useAppRole();
   const navigate = useNavigate();
-  const [helpText, setHelpText] = useState<string | null>(null);
+  const [homeHelp, setHomeHelp] = useState<{ path: string; anchor: HelpAnchor } | null>(null);
+
+  useEffect(() => {
+    if (!homeHelp) return;
+    const close = () => setHomeHelp(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    window.addEventListener('resize', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('resize', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [homeHelp]);
 
   const studentSteps: HomeStep[] = [
     {
@@ -28,6 +62,7 @@ const Home: React.FC = () => {
       title: 'View Rubric Score',
       text: 'Open your rubric score history and review previous assessment details.',
       path: '/rubric_score_student',
+      helpCloud: instructionStudentRubricList,
     },
     {
       icon: (
@@ -42,6 +77,7 @@ const Home: React.FC = () => {
       title: 'Perform Evaluation by AI',
       text: 'Upload your portfolio and run AI-assisted evaluation to generate draft scores.',
       path: '/profile2',
+      helpCloud: instructionStudentEvaluationOverview,
     },
     {
       icon: (
@@ -53,6 +89,7 @@ const Home: React.FC = () => {
       title: 'View Skill Map',
       text: 'Check your skill map to understand strengths and progress across skill areas.',
       path: '/skill_map',
+      helpCloud: instructionStudentSkillMap,
     },
     {
       icon: (
@@ -64,6 +101,7 @@ const Home: React.FC = () => {
       title: 'Export Certificate',
       text: 'Go to certificate page and export your latest evaluation result as a certificate.',
       path: '/certificate',
+      helpCloud: instructionStudentCertificate,
     },
   ];
 
@@ -78,6 +116,7 @@ const Home: React.FC = () => {
       title: 'Create Rubric Score',
       text: 'Open rubric score workspace to create and manage teacher scoring records.',
       path: '/rubric_score',
+      helpCloud: instructionTeacherRubricManage,
     },
     {
       icon: (
@@ -85,23 +124,79 @@ const Home: React.FC = () => {
           <path d="M4 7h16v12H4z" stroke="currentColor" strokeWidth="2" />
           <path d="M7 4h10v3H7z" stroke="currentColor" strokeWidth="2" />
           <path d="M8 12h8M8 15h6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          <path
+            d="M17 17l2 2M16 18l3-3"
+            stroke="currentColor"
+            strokeWidth="1.75"
+            strokeLinecap="round"
+          />
         </svg>
       ),
-      title: 'View Request',
-      text: 'Open evaluation requests from students and review each submission status.',
+      title: 'View Request & Perform Evaluation',
+      text: 'See every student request, then review portfolios and enter teacher scores in one workspace.',
       path: '/profile3',
+      helpCloud: instructionTeacherEvaluation,
+    },
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2V6z" stroke="currentColor" strokeWidth="2" />
+          <path d="M9 4v14M15 6v14" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      ),
+      title: 'View Skill Map',
+      text: 'Inspect skill maps for any student by choosing their evaluation—compare student, AI, and teacher levels.',
+      path: '/skill_map',
+      helpCloud: instructionTeacherSkillMap,
+    },
+    {
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" aria-hidden>
+          <path d="M2 9l10-4 10 4-10 4L2 9z" stroke="currentColor" strokeWidth="2" />
+          <path d="M6 11v4c0 1 3 3 6 3s6-2 6-3v-4" stroke="currentColor" strokeWidth="2" />
+        </svg>
+      ),
+      title: 'Export Certificate',
+      text: 'Access the certificate page to preview or export PDF certificates for any student’s completed evaluation.',
+      path: '/certificate',
+      helpCloud: instructionTeacherCertificate,
     },
   ];
 
   const steps = isStudent ? studentSteps : teacherSteps;
+
+  const openHelp = (event: React.MouseEvent<HTMLButtonElement>, step: HomeStep) => {
+    event.stopPropagation();
+    if (step.helpCloud == null) return;
+    const r = event.currentTarget.getBoundingClientRect();
+    setHomeHelp({
+      path: step.path,
+      anchor: {
+        top: r.top,
+        left: r.left,
+        width: r.width,
+        height: r.height,
+        bottom: r.bottom,
+      },
+    });
+  };
+
+  const closeHomeHelp = () => setHomeHelp(null);
+
+  const activeSteps = isStudent ? studentSteps : teacherSteps;
+  const homeHelpContent =
+    homeHelp != null ? activeSteps.find((s) => s.path === homeHelp.path)?.helpCloud : null;
 
   return (
     <div className="home-wrapper">
       <div className="home-container">
         <div className="home-instruction-section">
             <h2 className="home-instruction-heading">How to Use This Application</h2>
-          <div className={`home-instruction-grid ${!isStudent ? 'home-instruction-grid--teacher' : ''}`}>
-            {steps.map((step) => (
+          <div
+            key={isStudent ? 'student-home-grid' : 'teacher-home-grid'}
+            className={`home-instruction-grid ${!isStudent ? 'home-instruction-grid--teacher' : ''}`}
+          >
+            {steps.map((step, index) => (
               <article
                 key={step.title}
                 className="home-instruction-card"
@@ -120,10 +215,7 @@ const Home: React.FC = () => {
                   className="home-help-button"
                   aria-label={`How to use: ${step.title}`}
                   title="How to use"
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    setHelpText(step.text);
-                  }}
+                  onClick={(event) => openHelp(event, step)}
                 >
                   ?
                 </button>
@@ -139,20 +231,35 @@ const Home: React.FC = () => {
           </div>
         </div>
       </div>
-      {helpText && (
-        <div className="home-help-overlay" onClick={() => setHelpText(null)}>
-          <div className="home-help-modal" onClick={(event) => event.stopPropagation()}>
-            <h3 className="home-help-title">How to Use</h3>
-            <p className="home-help-text">{helpText}</p>
-            <button
-              type="button"
-              className="home-help-close"
-              onClick={() => setHelpText(null)}
-            >
-              Close
-            </button>
+      {homeHelp && homeHelpContent && (
+        <>
+          <div
+            className="home-student-help-dismiss"
+            role="presentation"
+            aria-hidden
+            onClick={closeHomeHelp}
+          />
+          <div
+            className="home-help-cloud"
+            role="dialog"
+            aria-modal="true"
+            aria-label={`Help: ${activeSteps.find((s) => s.path === homeHelp.path)?.title ?? 'Guide'}`}
+            style={{
+              top: homeHelp.anchor.bottom + 10,
+              left: Math.max(
+                16,
+                Math.min(
+                  homeHelp.anchor.left + homeHelp.anchor.width / 2,
+                  window.innerWidth - 16
+                )
+              ),
+              transform: 'translateX(-50%)',
+            }}
+            onClick={closeHomeHelp}
+          >
+            <div className="home-help-cloud-inner">{homeHelpContent}</div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

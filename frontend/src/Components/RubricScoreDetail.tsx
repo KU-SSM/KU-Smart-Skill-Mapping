@@ -54,7 +54,6 @@ const RubricScoreDetail: React.FC = () => {
   const [isDeleting, setIsDeleting] = useState<boolean>(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   
-  // Store original data to restore on cancel
   const [originalTitle, setOriginalTitle] = useState<string>('');
   const [originalHeaders, setOriginalHeaders] = useState<string[]>([]);
   const [originalRows, setOriginalRows] = useState<TableData[]>([]);
@@ -75,12 +74,11 @@ const RubricScoreDetail: React.FC = () => {
   const [showSaveExpirationModal, setShowSaveExpirationModal] = useState<boolean>(false);
   const [pendingSaveTitle, setPendingSaveTitle] = useState<string>('');
   const [hasHydratedFormerVersions, setHasHydratedFormerVersions] = useState<boolean>(false);
-  /** Bumped after each successful save so history refetches even when title is unchanged. */
   const [historyRefreshNonce, setHistoryRefreshNonce] = useState(0);
 
   const getDefaultExpirationDate = () => {
     const d = new Date();
-    d.setDate(d.getDate() + 3);
+    d.setFullYear(d.getFullYear() + 1);
     return d.toISOString().slice(0, 10);
   };
 
@@ -89,7 +87,6 @@ const RubricScoreDetail: React.FC = () => {
     return `former_rubric_versions_${id}`;
   }, [id]);
 
-  // Load persisted former rubric versions (frontend-only mock).
   useEffect(() => {
     setHasHydratedFormerVersions(false);
     if (!historyStorageKey) {
@@ -112,18 +109,15 @@ const RubricScoreDetail: React.FC = () => {
     }
   }, [historyStorageKey]);
 
-  // Persist whenever former versions change.
   useEffect(() => {
     if (!historyStorageKey) return;
     if (!hasHydratedFormerVersions) return;
     try {
       localStorage.setItem(historyStorageKey, JSON.stringify(savedFormerRubricVersions));
     } catch {
-      // Ignore quota/localStorage errors
     }
   }, [historyStorageKey, savedFormerRubricVersions, hasHydratedFormerVersions]);
 
-  // Prefer the richer source when backend/local snapshot counts diverge.
   const formerRubricVersionsRaw =
     backendFormerRubricVersions.length >= savedFormerRubricVersions.length
       ? backendFormerRubricVersions
@@ -135,19 +129,15 @@ const RubricScoreDetail: React.FC = () => {
     );
   });
 
-  // "Current" in history popup uses only the snapshot taken when opening (last saved = original*).
-  // Never fall back to live title/headers/rows or the modal will update while editing behind it.
   const currentHistoryTitle = currentPopupSnapshot.title || 'Untitled Rubric';
   const currentHistoryHeaders = currentPopupSnapshot.headers;
   const currentHistoryRows = currentPopupSnapshot.rows;
 
-  // Keep backend snapshot titles synced with whatever the user currently renamed the rubric to.
   useEffect(() => {
     if (!title) return;
     setBackendFormerRubricVersions((prev) => prev.map((v) => ({ ...v, title })));
   }, [title]);
 
-  // If we fall back to localStorage snapshots, keep their displayed title synced too.
   useEffect(() => {
     if (!title) return;
     setSavedFormerRubricVersions((prev) => prev.map((v) => ({ ...v, title })));
@@ -162,16 +152,12 @@ const RubricScoreDetail: React.FC = () => {
 
       try {
         setIsLoading(true);
-        console.log('Loading rubric score with ID:', id);
         const rubricData = await getRubricScore(id);
-        console.log('Loaded rubric score:', rubricData);
         
-        // Set current data
         setTitle(rubricData.title);
         setHeaders(rubricData.headers);
         setRows(rubricData.rows);
         
-        // Store original data for cancel functionality (deep copy to prevent mutation)
         setOriginalTitle(rubricData.title);
         setOriginalHeaders(rubricData.headers.map(h => h)); // Deep copy
         setOriginalRows(rubricData.rows.map(row => ({
@@ -181,7 +167,6 @@ const RubricScoreDetail: React.FC = () => {
       } catch (error: unknown) {
         console.error('Error loading rubric score:', error);
         alert(`Error: ${getApiErrorDetail(error) || 'Failed to load rubric score'}`);
-        // Set default empty rubric on error
         setTitle('Rubric Score Not Found');
         setHeaders([]);
         setRows([]);
@@ -233,7 +218,6 @@ const RubricScoreDetail: React.FC = () => {
     }
   }, [id, title]);
 
-  // Load former snapshots from backend (backend source of truth; localStorage only as fallback).
   useEffect(() => {
     void loadBackendFormerSnapshots();
   }, [loadBackendFormerSnapshots, historyRefreshNonce]);
@@ -252,8 +236,6 @@ const RubricScoreDetail: React.FC = () => {
 
     try {
       const effectiveTitle = (titleOverride ?? title).trim();
-      console.log('Saving rubric score:', { id, title: effectiveTitle, headers, rows });
-      console.log('Previous version expiration:', expirationDate, expirationTime);
 
       const rubricData = await updateRubricScore(id, {
         title: effectiveTitle,
@@ -261,8 +243,6 @@ const RubricScoreDetail: React.FC = () => {
         rows,
       });
 
-      // After save, backend closes previous valid history as "outdated".
-      // Apply teacher-selected expiration datetime to the latest outdated history.
       if (saveExpirationDate || saveExpirationTime) {
         try {
           const histories = await getRubricScoreHistoryByRubric(id);
@@ -280,11 +260,7 @@ const RubricScoreDetail: React.FC = () => {
         }
       }
 
-      console.log('Successfully saved rubric score!');
-      console.log('Returned data:', rubricData);
 
-      // Save former rubric history (frontend-only).
-      // If backend save fails, we won't reach this code because it's inside `try`.
       const effectiveExpirationDate = saveExpirationDate ?? expirationDate ?? getDefaultExpirationDate();
       const effectiveExpirationTime = saveExpirationTime ?? expirationTime ?? '23:59:59';
       const expiresAt = `${effectiveExpirationDate} ${effectiveExpirationTime}`.trim();
@@ -310,7 +286,6 @@ const RubricScoreDetail: React.FC = () => {
           try {
             localStorage.setItem(historyStorageKey, JSON.stringify(next));
           } catch {
-            // ignore
           }
           return next;
         });
@@ -355,7 +330,6 @@ const RubricScoreDetail: React.FC = () => {
         const histories = await getRubricScoreHistoryByRubric(id);
         isFirstSave = (histories || []).length === 0;
       } catch {
-        // If history lookup fails, keep safer explicit flow with popup.
         isFirstSave = false;
       }
 
@@ -445,8 +419,6 @@ const RubricScoreDetail: React.FC = () => {
   };
 
   const handleCancel = () => {
-    // Cancel all changes - restore original data and stay on the page
-    // Always restore to original values (create new references to ensure React detects the change)
     setTitle(originalTitle);
     setEditingTitle(originalTitle);
     setHeaders(originalHeaders.map(h => h)); // Create new array with deep copy
@@ -455,7 +427,6 @@ const RubricScoreDetail: React.FC = () => {
       values: row.values.map(v => v) // Create new array for values with deep copy
     })));
     
-    // Close title editing if active
     setIsEditingTitle(false);
   };
 
@@ -468,11 +439,8 @@ const RubricScoreDetail: React.FC = () => {
     setIsDeleting(true);
 
     try {
-      console.log('Deleting rubric score:', id);
       await deleteRubricScore(id);
-      console.log('Successfully deleted rubric score!');
       
-      // Navigate back to main page after successful deletion
       navigate('/rubric_score');
     } catch (error) {
       console.error('Error deleting rubric score:', error);
@@ -515,18 +483,14 @@ const RubricScoreDetail: React.FC = () => {
     }
   }, [isEditingTitle]);
 
-  // Check if there are unsaved changes
   const hasUnsavedChanges = useMemo(() => {
-    // Check if title changed (including if currently editing)
     const titleChanged = isEditingTitle 
       ? editingTitle.trim() !== originalTitle
       : title !== originalTitle;
     
-    // Check if headers changed
     const headersChanged = headers.length !== originalHeaders.length ||
       headers.some((h, i) => h !== (originalHeaders[i] || ''));
     
-    // Check if rows changed
     const rowsChanged = rows.length !== originalRows.length ||
       rows.some((row, i) => {
         const originalRow = originalRows[i];
@@ -766,7 +730,7 @@ const RubricScoreDetail: React.FC = () => {
         </div>
       )}
 
-      {/* Edit expiration date for selected former version */}
+      
       {showFormerExpirationModal && selectedFormerVersion && (
         <div className="modal-overlay rubric-expiration-overlay" onClick={() => setShowFormerExpirationModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -818,11 +782,13 @@ const RubricScoreDetail: React.FC = () => {
         </div>
       )}
 
-      {/* Set expiration date before saving current teacher rubric changes */}
+      
       {showSaveExpirationModal && (
         <div className="modal-overlay rubric-expiration-overlay" onClick={() => setShowSaveExpirationModal(false)}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 className="modal-title">Set expiration date before saving</h2>
+            <h2 className="modal-title rubric-save-expiration-modal-title">
+              Set expiration date before saving
+            </h2>
             <div className="modal-form">
               <div className="modal-field">
                 <label className="modal-label" htmlFor="save-expiration-date">

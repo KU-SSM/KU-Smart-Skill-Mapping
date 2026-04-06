@@ -16,11 +16,12 @@
   display: flex;
   flex-direction: row;
   font-family: 'Roboto', sans-serif;
-  font-size: 20px;
+  font-size: 25px;
+  font-weight: 400;
   justify-content: center;
   align-items: center;
   color: inherit;
-  transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease;
+  transition: color 0.2s ease, transform 0.15s ease;
 }
 
 span {
@@ -36,22 +37,23 @@ span {
 
 .List .row:hover {
   cursor: pointer;
-  background-color: #e5ecff;
-  color: #1e3a8a;
+  background-color: transparent;
+  font-weight: 800;
+  color: #14532d;
   transform: translateX(2px);
 }
 
 .List .row.active {
-  background-color: #d9f2d9;
-  color: #166534;
-  font-weight: 600;
-  box-shadow: inset 4px 0 0 #22c55e;
+  background-color: transparent;
+  color: #14532d;
+  font-weight: 800;
 }
 
 .List .row.active:hover {
-  background-color: #d9f2d9;
-  color: #166534;
-  transform: none;
+  background-color: transparent;
+  color: #14532d;
+  font-weight: 800;
+  transform: translateX(2px);
 }
 
 .row #icon {

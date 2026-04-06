@@ -21,7 +21,6 @@ function readInitialRole(): AppRole {
       return stored;
     }
   } catch {
-    /* ignore */
   }
   return 'student';
 }
@@ -45,7 +44,6 @@ export const AppRoleProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       localStorage.setItem(STORAGE_KEY, next);
     } catch {
-      /* ignore */
     }
   }, []);
 
