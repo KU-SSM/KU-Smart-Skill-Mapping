@@ -29,6 +29,7 @@ from schemas import (
 )
 from services.openai_service import get_openai_service
 from services.ai_evaluation import run_portfolio_ai_evaluation, PortfolioAIEvaluationResult
+from services.rubric_snapshot import apply_time_based_expiry_on_history
 
 logger = logging.getLogger(__name__)
 PORTFOLIO_FILE_STORAGE_DIR = (
@@ -43,6 +44,30 @@ AI_EVALUATED_SKILL_CRITERIA_PLACEHOLDER = (
 )
 
 router = APIRouter(tags=["Evaluation"])
+
+
+def _apply_time_based_expiry_for_evaluations(
+    db: Session, evaluations: list[models.SkillEvaluation]
+) -> None:
+    """Persist rubric snapshot + SkillEvaluation expiry for histories tied to these rows."""
+    if not evaluations:
+        return
+    now = datetime.utcnow()
+    history_ids = {
+        e.rubric_score_history_id for e in evaluations if e.rubric_score_history_id is not None
+    }
+    for hid in history_ids:
+        h = (
+            db.query(models.RubricScoreHistory)
+            .filter(models.RubricScoreHistory.id == hid)
+            .first()
+        )
+        if h:
+            apply_time_based_expiry_on_history(db, h, now)
+    if history_ids:
+        db.commit()
+        for e in evaluations:
+            db.refresh(e)
 
 
 @router.post("/portfolio/import")
@@ -315,7 +340,9 @@ async def list_skill_evaluations(
         q = q.filter(models.SkillEvaluation.portfolio_id == portfolio_id)
     # Defensive: avoid FastAPI response validation errors for legacy rows with NULL rubric snapshots.
     q = q.filter(models.SkillEvaluation.rubric_score_history_id.isnot(None))
-    return q.order_by(models.SkillEvaluation.id.desc()).offset(skip).limit(limit).all()
+    rows = q.order_by(models.SkillEvaluation.id.desc()).offset(skip).limit(limit).all()
+    _apply_time_based_expiry_for_evaluations(db, rows)
+    return rows
 
 
 @router.get(
@@ -346,6 +373,7 @@ async def read_skill_evaluation_full(
             status_code=500,
             detail=f"skill_evaluation_id {skill_evaluation_id} has no rubric_score_history_id",
         )
+    _apply_time_based_expiry_for_evaluations(db, [se])
     return SkillEvaluationFullModel(
         id=se.id,
         rubric_score_history_id=se.rubric_score_history_id,
@@ -372,6 +400,7 @@ async def read_skill_evaluation(skill_evaluation_id: int, db: db_dependency):
             status_code=500,
             detail=f"skill_evaluation_id {skill_evaluation_id} has no rubric_score_history_id",
         )
+    _apply_time_based_expiry_for_evaluations(db, [se])
     return se
 
 

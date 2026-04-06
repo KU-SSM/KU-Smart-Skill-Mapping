@@ -45,7 +45,6 @@ def close_active_histories_for_rubric(
     )
     closed_ids: list[int] = []
     for h in rows:
-        h.expired_at = now
         h.status = "outdated"
         closed_ids.append(h.id)
         db.query(models.SkillEvaluation).filter(
