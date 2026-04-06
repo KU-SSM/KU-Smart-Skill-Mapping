@@ -53,8 +53,7 @@ interface SkillMapEvaluation {
   id: string;
   title: string;
   rubricHint: string;
-  status: 'pending' | 'completed';
-  /** Max value on radar radius axis (same as number of rubric levels / max rank, e.g. 3). */
+  status: 'pending' | 'completed' | 'approved';
   rubricMaxRank: number;
   rows: SkillMapRadarRow[];
   aiCriteriaParsingRows: {
@@ -155,7 +154,6 @@ const maxRankForRows = (rows: SkillMapRadarRow[]): number => {
   return m;
 };
 
-/** Polar radius domain max: matches rubric level count / max rank (e.g. 3 levels → 0–3), not a fixed 0–5 scale. */
 const rubricAxisMaxFromLevels = (levels: { rank?: number | null }[]): number => {
   if (!levels.length) return 1;
   const ranks = levels.map((l) => toPositiveInt(l.rank));
@@ -169,6 +167,12 @@ const toRadarAxisLabel = (value: string): string => {
   const clean = value.trim();
   if (clean.length <= 18) return clean;
   return `${clean.slice(0, 16)}...`;
+};
+
+const toStatusLabel = (status?: string): 'Pending' | 'Approved' | 'Completed' => {
+  if (status === 'pending') return 'Pending';
+  if (status === 'approved') return 'Approved';
+  return 'Completed';
 };
 
 const SkillMap: React.FC = () => {
@@ -247,7 +251,6 @@ const SkillMap: React.FC = () => {
             return acc;
           }, {})
         );
-        // Start with unfilled selection; user explicitly chooses evaluation.
         setSelectedEvalId('');
         setPendingEvalId('');
       } catch (error) {
@@ -294,7 +297,6 @@ const SkillMap: React.FC = () => {
           const rubricRes = await api.get<RubricResponse>(`rubric/${rubricId}`);
           rubricTitle = rubricRes.data.name || rubricTitle;
         } catch {
-          // keep fallback title
         }
 
         let skills: { id: number; name: string; display_order?: number | null }[] = [];
@@ -323,7 +325,6 @@ const SkillMap: React.FC = () => {
             perSkill.set(c.level_history_id, c.description ?? '');
           });
         } else {
-          // Fallback for older data where only RubricScoreHistory exists without nested snapshot rows.
           const [rubricSkillsRes, rubricLevelsRes, rubricCriteriaRes] = await Promise.all([
             api.get<BackendRubricSkill[]>(`rubric/${rubricId}/rubric_skills`),
             api.get<BackendLevel[]>(`rubric/${rubricId}/levels`),
@@ -371,10 +372,7 @@ const SkillMap: React.FC = () => {
           id: selectedEvalId,
           title: rubricTitle || `Evaluation #${full.id}`,
           rubricHint: rubricTitle,
-          status:
-            full.status === 'pending' ? 'pending' : full.status === 'completed' || full.status === 'approved'
-              ? 'completed'
-              : 'completed',
+          status: full.status === 'pending' ? 'pending' : full.status === 'approved' ? 'approved' : 'completed',
           rubricMaxRank: rubricAxisMaxFromLevels(levels),
           rows: radarRows,
           aiCriteriaParsingRows,
@@ -532,7 +530,7 @@ const SkillMap: React.FC = () => {
                   title={evaluation?.title ?? ''}
                   aria-labelledby="skill-map-eval-label"
                 >
-                  {evaluation?.title ?? '—'}
+                  {evaluation ? `${evaluation.title} (${toStatusLabel(evaluation.status)})` : '—'}
                 </span>
                 <button
                   type="button"
@@ -684,7 +682,7 @@ const SkillMap: React.FC = () => {
                       onClick={() => setPendingEvalId(String(ev.id))}
                     >
                       <span className="skill-map-modal-item-title">
-                        {rubricTitleByHistoryId[ev.rubric_score_history_id] || `Evaluation #${ev.id}`} ({ev.status === 'pending' ? 'Pending' : 'Completed'})
+                        {rubricTitleByHistoryId[ev.rubric_score_history_id] || `Evaluation #${ev.id}`} ({toStatusLabel(ev.status)})
                       </span>
                     </button>
                   </li>

@@ -62,11 +62,6 @@ const RubricScore: React.FC = () => {
   };
 
   const handleSaveChanges = () => {
-    // Simple save handler - API integration will be added later
-    console.log('Save Changes clicked');
-    console.log('Title:', title);
-    console.log('Headers:', headers);
-    console.log('Rows:', rows);
   };
 
   const tableWrapperRef = useRef<HTMLDivElement>(null);

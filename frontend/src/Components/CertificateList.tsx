@@ -14,7 +14,7 @@ interface CertificateEvaluationItem {
   title: string;
   rubricTitle: string;
   requestedAt: string;
-  status: 'completed';
+  status: 'completed' | 'approved';
 }
 
 interface RubricHistoryResponse {
@@ -67,7 +67,6 @@ const CertificateList: React.FC = () => {
           rubric.data.name || rubricTitle
         );
       } catch {
-        // keep fallback title
       }
     }
 
@@ -78,7 +77,7 @@ const CertificateList: React.FC = () => {
       title: rubricTitle || `Evaluation #${ev.id}`,
       rubricTitle,
       requestedAt: ev.created_at || '',
-      status: 'completed',
+      status: ev.status === 'approved' ? 'approved' : 'completed',
     };
   };
 
@@ -104,7 +103,6 @@ const CertificateList: React.FC = () => {
             const rubric = await api.get<RubricResponse>(`rubric/${rh.data.rubric_score_id}`);
             rubricTitleByHistoryIdRef.current.set(historyId, rubric.data.name || `History #${historyId}`);
           } catch {
-            // keep fallback title
           }
         })
       );
@@ -191,7 +189,9 @@ const CertificateList: React.FC = () => {
                       <h3 className="student-name">{item.title}</h3>
                     </div>
                     <div className="student-request-status">
-                      <span className="status-badge completed">Completed</span>
+                      <span className={`status-badge ${item.status}`}>
+                        {item.status === 'approved' ? 'Approved' : 'Completed'}
+                      </span>
                     </div>
                   </div>
                   <div className="student-request-details">

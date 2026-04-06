@@ -15,7 +15,6 @@ const SignUp: React.FC = () => {
       alert('Passwords do not match');
       return;
     }
-    console.log('Sign Up:', { name, email, password });
   };
 
   return (

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './Home.css';
 import './InstructionHelpBubble.css';
 import { useAppRole } from '../context/AppRoleContext';
@@ -27,7 +27,6 @@ type HomeStep = {
   title: string;
   text: string;
   path: string;
-  /** Rich content for the ? speech bubble (student & teacher). */
   helpCloud?: React.ReactNode;
 };
 
@@ -35,18 +34,6 @@ const Home: React.FC = () => {
   const { isStudent } = useAppRole();
   const navigate = useNavigate();
   const [homeHelp, setHomeHelp] = useState<{ path: string; anchor: HelpAnchor } | null>(null);
-  const [rightCardsRoleAnim, setRightCardsRoleAnim] = useState(false);
-  const skipNextRoleAnimRef = useRef(true);
-
-  useEffect(() => {
-    if (skipNextRoleAnimRef.current) {
-      skipNextRoleAnimRef.current = false;
-      return;
-    }
-    setRightCardsRoleAnim(true);
-    const t = window.setTimeout(() => setRightCardsRoleAnim(false), 900);
-    return () => window.clearTimeout(t);
-  }, [isStudent]);
 
   useEffect(() => {
     if (!homeHelp) return;
@@ -205,13 +192,14 @@ const Home: React.FC = () => {
       <div className="home-container">
         <div className="home-instruction-section">
             <h2 className="home-instruction-heading">How to Use This Application</h2>
-          <div className={`home-instruction-grid ${!isStudent ? 'home-instruction-grid--teacher' : ''}`}>
+          <div
+            key={isStudent ? 'student-home-grid' : 'teacher-home-grid'}
+            className={`home-instruction-grid ${!isStudent ? 'home-instruction-grid--teacher' : ''}`}
+          >
             {steps.map((step, index) => (
               <article
                 key={step.title}
-                className={`home-instruction-card${
-                  rightCardsRoleAnim && index >= 2 ? ' home-instruction-card--role-switch-flash' : ''
-                }`}
+                className="home-instruction-card"
                 role="button"
                 tabIndex={0}
                 onClick={() => navigate(step.path)}

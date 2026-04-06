@@ -1,15 +1,40 @@
+@font-face {
+  font-family: 'DB Ozone X Med';
+  src: url('./assets/fonts/DB Ozone/db-ozone-x-med-v3.2.ttf') format('truetype');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+html {
+  font-size: 20px;
+}
+
 html, body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
   width: 100%;
   background: white;
-  font-family: 'Roboto', sans-serif;
+  font-family: 'DB Ozone X Med', 'Roboto', sans-serif;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
+*,
+*::before,
+*::after {
+  font-family: 'DB Ozone X Med', 'Roboto', sans-serif !important;
+}
+
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace !important;
+}
+
+button,
+input,
+select,
+textarea {
+  font-size: 1rem;
 }

@@ -35,7 +35,7 @@
 .home-instruction-heading {
   margin: 0 0 28px 0;
   font-family: 'Roboto', sans-serif;
-  font-size: 40px;
+  font-size: 44px;
   font-weight: 800;
   color: #222;
   text-align: left;
@@ -49,6 +49,7 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   width: 100%;
+  --home-card-stagger-step: 0.04s;
 }
 
 .home-instruction-grid--teacher {
@@ -61,39 +62,20 @@
   }
 }
 
-/* Right column cards (3rd & 4th) when switching Student ↔ Teacher in the navbar */
-@keyframes homeRightCardsRoleSwitch {
-  0% {
-    transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    border-color: #e5e7eb;
-  }
-  40% {
-    transform: translateY(-10px) scale(1.03);
-    box-shadow: 0 18px 40px rgba(178, 187, 30, 0.28);
-    border-color: rgba(178, 187, 30, 0.7);
-  }
-  100% {
-    transform: translateY(0);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
-    border-color: #e5e7eb;
-  }
+.home-instruction-grid .home-instruction-card:nth-child(1) {
+  animation-delay: calc(var(--home-card-stagger-step) * 0);
 }
 
-.home-instruction-grid--teacher .home-instruction-card:nth-child(1) {
-  animation-delay: 1s;
+.home-instruction-grid .home-instruction-card:nth-child(2) {
+  animation-delay: calc(var(--home-card-stagger-step) * 1);
 }
 
-.home-instruction-grid--teacher .home-instruction-card:nth-child(2) {
-  animation-delay: 1.15s;
+.home-instruction-grid .home-instruction-card:nth-child(3) {
+  animation-delay: calc(var(--home-card-stagger-step) * 2);
 }
 
-.home-instruction-grid--teacher .home-instruction-card:nth-child(3) {
-  animation-delay: 1.3s;
-}
-
-.home-instruction-grid--teacher .home-instruction-card:nth-child(4) {
-  animation-delay: 1.45s;
+.home-instruction-grid .home-instruction-card:nth-child(4) {
+  animation-delay: calc(var(--home-card-stagger-step) * 3);
 }
 
 .home-instruction-card {
@@ -108,7 +90,7 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  animation: fadeUp 0.8s ease-out forwards;
+  animation: fadeUp 0.5s ease-out forwards;
   opacity: 0;
   transform: translateY(30px);
   cursor: pointer;
@@ -178,33 +160,8 @@
   cursor: pointer;
 }
 
-.home-instruction-grid:not(.home-instruction-grid--teacher) .home-instruction-card:nth-child(1) {
-  animation-delay: 1s;
-}
-
-.home-instruction-grid:not(.home-instruction-grid--teacher) .home-instruction-card:nth-child(2) {
-  animation-delay: 1.15s;
-}
-
-.home-instruction-grid:not(.home-instruction-grid--teacher) .home-instruction-card:nth-child(3) {
-  animation-delay: 1.3s;
-}
-
-.home-instruction-grid:not(.home-instruction-grid--teacher) .home-instruction-card:nth-child(4) {
-  animation-delay: 1.45s;
-}
-
 .home-instruction-grid:not(.home-instruction-grid--teacher) .home-instruction-card:nth-child(5) {
-  animation-delay: 1.6s;
-}
-
-/* After stagger delays above: role-switch must replace animation so delays do not linger */
-.home-instruction-grid .home-instruction-card.home-instruction-card--role-switch-flash {
-  animation: homeRightCardsRoleSwitch 0.72s cubic-bezier(0.33, 1.15, 0.52, 1) forwards;
-}
-
-.home-instruction-grid .home-instruction-card.home-instruction-card--role-switch-flash:nth-child(4) {
-  animation-delay: 0.1s;
+  animation-delay: calc(var(--home-card-stagger-step) * 4);
 }
 
 .home-instruction-icon {
@@ -218,14 +175,14 @@
 }
 
 .home-instruction-icon svg {
-  width: 42px;
-  height: 42px;
+  width: 46px;
+  height: 46px;
 }
 
 .home-instruction-title {
   margin: 0 0 10px 0;
   font-family: 'Roboto', sans-serif;
-  font-size: 22px;
+  font-size: 25px;
   font-weight: 800;
   color: #111111;
   text-align: center;
@@ -238,11 +195,11 @@
 .home-instruction-text {
   margin: 0;
   font-family: 'Roboto', sans-serif;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.5;
   color: #666;
   text-align: center;
-  min-height: 78px;
+  min-height: 88px;
 }
 
 @media (max-width: 1024px) {
@@ -255,7 +212,7 @@
   }
 
   .home-instruction-heading {
-    font-size: 24px;
+    font-size: 28px;
   }
 }
 
@@ -265,7 +222,6 @@
   }
 }
 
-/* Student home: ? opens speech bubble; tap anywhere (including bubble) to dismiss */
 .home-student-help-dismiss {
   position: fixed;
   inset: 0;
@@ -316,7 +272,7 @@
   position: relative;
   z-index: 1;
   font-family: 'Roboto', sans-serif;
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.55;
   color: #334155;
 }
@@ -324,7 +280,7 @@
 .home-help-cloud-page-title {
   margin: 0 0 10px 0;
   font-weight: 800;
-  font-size: 14px;
+  font-size: 16px;
   color: #14532d;
 }
 
@@ -334,6 +290,7 @@
 
 .home-help-cloud-steps-label {
   margin: 0 0 6px 0;
+  font-size: 15px;
   font-weight: 700;
   color: #1e293b;
 }

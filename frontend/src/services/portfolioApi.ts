@@ -67,32 +67,12 @@ export const importPortfolio = async (
     const formData = new FormData();
     formData.append('file', firstFile, firstFile.name);
 
-    console.log('📤 Sending portfolio data to backend:');
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('Portfolio ID:', portfolioId);
-    console.log('Portfolio Name:', portfolioName);
-    console.log('Total Files:', files.length);
-    console.log('File Details:');
     files.forEach((file, index) => {
-      console.log(`  [${index + 1}] ${file.name}`);
-      console.log(`      Size: ${file.size} bytes (${(file.size / 1024).toFixed(2)} KB)`);
-      console.log(`      Type: ${file.type}`);
-      console.log(`      Last Modified: ${new Date(file.lastModified).toISOString()}`);
     });
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-    console.log('FormData Contents:');
-    console.log('  Field: file');
-    console.log('  File Name:', firstFile.name);
-    console.log('  File Size:', firstFile.size, 'bytes');
-    console.log('  File Type:', firstFile.type);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
     const response = await api.post('portfolio/import', formData);
 
-    console.log('Response Status:', response.status, response.statusText);
     const data = response.data;
-    console.log('Success Response Data:', data);
-    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     
     return {
       success: true,
@@ -132,7 +112,6 @@ export const evaluatePortfolio = async (
   }
 
   const refreshRubricSnapshot = async (rid: number): Promise<void> => {
-    // Refresh by re-saving the rubric (backend will create a new RubricScoreHistory snapshot).
     const rubricRes = await api.get<BackendRubric>(`rubric/${rid}`);
     const rubric = rubricRes.data;
     await api.put<BackendRubric>(`rubric/${rid}`, {
@@ -161,15 +140,12 @@ export const evaluatePortfolio = async (
   };
 
   try {
-    // Use JSON body endpoint to avoid oversized query-string failures for long portfolio text.
     const response = await api.post<PortfolioEvaluateResponse>('ai_evaluation/run', requestBody);
     return response.data;
   } catch (error) {
     console.error('Error evaluating portfolio:', error);
     const detail = getApiErrorDetail(error);
 
-    // If the backend snapshot has criteria histories but none of them include description text,
-    // refresh the rubric snapshot once and retry.
     if (isNoCriteriaWithDescriptionsError(detail)) {
       try {
         await refreshRubricSnapshot(rubric_id);
@@ -177,7 +153,6 @@ export const evaluatePortfolio = async (
         return retryRes.data;
       } catch (retryError) {
         console.error('Retry after rubric snapshot refresh failed:', retryError);
-        // Fall through to throw the original error detail.
       }
     }
 

@@ -23,24 +23,19 @@ const Navbar: React.FC = () => {
     const path = location.pathname;
     const segments = path.split('/').filter(Boolean);
 
-    // Keep user on matching role pages when switching role.
     if (segments[0] === 'profile2' && nextRole === 'teacher') {
-      // /profile2 -> /profile3, /profile2/:id -> /profile3/:id
       navigate(segments[1] && segments[1] !== 'new' ? `/profile3/${segments[1]}` : '/profile3');
       return;
     }
     if (segments[0] === 'profile3' && nextRole === 'student') {
-      // /profile3 -> /profile2, /profile3/:id -> /profile2/:id
       navigate(segments[1] ? `/profile2/${segments[1]}` : '/profile2');
       return;
     }
     if (segments[0] === 'rubric_score_student' && nextRole === 'teacher') {
-      // /rubric_score_student -> /rubric_score, /rubric_score_student/:id -> /rubric_score/:id
       navigate(segments[1] ? `/rubric_score/${segments[1]}` : '/rubric_score');
       return;
     }
     if (segments[0] === 'rubric_score' && nextRole === 'student') {
-      // /rubric_score -> /rubric_score_student, /rubric_score/:id -> /rubric_score_student/:id
       navigate(segments[1] ? `/rubric_score_student/${segments[1]}` : '/rubric_score_student');
     }
   };

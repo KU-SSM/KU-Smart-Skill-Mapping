@@ -152,7 +152,6 @@
   margin: 0;
 }
 
-/* Evaluation picker: label + displayed name + open modal button */
 .skill-map-eval-picker {
   display: flex;
   flex-direction: column;
@@ -217,7 +216,6 @@
   outline-offset: 2px;
 }
 
-/* Modal: select evaluation */
 .skill-map-modal-overlay {
   position: fixed;
   inset: 0;
@@ -395,7 +393,6 @@
   filter: brightness(0.97);
 }
 
-/* Full-width rubric score session (mock) */
 .skill-map-rubric-session {
   width: 100%;
   max-width: 1400px;

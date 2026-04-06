@@ -1,6 +1,5 @@
 import axios from 'axios';
 
-/** Prefer FastAPI `detail` (string or validation array) over generic axios text. */
 export function getApiErrorDetail(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data;

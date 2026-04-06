@@ -46,7 +46,6 @@ const RubricScoreDetailStudent: React.FC = () => {
     return `former_rubric_versions_${id}`;
   }, [id]);
 
-  // Same storage key as teacher rubric detail — students only read (no edits / no expiration modal).
   useEffect(() => {
     if (!historyStorageKey) {
       setSavedFormerRubricVersions([]);
@@ -128,12 +127,10 @@ const RubricScoreDetailStudent: React.FC = () => {
     }
   }, [id, title]);
 
-  // Load former snapshots from backend (backend source of truth; localStorage only as fallback).
   useEffect(() => {
     void loadBackendFormerSnapshots();
   }, [loadBackendFormerSnapshots]);
 
-  // Prefer the richer source when backend/local snapshot counts diverge.
   const formerRubricVersionsRaw =
     backendFormerRubricVersions.length >= savedFormerRubricVersions.length
       ? backendFormerRubricVersions
@@ -145,7 +142,6 @@ const RubricScoreDetailStudent: React.FC = () => {
     );
   });
 
-  // Keep backend snapshot titles synced with whatever the user renamed the rubric to.
   useEffect(() => {
     if (!title) return;
     setBackendFormerRubricVersions((prev) => prev.map((v) => ({ ...v, title })));

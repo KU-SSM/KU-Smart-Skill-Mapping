@@ -12,7 +12,6 @@ type HelpAnchor = {
 export interface InstructionHelpBubbleProps {
   content: React.ReactNode;
   ariaLabel: string;
-  /** Optional class on the ? trigger (e.g. align with section titles) */
   triggerClassName?: string;
 }
 

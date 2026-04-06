@@ -1,6 +1,5 @@
 import React from 'react';
 
-/** Shared bubble typography (matches Home.css help cloud) */
 const B = {
   pageTitle: 'ihb-page-title' as const,
   sectionTitle: 'ihb-section-title' as const,
@@ -13,7 +12,7 @@ export const instructionStudentRubricList: React.ReactNode = (
   <div className="ihb-body">
     <p className={B.pageTitle}>Rubric score Page:</p>
     <p className={B.para}>
-      You can view rubric scores for different careers, their criteria and date time of updates
+      You can view rubric scores for different careers, their criteria and date time of updates.
     </p>
   </div>
 );
@@ -73,17 +72,16 @@ export const instructionTeacherCertificate: React.ReactNode = (
   </div>
 );
 
-/** Teacher.txt — full &quot;Rubric Score Page&quot; (manage + table + pop-up) for one bubble. */
 export const instructionTeacherRubricManage: React.ReactNode = (
   <div className="ihb-body">
     <p className={B.pageTitle}>Rubric Score Page:</p>
 
-    <p className={B.sectionTitle}>Rubrics manage page</p>
+    <p className={B.sectionTitle}>Rubrics Manage Page</p>
     <p className={B.para}>Create, update and delete your rubric scores criteria</p>
 
     <p className={B.sectionTitle}>Rubric Table Page</p>
     <p className={B.para}>
-      main description: The rubric score table which will be used for skill evaluation criteria.
+      Main Description: The rubric score table which will be used for skill evaluation criteria.
     </p>
     <ul className={B.list}>
       <li>Add your rubric criteria table with headers being levels of your skills.</li>

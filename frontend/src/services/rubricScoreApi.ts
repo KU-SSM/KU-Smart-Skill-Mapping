@@ -61,17 +61,13 @@ export const getRubricScores = async (): Promise<RubricScoreListItem[]> => {
 };
 
 const fetchRubricData = async (rubricId: number) => {
-  // Get skills using the correct endpoint
   try {
     const skillsResponse = await api.get<BackendRubricSkill[]>(`rubric/${rubricId}/rubric_skills`);
     const skills = skillsResponse.data;
 
-    // Get levels using the new endpoint
     try {
-      // Backend may return 500 if levels have null descriptions, so we'll catch and handle it
       const levelsResponse = await api.get<BackendLevel[]>(`rubric/${rubricId}/levels`);
       const levels = levelsResponse.data;
-      // Filter out any levels with null descriptions or handle them gracefully
       const validLevels = levels.map(level => ({
         ...level,
         description: level.description === null || level.description === undefined 
@@ -79,7 +75,6 @@ const fetchRubricData = async (rubricId: number) => {
           : level.description
       }));
 
-      // Get criteria using the new endpoint
       try {
         const criteriaResponse = await api.get<BackendCriteria[]>(`rubric/${rubricId}/criteria`);
         const criteria = criteriaResponse.data;
@@ -89,8 +84,6 @@ const fetchRubricData = async (rubricId: number) => {
         return { skills, levels: validLevels, criteria: [] };
       }
     } catch (error) {
-      // If the error is a 500 due to validation (null descriptions), try to continue
-      // by returning empty levels - the frontend can work with skills only
       return { skills, levels: [], criteria: [] };
     }
   } catch (error) {
@@ -107,12 +100,9 @@ const transformBackendToFrontend = (
   const sortedLevels = [...levels].sort((a, b) => a.rank - b.rank);
   const sortedSkills = [...skills].sort((a, b) => a.display_order - b.display_order);
 
-  // Use level descriptions from backend
-  // Handle None/null descriptions from backend gracefully
   let headers: string[];
   if (sortedLevels.length > 0) {
     headers = sortedLevels.map((level) => {
-      // Handle None/null/undefined descriptions
       const desc = level.description;
       if (desc === null || desc === undefined || desc === 'None') {
         return `Level ${level.rank}`; // Fallback to "Level 1", "Level 2", etc.
@@ -125,7 +115,6 @@ const transformBackendToFrontend = (
 
   const rows: TableData[] = sortedSkills.map((skill, index) => {
     const skillCriteria = criteria.filter((c) => c.rubric_skill_id === skill.id);
-    // If levels are empty, create empty values array (still create the row for the skill)
     const values = sortedLevels.length > 0 
       ? sortedLevels.map((level) => {
           const criterion = skillCriteria.find((c) => c.level_id === level.id);
@@ -148,27 +137,19 @@ const transformBackendToFrontend = (
 
 export const getRubricScore = async (id: string): Promise<RubricScoreDetail> => {
   try {
-    // Get the rubric
     const rubricResponse = await api.get<BackendRubric>(`rubric/${id}`);
     const rubric = rubricResponse.data;
     
-    // Get skills, levels, and criteria using the new endpoints
-    // This will return empty arrays for levels/criteria if they fail to load
     const { skills, levels, criteria } = await fetchRubricData(rubric.id);
     
-    // A rubric may intentionally have only level headers before skills are added.
-    // Preserve headers from backend levels even when no skills exist.
     if (skills.length === 0) {
       console.warn('No skills found for this rubric. Preserving level headers.');
     }
     
-    // If we have no levels, log a warning but continue (skills are more important)
     if (levels.length === 0) {
       console.warn('No levels found for this rubric. Continuing with skills only.');
     }
     
-    // Transform backend data to frontend format.
-    // This also supports: levels-only rubric (headers with zero rows).
     return transformBackendToFrontend(rubric, skills, levels, criteria);
   } catch (error: unknown) {
     console.error('Error fetching rubric score:', error);
@@ -197,7 +178,6 @@ export const createRubricScore = async (
     const createdCriteria: BackendCriteria[] = [];
 
     for (let i = 0; i < rubricScore.headers.length; i++) {
-      // Ensure description is always a valid string (not null, undefined, or empty)
       const headerValue = rubricScore.headers[i];
       const description = (headerValue && headerValue.trim() !== '') 
         ? headerValue.trim() 
@@ -275,8 +255,6 @@ export const updateRubricName = async (
   name: string
 ): Promise<BackendRubric> => {
   try {
-    // Backend expects full RubricScoreBase: { name, created_at, updated_at }
-    // So we first fetch the existing rubric to preserve created_at.
     const existingRes = await api.get<BackendRubric>(`rubric/${id}`);
     const existing = existingRes.data;
 
@@ -305,10 +283,8 @@ export const updateRubricScore = async (
       throw new Error(`Invalid rubric ID: ${id}`);
     }
 
-    // First, update rubric name. If this fails, stop and surface the error.
     await updateRubricName(id, rubricScore.title);
 
-    // Strictly replace rubric internals to avoid duplicates on revisit.
     const [skillsResponse, levelsResponse, criteriaResponse] = await Promise.all([
       api.get<BackendRubricSkill[]>(`rubric/${rubricId}/rubric_skills`),
       api.get<BackendLevel[]>(`rubric/${rubricId}/levels`),
@@ -318,7 +294,6 @@ export const updateRubricScore = async (
     const existingLevels = levelsResponse.data;
     const existingCriteria = criteriaResponse.data;
 
-    // Delete criteria first, then skills/levels.
     for (const c of existingCriteria) {
       await api.delete(`criteria/${c.id}`);
     }
@@ -333,9 +308,7 @@ export const updateRubricScore = async (
     const createdLevels: BackendLevel[] = [];
     const createdCriteria: BackendCriteria[] = [];
 
-    // Create new levels for each header
     for (let i = 0; i < rubricScore.headers.length; i++) {
-      // Ensure description is always a valid string (not null, undefined, or empty)
       const headerValue = rubricScore.headers[i];
       const description = (headerValue && headerValue.trim() !== '') 
         ? headerValue.trim() 
@@ -357,8 +330,6 @@ export const updateRubricScore = async (
       }
     }
 
-    // Create new skills for each row
-    // Ensure we have levels before creating skills
     if (createdLevels.length === 0 && rubricScore.headers.length > 0) {
       throw new Error('Failed to create levels. Cannot create skills without levels.');
     }
@@ -380,14 +351,11 @@ export const updateRubricScore = async (
         throw new Error(`Failed to create skill ${i + 1}: ${getApiErrorDetail(error)}`);
       }
 
-      // Create criteria for each cell value (save ALL cells, including empty ones)
       for (let j = 0; j < Math.max(rubricScore.rows[i].values.length, createdLevels.length); j++) {
-        // Skip if we don't have a level for this column
         if (j >= createdLevels.length) {
           continue;
         }
         
-        // Save all cells, even if empty, to preserve all user edits
         const cellValue = (rubricScore.rows[i].values[j] || '').trim();
         const criteriaPayload = {
           rubric_skill_id: skill.id,
@@ -411,7 +379,6 @@ export const updateRubricScore = async (
       }
     }
 
-    // Return canonical backend state after save.
     return await getRubricScore(id);
   } catch (error: unknown) {
     console.error('Error updating rubric score:', error);
@@ -428,7 +395,6 @@ export const deleteRubricScore = async (id: string): Promise<void> => {
   }
 };
 
-// --- Rubric snapshot history (backend snapshots) ---
 export interface BackendRubricScoreHistory {
   id: number;
   created_at: string;
@@ -491,7 +457,6 @@ export const getRubricScoreHistoryByRubric = async (
   }
 };
 
-// Fetch one snapshot table (headers + values) from backend.
 export const getRubricScoreHistorySnapshot = async (
   rubricHistoryId: number
 ): Promise<RubricHistorySnapshot> => {

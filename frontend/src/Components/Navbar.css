@@ -1,4 +1,3 @@
-/* Original bar was rgb(178, 187, 30); slightly darker so the logo lime stripe reads clearly */
 .Navbar {
   width: 100%;
   max-width: 100%;
@@ -28,7 +27,7 @@
   align-items: center;
   gap: 14px;
   font-family: 'Montserrat', sans-serif;
-  font-size: 28px;
+  font-size: 40px;
   font-weight: 700;
   letter-spacing: 0.3px;
 }
@@ -64,7 +63,7 @@
 
 .Navbar-role-label {
   font-family: 'Montserrat', sans-serif;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   opacity: 0.95;
   text-transform: uppercase;
@@ -72,13 +71,13 @@
 }
 
 .Navbar-role-pill {
-  padding: 8px 14px;
+  padding: 9px 16px;
   border: 2px solid rgba(255, 255, 255, 0.85);
   border-radius: 999px;
   background: transparent;
   color: #fff;
   font-family: 'Montserrat', sans-serif;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease;
@@ -101,11 +100,11 @@
 }
 
 .Navbar-button {
-  padding: 10px 20px;
+  padding: 11px 22px;
   border: none;
   border-radius: 5px;
   font-family: 'Montserrat', sans-serif;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -139,7 +138,7 @@
 
   .Navbar-logo {
     min-width: 390px;
-    font-size: 24px;
+    font-size: 25px;
     gap: 10px;
   }
 

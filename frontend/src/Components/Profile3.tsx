@@ -66,7 +66,6 @@ const Profile3: React.FC = () => {
         studentNameByUserIdRef.current.set(ev.user_id, resolvedName);
         studentName = resolvedName;
       } catch {
-        // keep fallback
       }
     }
 
@@ -78,7 +77,6 @@ const Profile3: React.FC = () => {
         rubricTitleByHistoryIdRef.current.set(ev.rubric_score_history_id, resolvedTitle);
         rubricTitle = resolvedTitle;
       } catch {
-        // keep fallback
       }
     }
 
@@ -125,7 +123,6 @@ const Profile3: React.FC = () => {
                 userRes.data.name || `Student #${userId}`
               );
             } catch {
-              // keep fallback
             }
           })
         ),
@@ -139,7 +136,6 @@ const Profile3: React.FC = () => {
                 rubricRes.data.name || `History #${historyId}`
               );
             } catch {
-              // keep fallback
             }
           })
         ),
@@ -150,7 +146,6 @@ const Profile3: React.FC = () => {
         mapped
           .filter((item): item is StudentRequest => item !== null)
           .sort((a, b) => {
-            // In "All" view, pending should appear before completed.
             if (a.status !== b.status) {
               return a.status === 'pending' ? -1 : 1;
             }
