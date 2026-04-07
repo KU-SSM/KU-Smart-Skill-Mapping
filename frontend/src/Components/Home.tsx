@@ -1,53 +1,19 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import './Home.css';
 import './InstructionHelpBubble.css';
 import { useAppRole } from '../context/AppRoleContext';
 import { useNavigate } from 'react-router-dom';
-import {
-  instructionStudentCertificate,
-  instructionStudentEvaluationOverview,
-  instructionStudentRubricList,
-  instructionStudentSkillMap,
-  instructionTeacherCertificate,
-  instructionTeacherEvaluation,
-  instructionTeacherRubricManage,
-  instructionTeacherSkillMap,
-} from './instructionHelpContent';
-
-type HelpAnchor = {
-  top: number;
-  left: number;
-  width: number;
-  height: number;
-  bottom: number;
-};
 
 type HomeStep = {
   icon?: JSX.Element;
   title: string;
   text: string;
   path: string;
-  helpCloud?: React.ReactNode;
 };
 
 const Home: React.FC = () => {
   const { isStudent } = useAppRole();
   const navigate = useNavigate();
-  const [homeHelp, setHomeHelp] = useState<{ path: string; anchor: HelpAnchor } | null>(null);
-
-  useEffect(() => {
-    if (!homeHelp) return;
-    const close = () => setHomeHelp(null);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') close();
-    };
-    window.addEventListener('resize', close);
-    window.addEventListener('keydown', onKey);
-    return () => {
-      window.removeEventListener('resize', close);
-      window.removeEventListener('keydown', onKey);
-    };
-  }, [homeHelp]);
 
   const studentSteps: HomeStep[] = [
     {
@@ -60,9 +26,8 @@ const Home: React.FC = () => {
         </svg>
       ),
       title: 'View Rubric Score',
-      text: 'Open your rubric score history and review previous assessment details.',
+      text: 'View rubric scores for different careers, their criteria and date time of updates.',
       path: '/rubric_score_student',
-      helpCloud: instructionStudentRubricList,
     },
     {
       icon: (
@@ -75,9 +40,8 @@ const Home: React.FC = () => {
         </svg>
       ),
       title: 'Perform Evaluation by AI',
-      text: 'Upload your portfolio and run AI-assisted evaluation to generate draft scores.',
+      text: 'Upload your portfolio and run AI evaluation to generate draft scores.',
       path: '/profile2',
-      helpCloud: instructionStudentEvaluationOverview,
     },
     {
       icon: (
@@ -89,7 +53,6 @@ const Home: React.FC = () => {
       title: 'View Skill Map',
       text: 'Check your skill map to understand strengths and progress across skill areas.',
       path: '/skill_map',
-      helpCloud: instructionStudentSkillMap,
     },
     {
       icon: (
@@ -99,9 +62,8 @@ const Home: React.FC = () => {
         </svg>
       ),
       title: 'Export Certificate',
-      text: 'Go to certificate page and export your latest evaluation result as a certificate.',
+      text: 'Choose the approved evaluation results to make a certificate to export.',
       path: '/certificate',
-      helpCloud: instructionStudentCertificate,
     },
   ];
 
@@ -114,9 +76,8 @@ const Home: React.FC = () => {
         </svg>
       ),
       title: 'Create Rubric Score',
-      text: 'Open rubric score workspace to create and manage teacher scoring records.',
+      text: 'Create, update or rename your rubric scores criteria.',
       path: '/rubric_score',
-      helpCloud: instructionTeacherRubricManage,
     },
     {
       icon: (
@@ -133,9 +94,8 @@ const Home: React.FC = () => {
         </svg>
       ),
       title: 'View Request & Perform Evaluation',
-      text: 'See every student request, then review portfolios and enter teacher scores in one workspace.',
+      text: 'See every student request, then review portfolios and enter teacher scores.',
       path: '/profile3',
-      helpCloud: instructionTeacherEvaluation,
     },
     {
       icon: (
@@ -145,9 +105,8 @@ const Home: React.FC = () => {
         </svg>
       ),
       title: 'View Skill Map',
-      text: 'Inspect skill maps for any student by choosing their evaluation—compare student, AI, and teacher levels.',
+      text: 'Inspect skill maps for any student by choosing their evaluation.',
       path: '/skill_map',
-      helpCloud: instructionTeacherSkillMap,
     },
     {
       icon: (
@@ -157,35 +116,12 @@ const Home: React.FC = () => {
         </svg>
       ),
       title: 'Export Certificate',
-      text: 'Access the certificate page to preview or export PDF certificates for any student’s completed evaluation.',
+      text: 'Choose the approved evaluation results to make a certificate to export.',
       path: '/certificate',
-      helpCloud: instructionTeacherCertificate,
     },
   ];
 
   const steps = isStudent ? studentSteps : teacherSteps;
-
-  const openHelp = (event: React.MouseEvent<HTMLButtonElement>, step: HomeStep) => {
-    event.stopPropagation();
-    if (step.helpCloud == null) return;
-    const r = event.currentTarget.getBoundingClientRect();
-    setHomeHelp({
-      path: step.path,
-      anchor: {
-        top: r.top,
-        left: r.left,
-        width: r.width,
-        height: r.height,
-        bottom: r.bottom,
-      },
-    });
-  };
-
-  const closeHomeHelp = () => setHomeHelp(null);
-
-  const activeSteps = isStudent ? studentSteps : teacherSteps;
-  const homeHelpContent =
-    homeHelp != null ? activeSteps.find((s) => s.path === homeHelp.path)?.helpCloud : null;
 
   return (
     <div className="home-wrapper">
@@ -210,15 +146,6 @@ const Home: React.FC = () => {
                   }
                 }}
               >
-                <button
-                  type="button"
-                  className="home-help-button"
-                  aria-label={`How to use: ${step.title}`}
-                  title="How to use"
-                  onClick={(event) => openHelp(event, step)}
-                >
-                  ?
-                </button>
                 {step.icon && (
                   <div className="home-instruction-icon" aria-hidden>
                     {step.icon}
@@ -231,36 +158,6 @@ const Home: React.FC = () => {
           </div>
         </div>
       </div>
-      {homeHelp && homeHelpContent && (
-        <>
-          <div
-            className="home-student-help-dismiss"
-            role="presentation"
-            aria-hidden
-            onClick={closeHomeHelp}
-          />
-          <div
-            className="home-help-cloud"
-            role="dialog"
-            aria-modal="true"
-            aria-label={`Help: ${activeSteps.find((s) => s.path === homeHelp.path)?.title ?? 'Guide'}`}
-            style={{
-              top: homeHelp.anchor.bottom + 10,
-              left: Math.max(
-                16,
-                Math.min(
-                  homeHelp.anchor.left + homeHelp.anchor.width / 2,
-                  window.innerWidth - 16
-                )
-              ),
-              transform: 'translateX(-50%)',
-            }}
-            onClick={closeHomeHelp}
-          >
-            <div className="home-help-cloud-inner">{homeHelpContent}</div>
-          </div>
-        </>
-      )}
     </div>
   );
 };

@@ -13,6 +13,11 @@ import {
 } from '../services/rubricScoreApi';
 import { localDateAndTimeToUtcIso } from '../utils/dateTime';
 import { getApiErrorDetail } from '../utils/apiErrors';
+import InstructionHelpBubble from './InstructionHelpBubble';
+import {
+  instructionTeacherRubricSaveExpiration,
+  instructionTeacherRubricTable,
+} from './instructionHelpContent';
 import './RubricScore.css';
 
 const DeleteIcon = AiOutlineDelete as React.ComponentType;
@@ -544,6 +549,11 @@ const RubricScoreDetail: React.FC = () => {
           >
             {React.createElement(HistoryIcon)}
           </button>
+          <InstructionHelpBubble
+            content={instructionTeacherRubricTable}
+            ariaLabel="Teacher rubric table help"
+            triggerClassName="ihb-trigger--section"
+          />
           <button 
             className="delete-rubric-button" 
             onClick={handleDelete}
@@ -788,6 +798,11 @@ const RubricScoreDetail: React.FC = () => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2 className="modal-title rubric-save-expiration-modal-title">
               Set expiration date before saving
+              <InstructionHelpBubble
+                content={instructionTeacherRubricSaveExpiration}
+                ariaLabel="Teacher rubric expiration popup help"
+                triggerClassName="ihb-trigger--section"
+              />
             </h2>
             <div className="modal-form">
               <div className="modal-field">
