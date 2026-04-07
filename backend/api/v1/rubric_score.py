@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 import models
 from api.deps import db_dependency
 from services.rubric_snapshot import (
-    close_active_histories_for_rubric,
+    update_active_histories_for_rubric,
     snapshot_live_rubric_to_history,
 )
 from schemas import (
@@ -80,7 +80,7 @@ async def update_rubric(rubric_id: int, rubric: RubricScoreBase, db: db_dependen
     for key, value in rubric.model_dump().items():
         setattr(db_rubric, key, value)
 
-    close_active_histories_for_rubric(db, rubric_id)
+    update_active_histories_for_rubric(db, rubric_id)
     db.refresh(db_rubric)
     snapshot_live_rubric_to_history(db, rubric_id)
     db.commit()

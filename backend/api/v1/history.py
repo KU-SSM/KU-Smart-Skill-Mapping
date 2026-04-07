@@ -14,6 +14,7 @@ from schemas import (
     LevelHistoryModel,
     RubricScoreHistoryCreate,
     RubricScoreHistoryModel,
+    RubricScoreHistoryUpdate,
     RubricSkillHistoryCreate,
     RubricSkillHistoryModel,
 )
@@ -248,6 +249,22 @@ async def create_criteria_history_nested(
 )
 async def read_rubric_score_history(rubric_history_id: int, db: db_dependency):
     return _get_rubric_score_history_or_404(db, rubric_history_id)
+
+
+@router.put(
+    "/rubric_score_history/{rubric_history_id}",
+    response_model=RubricScoreHistoryModel,
+)
+async def update_rubric_score_history(
+    rubric_history_id: int, body: RubricScoreHistoryUpdate, db: db_dependency
+):
+    row = _get_rubric_score_history_or_404(db, rubric_history_id)
+    data = body.model_dump(exclude_unset=True)
+    for key, value in data.items():
+        setattr(row, key, value)
+    db.commit()
+    db.refresh(row)
+    return row
 
 
 @router.delete("/rubric_score_history/{rubric_history_id}")

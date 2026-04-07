@@ -16,7 +16,7 @@ from sqlalchemy.orm import Session, joinedload
 import models
 from services.rubric_snapshot import (
     apply_time_based_expiry_on_history,
-    close_active_histories_for_rubric,
+    update_active_histories_for_rubric,
     get_current_evaluable_rubric_history,
     snapshot_live_rubric_to_history,
 )
@@ -296,7 +296,7 @@ async def run_portfolio_ai_evaluation(
         # it from the live rubric and continue evaluation against the new history.
         #
         # This keeps the system robust even if the frontend missed triggering snapshot regen.
-        close_active_histories_for_rubric(db, rubric_id)
+        update_active_histories_for_rubric(db, rubric_id)
         new_rh = snapshot_live_rubric_to_history(db, rubric_id)
         db.flush()
 

@@ -5,12 +5,14 @@ Triggers (caller): POST/PUT RubricScore. Closes prior active histories on rubric
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timedelta
 
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 import models
 
+OUTDATED_GRACE_PERIOD_DAYS = 30
 
 def apply_time_based_expiry_on_history(
     db: Session, row: models.RubricScoreHistory, now: datetime | None = None
@@ -26,11 +28,14 @@ def apply_time_based_expiry_on_history(
         ).update({models.SkillEvaluation.status: "expired"}, synchronize_session=False)
 
 
-def close_active_histories_for_rubric(
+def update_active_histories_for_rubric(
     db: Session, rubric_score_id: int, now: datetime | None = None
 ) -> list[int]:
     """
-    Mark current active history rows as superseded: expired_at = now, status = outdated.
+    Update active history rows.
+    Preserve status separation:
+    - outdated while now < expired_at
+    - expired when now >= expired_at (handled by time-based expiry checks)
     Returns ids of rows that were closed.
     """
     now = now or datetime.utcnow()
@@ -38,13 +43,18 @@ def close_active_histories_for_rubric(
         db.query(models.RubricScoreHistory)
         .filter(
             models.RubricScoreHistory.rubric_score_id == rubric_score_id,
-            models.RubricScoreHistory.expired_at.is_(None),
             models.RubricScoreHistory.status == "valid",
+            or_(
+                models.RubricScoreHistory.expired_at.is_(None),
+                models.RubricScoreHistory.expired_at > now,
+            ),
         )
         .all()
     )
     closed_ids: list[int] = []
     for h in rows:
+        if h.expired_at is None:
+            h.expired_at = now + timedelta(days=OUTDATED_GRACE_PERIOD_DAYS)
         h.status = "outdated"
         closed_ids.append(h.id)
         db.query(models.SkillEvaluation).filter(
