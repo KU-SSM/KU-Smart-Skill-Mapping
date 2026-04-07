@@ -73,7 +73,7 @@ const RubricVersionEvaluationDetail: React.FC = () => {
 
   return (
     <div className="profile-wrapper">
-      {/* Header */}
+      
       <div className="portfolio-container">
         <div className="portfolio-section">
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
@@ -95,7 +95,7 @@ const RubricVersionEvaluationDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* Rubric (as of this version) */}
+      
       <div className="portfolio-container">
         <div className="portfolio-section">
           <h2 className="portfolio-section-title">Rubric (as of this version)</h2>
@@ -109,7 +109,7 @@ const RubricVersionEvaluationDetail: React.FC = () => {
         </div>
       </div>
 
-      {/* Evaluation results (read-only) */}
+      
       <div className="evaluation-container">
         <div className="evaluation-section">
           <h2 className="evaluation-section-title">Evaluation Results</h2>

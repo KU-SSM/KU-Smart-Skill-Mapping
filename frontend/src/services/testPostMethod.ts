@@ -13,13 +13,9 @@ export const testPostMethod = async () => {
       ]
     };
 
-    console.log('Testing POST method...');
-    console.log('Sending data:', testData);
 
     const result = await createRubricScore(testData);
     
-    console.log('✅ Success! Created rubric score:');
-    console.log(result);
     
     return result;
   } catch (error) {

@@ -116,6 +116,13 @@
   margin: 0 0 16px 0;
 }
 
+.profile3-detail-title-with-help {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
 .add-new-skill-container {
   display: flex;
   gap: 8px;
@@ -558,7 +565,6 @@
   transform: translateY(-1px);
 }
 
-/* Profile2 — Your Profile title + delete evaluation (student) */
 .profile2-profile-title-row {
   display: flex;
   align-items: center;
@@ -572,6 +578,31 @@
   margin: 0 !important;
   flex: 1;
   min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile2-section-help-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  padding: 0;
+  font-size: 18px;
+}
+
+.profile2-section-help-button:hover {
+  color: rgba(178, 187, 30, 1);
+}
+
+.profile2-section-title-with-help {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
 }
 
 .profile2-delete-eval-header-button {
@@ -603,7 +634,6 @@
   transform: scale(0.96);
 }
 
-/* Profile2 single-file upload style */
 .profile2-upload-row {
   display: flex;
   align-items: center;
@@ -690,7 +720,6 @@
   }
 }
 
-/* Profile2 Upload Container - Two Card Layout */
 .profile-upload-container {
   display: flex;
   gap: 24px;
@@ -857,7 +886,6 @@
   width: 100%;
 }
 
-/* Evaluation page — same heading scale for student (Profile2) and teacher (Profile3Detail) */
 .evaluation-section-title {
   font-family: 'Roboto', sans-serif;
   font-size: 2rem;
@@ -876,7 +904,6 @@
   margin-left: 0.625rem;
 }
 
-/* Panel column headings (AI / Student / Teacher) — match across roles */
 .evaluation-container .skills-panel .panel-title {
   font-family: 'Roboto', sans-serif;
   font-size: 1.125rem;
@@ -1150,7 +1177,6 @@
   }
 }
 
-/* Profile2 Evaluation Cards */
 .profile2-eval-list {
   display: flex;
   flex-direction: column;
@@ -1203,7 +1229,6 @@
   color: #333;
 }
 
-/* Profile2 Rubric Bar with View Details Button */
 .profile2-rubric-bar {
   display: flex;
   align-items: center;
@@ -1251,7 +1276,6 @@
   font-size: 13px;
 }
 
-/* When rubric bar is selected, adjust button styling */
 .profile2-rubric-bar.selected .profile2-view-details-button {
   color: #333;
 }
@@ -1275,7 +1299,6 @@
   }
 }
 
-/* Profile2 Three Panels Layout */
 .profile2-three-panels {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -1295,7 +1318,6 @@
   min-height: 400px;
 }
 
-/* Profile2 Skill Item with Score Input */
 .profile2-skill-item {
   display: flex;
   align-items: center;
@@ -1379,7 +1401,6 @@
   font-size: 12px;
 }
 
-/* Profile2 Evaluation Header with Button */
 .evaluation-header-container {
   display: flex;
   align-items: center;
@@ -1454,7 +1475,6 @@
   box-shadow: 0 0 0 3px rgba(178, 187, 30, 0.22);
 }
 
-/* Manual AI evaluation — outlined to pair with solid “Request Teacher Evaluation” */
 .profile2-ai-evaluate-button {
   padding: 10px 20px;
   border: 2px solid rgba(178, 187, 30, 1);
@@ -1486,6 +1506,19 @@
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+.profile2-ai-evaluate-sticky-footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  width: 100%;
+  margin-top: auto;
+  padding: 12px 0 10px 0;
+  background-color: #ffffff;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: center;
 }
 
 .profile2-ai-draft-hint {
@@ -1551,8 +1584,6 @@
   }
 }
 
-/* Profile3 Teacher Evaluation Styles */
-/* Your Evaluation (Profile2List): space between cards and + add row */
 .profile2-yevaluation-stack {
   display: flex;
   flex-direction: column;
@@ -1684,6 +1715,11 @@
   color: #155724;
 }
 
+.status-badge.approved {
+  background-color: #dbeafe;
+  color: #1e3a8a;
+}
+
 .status-badge.expired {
   background-color: #f8d7da;
   color: #721c24;
@@ -1724,7 +1760,6 @@
   text-align: left;
 }
 
-/* Your Evaluation list — placeholders: no border/underline (avoids browser “dotted” dash under text) */
 .profile2-eval-detail-dashed {
   display: inline;
   padding: 0;
@@ -1749,7 +1784,6 @@
   min-height: 200px;
 }
 
-/* Teacher view (Profile3): shorter Student Portfolio strip */
 .portfolio-display-box.profile3-student-portfolio-box {
   padding: 14px 20px;
   min-height: 0;
@@ -1863,7 +1897,6 @@
   width: 80px;
 }
 
-/* AI Score Input - Auto-filled and read-only */
 .ai-score-input {
   background-color: #f5f5f5;
   cursor: not-allowed;
@@ -1875,7 +1908,6 @@
   box-shadow: none;
 }
 
-/* Teacher Score Input - Dashed border and read-only */
 .profile2-teacher-dashed {
   border: 2px dashed #ccc;
   background-color: #fafafa;
@@ -1903,7 +1935,6 @@
   box-shadow: none;
 }
 
-/* Profile2 Rubric Confirm Button */
 .rubric-score-actions {
   display: flex;
   justify-content: flex-end;
@@ -1967,7 +1998,6 @@
   }
 }
 
-/* Profile3 Detail Page Styles */
 .profile3-submit-button-container {
   display: flex;
   justify-content: flex-end;
@@ -2019,6 +2049,11 @@
 
 .student-request-header-info {
   flex: 1;
+}
+
+.profile3-student-skill-pending-self-eval {
+  border: 1px dashed #b2bb1e;
+  border-radius: 8px;
 }
 
 @media (max-width: 768px) {

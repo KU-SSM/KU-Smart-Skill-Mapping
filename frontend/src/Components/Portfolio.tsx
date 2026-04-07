@@ -17,7 +17,6 @@ const Portfolio: React.FC = () => {
     if (files) {
       const fileArray = Array.from(files);
       setSelectedFiles(fileArray);
-      console.log('Selected files:', fileArray);
       
       const pdfFiles = fileArray.filter(file => file.name.toLowerCase().endsWith('.pdf'));
       
@@ -29,7 +28,6 @@ const Portfolio: React.FC = () => {
             'General Portfolio',
             pdfFiles
           );
-          console.log('Portfolio import successful:', result);
         } catch (error: any) {
           console.error('Error importing portfolio:', error);
         } finally {

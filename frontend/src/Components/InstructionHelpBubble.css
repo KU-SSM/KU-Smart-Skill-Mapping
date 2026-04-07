@@ -1,0 +1,139 @@
+.ihb-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  margin: 0 0 0 8px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.ihb-trigger:hover {
+  border-color: rgba(178, 187, 30, 0.7);
+  color: #14532d;
+}
+
+.ihb-trigger--modal-inline {
+  margin-left: 6px;
+  margin-right: 0;
+}
+
+.ihb-trigger--section {
+  margin-left: 6px;
+  margin-top: 2px;
+}
+
+.ihb-dismiss {
+  position: fixed;
+  inset: 0;
+  z-index: 2140;
+  cursor: default;
+  background: transparent;
+}
+
+.ihb-cloud {
+  position: fixed;
+  z-index: 2150;
+  max-width: min(380px, calc(100vw - 24px));
+  max-height: min(72vh, 480px);
+  overflow: visible;
+  cursor: pointer;
+  text-align: left;
+}
+
+.ihb-cloud-inner {
+  position: relative;
+  margin-top: 6px;
+  padding: 14px 16px 16px;
+  background: #fff;
+  border: 1px solid #c5cdb8;
+  border-radius: 18px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.12);
+  overflow-y: auto;
+  max-height: min(calc(72vh - 12px), 468px);
+}
+
+.ihb-cloud-inner::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  background: #fff;
+  border-left: 1px solid #c5cdb8;
+  border-top: 1px solid #c5cdb8;
+  transform: rotate(45deg);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.ihb-body {
+  position: relative;
+  z-index: 1;
+  font-family: 'Roboto', sans-serif;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #334155;
+}
+
+.ihb-page-title {
+  margin: 0 0 10px 0;
+  font-weight: 800;
+  font-size: 14px;
+  color: #14532d;
+}
+
+.ihb-section-title {
+  margin: 12px 0 6px 0;
+  font-weight: 700;
+  font-size: 13px;
+  color: #1e293b;
+}
+
+.ihb-body > .ihb-page-title + .ihb-section-title {
+  margin-top: 6px;
+}
+
+.ihb-paragraph {
+  margin: 0;
+}
+
+.ihb-paragraph + .ihb-section-title {
+  margin-top: 14px;
+}
+
+.ihb-steps-label {
+  margin: 0 0 6px 0;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.ihb-list {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+
+.ihb-list li {
+  margin-bottom: 6px;
+}
+
+.ihb-list li:last-child {
+  margin-bottom: 0;
+}
+
+.ihb-list--flat {
+  list-style: disc;
+  padding-left: 1.25rem;
+}

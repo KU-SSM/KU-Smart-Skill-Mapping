@@ -11,6 +11,8 @@ import {
   getSkillEvaluationsByUser,
   type SkillEvaluationRecord,
 } from '../services/skillEvaluationApi';
+import InstructionHelpBubble from './InstructionHelpBubble';
+import { instructionStudentEvaluationOverview } from './instructionHelpContent';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const DeleteIcon = AiOutlineDelete as React.ComponentType;
@@ -22,7 +24,7 @@ interface StudentEvaluationItem {
   rubricTitle: string;
   portfolioFileName: string;
   requestedAt: string;
-  status: 'drafted' | 'pending' | 'completed' | 'outdated' | 'expired';
+  status: 'drafted' | 'pending' | 'approved' | 'completed' | 'outdated' | 'expired';
 }
 
 interface RubricHistoryResponse {
@@ -74,7 +76,6 @@ const Profile2List: React.FC = () => {
     const isRubricHistoryOutdated =
       rubricOutdatedByHistoryIdRef.current.get(ev.rubric_score_history_id) || false;
 
-    // Fallback to backend rubric name when local meta is missing (cached by history id).
     if (!meta?.rubricTitle && !rubricTitleByHistoryIdRef.current.has(ev.rubric_score_history_id)) {
       try {
         const rh = await api.get<RubricHistoryResponse>(`rubric_score_history/${ev.rubric_score_history_id}`);
@@ -84,7 +85,6 @@ const Profile2List: React.FC = () => {
           rubric.data.name || rubricTitle
         );
       } catch {
-        // keep fallback title
       }
     }
     rubricTitle =
@@ -95,7 +95,9 @@ const Profile2List: React.FC = () => {
         ? 'expired'
         : isRubricHistoryOutdated
           ? 'outdated'
-        : ev.status === 'completed' || ev.status === 'approved'
+        : ev.status === 'approved'
+          ? 'approved'
+        : ev.status === 'completed'
           ? 'completed'
           : ev.status === 'pending'
             ? 'pending'
@@ -106,7 +108,6 @@ const Profile2List: React.FC = () => {
       title: rubricTitle || `Evaluation #${ev.id}`,
       rubricTitle,
       portfolioFileName: meta?.portfolioFileName || `Portfolio #${ev.portfolio_id}`,
-      // Draft means teacher request has not been sent yet.
       requestedAt:
         mappedStatus === 'drafted' || mappedStatus === 'outdated' || mappedStatus === 'expired'
           ? ''
@@ -121,7 +122,6 @@ const Profile2List: React.FC = () => {
       const userId = getCurrentUserId();
       const rows = await getSkillEvaluationsByUser(userId);
 
-      // Pre-fetch rubric titles once per history id (avoids repeated calls for each row).
       const idsNeedingRubric = Array.from(
         new Set(
           rows
@@ -141,20 +141,17 @@ const Profile2List: React.FC = () => {
             const isExpired = rh.data.status === 'expired';
             rubricExpiredByHistoryIdRef.current.set(historyId, isExpired);
             rubricOutdatedByHistoryIdRef.current.set(historyId, rh.data.status === 'outdated');
-
             const rubric = await api.get<RubricResponse>(`rubric/${rh.data.rubric_score_id}`);
             rubricTitleByHistoryIdRef.current.set(
               historyId,
               rubric.data.name || `History #${historyId}`
             );
           } catch {
-            // keep fallback title
           }
         })
       );
 
       const enriched = await Promise.all(rows.map((row) => mapBackendEvaluation(row)));
-      // Persist snapshot-driven statuses so detail pages can reliably lock/disable.
       const rowsToExpire = rows.filter((row) => {
         const shouldExpire =
           rubricExpiredByHistoryIdRef.current.get(row.rubric_score_history_id) || false;
@@ -207,7 +204,6 @@ const Profile2List: React.FC = () => {
   }, [evaluations, searchTitle]);
 
   const formatDate = (dateString: string) => {
-    // Backend datetime may be timezone-naive; treat it as UTC, then render in Thai time.
     const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/.test(dateString);
     const normalizedIso = hasTimezone ? dateString : `${dateString}Z`;
     const date = new Date(normalizedIso);
@@ -238,7 +234,6 @@ const Profile2List: React.FC = () => {
       try {
         localStorage.removeItem(evaluationMetaKey(id));
       } catch {
-        // ignore localStorage errors
       }
       setEvaluations((prev) => prev.filter((item) => item.id !== id));
     } catch (error) {
@@ -256,7 +251,13 @@ const Profile2List: React.FC = () => {
   return (
     <div className="rubric-score-wrapper">
       <div className="rubric-score-container">
-        <h1 className="rubric-score-title">Your Evaluation</h1>
+        <div className="rubric-score-title-row">
+          <h1 className="rubric-score-title">Your Evaluation</h1>
+          <InstructionHelpBubble
+            content={instructionStudentEvaluationOverview}
+            ariaLabel="Evaluation page help"
+          />
+        </div>
 
           <div className="rubric-score-search-container" style={{ marginBottom: '16px' }}>
             <input
@@ -322,7 +323,7 @@ const Profile2List: React.FC = () => {
                 {filteredEvaluations.map((item) => (
                   <div
                     key={item.id}
-                    className={`student-request-card ${item.status === 'completed' ? 'completed' : ''} ${
+                    className={`student-request-card ${item.status === 'completed' || item.status === 'approved' ? 'completed' : ''} ${
                       item.status === 'expired' ? 'expired' : ''
                     }`}
                     onClick={() => {
@@ -369,6 +370,8 @@ const Profile2List: React.FC = () => {
                               ? 'expired'
                               : item.status === 'outdated'
                                 ? 'outdated'
+                              : item.status === 'approved'
+                                ? 'completed'
                               : item.status === 'completed'
                                 ? 'completed'
                                 : 'pending'
@@ -378,6 +381,8 @@ const Profile2List: React.FC = () => {
                             ? 'Expired'
                             : item.status === 'outdated'
                               ? 'Outdated'
+                            : item.status === 'approved'
+                              ? 'Approved'
                             : item.status === 'completed'
                               ? 'Completed'
                               : item.status === 'pending'

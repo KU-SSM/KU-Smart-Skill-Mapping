@@ -4,7 +4,7 @@
   margin: 0;
   padding: 0;
   overflow-y: auto;
-  color: black;
+  color: #1f2937;
   flex-shrink: 0;
 }
 
@@ -16,9 +16,12 @@
   display: flex;
   flex-direction: row;
   font-family: 'Roboto', sans-serif;
-  font-size: 20px;
+  font-size: 25px;
+  font-weight: 400;
   justify-content: center;
   align-items: center;
+  color: inherit;
+  transition: color 0.2s ease, transform 0.15s ease;
 }
 
 span {
@@ -34,16 +37,23 @@ span {
 
 .List .row:hover {
   cursor: pointer;
-  background-color: rgba(178, 187, 30, 0.8);
+  background-color: transparent;
+  font-weight: 800;
+  color: #14532d;
+  transform: translateX(2px);
 }
 
 .List .row.active {
-  background-color: rgba(178, 187, 30, 1);
-  font-weight: 600;
+  background-color: transparent;
+  color: #14532d;
+  font-weight: 800;
 }
 
 .List .row.active:hover {
-  background-color: rgba(178, 187, 30, 1);
+  background-color: transparent;
+  color: #14532d;
+  font-weight: 800;
+  transform: translateX(2px);
 }
 
 .row #icon {

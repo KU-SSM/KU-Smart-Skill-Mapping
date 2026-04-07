@@ -110,7 +110,6 @@ const Profile: React.FC = () => {
         ...portfolioFiles,
         [portfolioId]: fileArray
       });
-      console.log(`Selected files for ${portfolioId}:`, fileArray);
       
       const portfolio = portfolios.find(p => p.id === portfolioId);
       
@@ -127,7 +126,6 @@ const Profile: React.FC = () => {
           portfolio?.name || 'Unknown Portfolio',
           pdfFiles.length > 0 ? pdfFiles : fileArray
         );
-        console.log('Portfolio import successful:', result);
       } catch (error: any) {
         console.error('Error importing portfolio:', error);
       }

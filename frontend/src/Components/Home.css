@@ -16,29 +16,6 @@
   box-sizing: border-box;
 }
 
-.home-top-row {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 40px;
-  box-sizing: border-box;
-}
-
-.home-image-section {
-  flex: 1;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.home-image {
-  width: 100%;
-  max-width: 400px;
-  height: auto;
-  animation: fadeUp 0.8s ease-out forwards;
-  opacity: 0;
-  transform: translateY(30px);
-}
 
 @keyframes fadeUp {
   from {
@@ -51,53 +28,14 @@
   }
 }
 
-.home-greeting-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 20px;
-  box-sizing: border-box;
-}
-
-.greeting-title {
-  font-family: 'Roboto', sans-serif;
-  font-size: 42px;
-  font-weight: 700;
-  color: #333;
-  margin: 0 0 24px 0;
-  line-height: 1.2;
-  text-align: left;
-  animation: fadeUp 0.8s ease-out 0.4s forwards;
-  opacity: 0;
-  transform: translateY(30px);
-}
-
-.greeting-message {
-  font-family: 'Roboto', sans-serif;
-  font-size: 18px;
-  line-height: 1.8;
-  color: #666;
-  margin: 0 0 20px 0;
-  text-align: left;
-  animation: fadeUp 0.8s ease-out 0.6s forwards;
-  opacity: 0;
-  transform: translateY(30px);
-}
-
-.greeting-message:last-child {
-  margin-bottom: 0;
-}
-
 .home-instruction-section {
-  margin-top: 20px;
   width: 100%;
 }
 
 .home-instruction-heading {
   margin: 0 0 28px 0;
   font-family: 'Roboto', sans-serif;
-  font-size: 40px;
+  font-size: 44px;
   font-weight: 800;
   color: #222;
   text-align: left;
@@ -111,6 +49,33 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
   width: 100%;
+  --home-card-stagger-step: 0.04s;
+}
+
+.home-instruction-grid--teacher {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+@media (max-width: 1280px) {
+  .home-instruction-grid--teacher {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.home-instruction-grid .home-instruction-card:nth-child(1) {
+  animation-delay: calc(var(--home-card-stagger-step) * 0);
+}
+
+.home-instruction-grid .home-instruction-card:nth-child(2) {
+  animation-delay: calc(var(--home-card-stagger-step) * 1);
+}
+
+.home-instruction-grid .home-instruction-card:nth-child(3) {
+  animation-delay: calc(var(--home-card-stagger-step) * 2);
+}
+
+.home-instruction-grid .home-instruction-card:nth-child(4) {
+  animation-delay: calc(var(--home-card-stagger-step) * 3);
 }
 
 .home-instruction-card {
@@ -125,114 +90,129 @@
   align-items: center;
   justify-content: center;
   text-align: center;
-  animation: fadeUp 0.8s ease-out forwards;
+  animation: fadeUp 0.5s ease-out forwards;
   opacity: 0;
   transform: translateY(30px);
-}
-
-.home-instruction-grid .home-instruction-card:nth-child(1) {
-  animation-delay: 1s;
-}
-
-.home-instruction-grid .home-instruction-card:nth-child(2) {
-  animation-delay: 1.15s;
-}
-
-.home-instruction-grid .home-instruction-card:nth-child(3) {
-  animation-delay: 1.3s;
-}
-
-.home-instruction-grid .home-instruction-card:nth-child(4) {
-  animation-delay: 1.45s;
-}
-
-.home-instruction-card--with-action {
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   position: relative;
 }
 
-.home-instruction-icon {
-  font-size: 44px;
-  font-weight: 900;
-  color: #000000;
+.home-instruction-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+  border-color: rgba(178, 187, 30, 0.6);
+}
+
+.home-instruction-card:focus-visible {
+  outline: 3px solid rgba(178, 187, 30, 0.5);
+  outline-offset: 2px;
+}
+
+.home-help-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #334155;
+  font-weight: 700;
+  cursor: pointer;
   line-height: 1;
-  margin-bottom: 26px;
+}
+
+.home-help-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1200;
+}
+
+.home-help-modal {
+  width: 92%;
+  max-width: 460px;
+  background: #fff;
+  border-radius: 10px;
+  padding: 18px;
+}
+
+.home-help-title {
+  margin: 0 0 10px 0;
+}
+
+.home-help-text {
+  margin: 0 0 14px 0;
+  color: #444;
+}
+
+.home-help-close {
+  border: none;
+  border-radius: 6px;
+  background: rgba(178, 187, 30, 1);
+  color: #fff;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.home-instruction-grid:not(.home-instruction-grid--teacher) .home-instruction-card:nth-child(5) {
+  animation-delay: calc(var(--home-card-stagger-step) * 4);
+}
+
+.home-instruction-icon {
+  color: #111111;
+  line-height: 1;
+  margin-top: 0;
+  margin-bottom: 18px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
+.home-instruction-icon svg {
+  width: 46px;
+  height: 46px;
+}
+
 .home-instruction-title {
-  margin: 0 0 8px 0;
+  margin: 0 0 10px 0;
   font-family: 'Roboto', sans-serif;
-  font-size: 24px;
+  font-size: 25px;
   font-weight: 800;
   color: #111111;
   text-align: center;
+  min-height: 56px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
 }
 
 .home-instruction-text {
   margin: 0;
   font-family: 'Roboto', sans-serif;
-  font-size: 13px;
+  font-size: 15px;
   line-height: 1.5;
   color: #666;
   text-align: center;
-}
-
-.home-start-now-button {
-  margin-top: 0;
-  padding: 8px 14px;
-  border: 1px solid rgba(178, 187, 30, 1);
-  border-radius: 8px;
-  background-color: rgba(178, 187, 30, 1);
-  color: #fff;
-  font-family: 'Roboto', sans-serif;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: absolute;
-  left: 50%;
-  bottom: 16px;
-  transform: translateX(-50%);
-  white-space: nowrap;
-}
-
-.home-start-now-button:hover {
-  background-color: rgba(154, 160, 23, 1);
-  border-color: rgba(154, 160, 23, 1);
-  transform: translateX(-50%) translateY(-1px);
+  min-height: 88px;
 }
 
 @media (max-width: 1024px) {
-  .home-top-row {
-    flex-direction: column;
-    gap: 30px;
-  }
-
-  .home-image-section {
-    width: 100%;
-  }
-
-  .home-greeting-section {
-    width: 100%;
-    text-align: center;
-  }
-
-  .greeting-title {
-    font-size: 32px;
-  }
-
-  .greeting-message {
-    font-size: 16px;
-  }
-
   .home-instruction-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .home-instruction-grid--teacher {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .home-instruction-heading {
-    font-size: 24px;
+    font-size: 28px;
   }
 }
 
@@ -240,4 +220,95 @@
   .home-instruction-grid {
     grid-template-columns: 1fr;
   }
+}
+
+.home-student-help-dismiss {
+  position: fixed;
+  inset: 0;
+  z-index: 1180;
+  cursor: default;
+  background: transparent;
+}
+
+.home-help-cloud {
+  position: fixed;
+  z-index: 1190;
+  max-width: min(380px, calc(100vw - 24px));
+  max-height: min(72vh, 480px);
+  overflow: visible;
+  cursor: pointer;
+  text-align: left;
+}
+
+.home-help-cloud-inner {
+  position: relative;
+  margin-top: 6px;
+  padding: 14px 16px 16px;
+  background: #fff;
+  border: 1px solid #c5cdb8;
+  border-radius: 18px;
+  box-shadow: 0 14px 40px rgba(0, 0, 0, 0.12);
+  overflow-y: auto;
+  max-height: min(calc(72vh - 12px), 468px);
+}
+
+.home-help-cloud-inner::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin-left: -7px;
+  background: #fff;
+  border-left: 1px solid #c5cdb8;
+  border-top: 1px solid #c5cdb8;
+  transform: rotate(45deg);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.home-help-cloud-body {
+  position: relative;
+  z-index: 1;
+  font-family: 'Roboto', sans-serif;
+  font-size: 14px;
+  line-height: 1.55;
+  color: #334155;
+}
+
+.home-help-cloud-page-title {
+  margin: 0 0 10px 0;
+  font-weight: 800;
+  font-size: 16px;
+  color: #14532d;
+}
+
+.home-help-cloud-paragraph {
+  margin: 0;
+}
+
+.home-help-cloud-steps-label {
+  margin: 0 0 6px 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1e293b;
+}
+
+.home-help-cloud-list {
+  margin: 0;
+  padding-left: 1.15rem;
+}
+
+.home-help-cloud-list li {
+  margin-bottom: 6px;
+}
+
+.home-help-cloud-list li:last-child {
+  margin-bottom: 0;
+}
+
+.home-help-cloud-list--flat {
+  list-style: disc;
+  padding-left: 1.25rem;
 }

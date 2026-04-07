@@ -229,7 +229,7 @@ class OpenAIService:
             return []
 
         # Build prompt
-        system_msg = {"role": "system", "content": "You are an assistant that matches portfolio text to rubric criteria. Output valid JSON only."}
+        system_msg = {"role": "system", "content": "You are an assistant that matches portfolio content of text and implication with passing rubric criteria. Output valid JSON only."}
         user_content = (
             "Given the portfolio text and a list of rubric criteria, find which parts of the text or extracted skills match each criteria.\n"
             "Return a JSON object with keys: \n"

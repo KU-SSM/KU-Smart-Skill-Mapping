@@ -1,6 +1,5 @@
 import axios from 'axios';
 
-/** Prefer FastAPI `detail` (string or validation array) over generic axios text. */
 export function getApiErrorDetail(error: unknown): string {
   if (axios.isAxiosError(error)) {
     const data = error.response?.data;
@@ -16,6 +15,16 @@ export function getApiErrorDetail(error: unknown): string {
             return JSON.stringify(item);
           })
           .join('; ');
+      }
+      if (detail != null && typeof detail === 'object' && !Array.isArray(detail)) {
+        const o = detail as Record<string, unknown>;
+        if (typeof o.msg === 'string') return o.msg;
+        if (typeof o.message === 'string') return o.message;
+        try {
+          return JSON.stringify(detail);
+        } catch {
+          return 'Request failed';
+        }
       }
     }
     if (typeof data === 'string' && data.trim()) return data;

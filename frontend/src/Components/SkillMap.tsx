@@ -17,6 +17,8 @@ import {
 } from '../services/skillEvaluationApi';
 import { getCurrentUserId } from '../utils/currentUser';
 import { useAppRole } from '../context/AppRoleContext';
+import InstructionHelpBubble from './InstructionHelpBubble';
+import { instructionStudentSkillMap, instructionTeacherSkillMap } from './instructionHelpContent';
 
 const PolarAngleAxisComponent = PolarAngleAxis as React.ComponentType<any>;
 const PolarRadiusAxisComponent = PolarRadiusAxis as React.ComponentType<any>;
@@ -51,8 +53,14 @@ interface SkillMapEvaluation {
   id: string;
   title: string;
   rubricHint: string;
-  status: 'pending' | 'completed';
+  status: 'pending' | 'completed' | 'approved';
+  rubricMaxRank: number;
   rows: SkillMapRadarRow[];
+  aiCriteriaParsingRows: {
+    skillName: string;
+    levelRank: number;
+    criteriaPassingDescription: string;
+  }[];
   rubricScore: RubricScoreSession;
 }
 
@@ -63,7 +71,11 @@ interface SkillEvaluationFullResponse {
   user_id: number;
   created_at?: string;
   status: string;
-  ai_evaluated_skills: { skill_name: string; level_rank: number }[];
+  ai_evaluated_skills: {
+    skill_name: string;
+    level_rank: number;
+    criteria_passing_description?: string | null;
+  }[];
   student_evaluated_skills: { skill_name: string; level_rank: number }[];
   teacher_evaluated_skills: { skill_name: string; level_rank: number }[];
 }
@@ -135,17 +147,32 @@ const scoreMapFromRows = (rows: { skill_name: string; level_rank: number }[]) =>
 };
 
 const maxRankForRows = (rows: SkillMapRadarRow[]): number => {
-  let m = 5;
+  let m = 0;
   for (const r of rows) {
     m = Math.max(m, r.student, r.ai, r.teacher);
   }
   return m;
 };
 
+const rubricAxisMaxFromLevels = (levels: { rank?: number | null }[]): number => {
+  if (!levels.length) return 1;
+  const ranks = levels.map((l) => toPositiveInt(l.rank));
+  const maxR = Math.max(0, ...ranks);
+  const n = levels.length;
+  if (maxR > 0) return Math.max(maxR, n);
+  return Math.max(1, n);
+};
+
 const toRadarAxisLabel = (value: string): string => {
   const clean = value.trim();
   if (clean.length <= 18) return clean;
   return `${clean.slice(0, 16)}...`;
+};
+
+const toStatusLabel = (status?: string): 'Pending' | 'Approved' | 'Completed' => {
+  if (status === 'pending') return 'Pending';
+  if (status === 'approved') return 'Approved';
+  return 'Completed';
 };
 
 const SkillMap: React.FC = () => {
@@ -172,7 +199,16 @@ const SkillMap: React.FC = () => {
     [evaluation]
   );
 
-  const radiusMax = useMemo(() => maxRankForRows(chartData), [chartData]);
+  const radiusMax = useMemo(() => {
+    const fromData = maxRankForRows(chartData);
+    const fromRubric =
+      evaluation?.rubricMaxRank ??
+      (evaluation?.rubricScore?.headers?.length
+        ? Math.max(1, evaluation.rubricScore.headers.length)
+        : 0);
+    if (fromRubric > 0) return Math.max(fromRubric, fromData);
+    return Math.max(1, fromData);
+  }, [chartData, evaluation?.rubricMaxRank, evaluation?.rubricScore?.headers]);
 
   const filteredModalEvaluations = useMemo(() => {
     const q = modalSearch.trim().toLowerCase();
@@ -215,7 +251,6 @@ const SkillMap: React.FC = () => {
             return acc;
           }, {})
         );
-        // Start with unfilled selection; user explicitly chooses evaluation.
         setSelectedEvalId('');
         setPendingEvalId('');
       } catch (error) {
@@ -262,7 +297,6 @@ const SkillMap: React.FC = () => {
           const rubricRes = await api.get<RubricResponse>(`rubric/${rubricId}`);
           rubricTitle = rubricRes.data.name || rubricTitle;
         } catch {
-          // keep fallback title
         }
 
         let skills: { id: number; name: string; display_order?: number | null }[] = [];
@@ -291,7 +325,6 @@ const SkillMap: React.FC = () => {
             perSkill.set(c.level_history_id, c.description ?? '');
           });
         } else {
-          // Fallback for older data where only RubricScoreHistory exists without nested snapshot rows.
           const [rubricSkillsRes, rubricLevelsRes, rubricCriteriaRes] = await Promise.all([
             api.get<BackendRubricSkill[]>(`rubric/${rubricId}/rubric_skills`),
             api.get<BackendLevel[]>(`rubric/${rubricId}/levels`),
@@ -323,6 +356,11 @@ const SkillMap: React.FC = () => {
           ai: aiScoreMap[s.name] ?? 0,
           teacher: teacherScoreMap[s.name] ?? 0,
         }));
+        const aiCriteriaParsingRows = (full.ai_evaluated_skills || []).map((row) => ({
+          skillName: row.skill_name,
+          levelRank: toPositiveInt(row.level_rank),
+          criteriaPassingDescription: (row.criteria_passing_description || '').trim(),
+        }));
 
         const rubricRows: RubricTableData[] = skills.map((s) => {
           const perSkill = criteriaBySkillId.get(s.id) || new Map<number, string>();
@@ -334,11 +372,10 @@ const SkillMap: React.FC = () => {
           id: selectedEvalId,
           title: rubricTitle || `Evaluation #${full.id}`,
           rubricHint: rubricTitle,
-          status:
-            full.status === 'pending' ? 'pending' : full.status === 'completed' || full.status === 'approved'
-              ? 'completed'
-              : 'completed',
+          status: full.status === 'pending' ? 'pending' : full.status === 'approved' ? 'approved' : 'completed',
+          rubricMaxRank: rubricAxisMaxFromLevels(levels),
           rows: radarRows,
+          aiCriteriaParsingRows,
           rubricScore: {
             title: rubricTitle,
             headers,
@@ -390,7 +427,13 @@ const SkillMap: React.FC = () => {
     <div className="skill-map-wrapper">
       <div className="skill-map-container">
         <div className="skill-map-chart-container">
-          <h1 className="skill-map-title">Skill Map</h1>
+          <div className="skill-map-title-row">
+            <h1 className="skill-map-title">Skill Map</h1>
+            <InstructionHelpBubble
+              content={isTeacher ? instructionTeacherSkillMap : instructionStudentSkillMap}
+              ariaLabel="Skill map page help"
+            />
+          </div>
           <div className="radar-chart-wrapper">
             {!anyPartyVisible ? (
               <div className="skill-map-chart-empty">
@@ -399,11 +442,19 @@ const SkillMap: React.FC = () => {
             ) : isLoadingEvaluations || isLoadingSelected ? (
               <div className="skill-map-chart-empty">Loading evaluation...</div>
             ) : !selectedEvalId ? (
-              <div className="skill-map-chart-empty">
-                {availableEvaluations.length === 0
-                  ? 'No evaluations found.'
-                  : 'Please choose an evaluation.'}
-              </div>
+              availableEvaluations.length === 0 ? (
+                <div className="skill-map-chart-empty">No evaluations found.</div>
+              ) : (
+                <button
+                  type="button"
+                  className="skill-map-chart-empty skill-map-chart-empty--select"
+                  onClick={openEvalModal}
+                  aria-haspopup="dialog"
+                  aria-expanded={evalModalOpen}
+                >
+                  Please choose an evaluation.
+                </button>
+              )
             ) : chartData.length === 0 ? (
               <div className="skill-map-chart-empty">No skills for this evaluation.</div>
             ) : (
@@ -479,7 +530,7 @@ const SkillMap: React.FC = () => {
                   title={evaluation?.title ?? ''}
                   aria-labelledby="skill-map-eval-label"
                 >
-                  {evaluation?.title ?? '—'}
+                  {evaluation ? `${evaluation.title} (${toStatusLabel(evaluation.status)})` : '—'}
                 </span>
                 <button
                   type="button"
@@ -532,14 +583,14 @@ const SkillMap: React.FC = () => {
         </aside>
       </div>
 
-      {evaluation?.rubricScore && (
+      {evaluation && (
         <section className="skill-map-rubric-session" aria-labelledby="skill-map-rubric-session-title">
           <div className="skill-map-rubric-session-head">
             <h2 id="skill-map-rubric-session-title" className="skill-map-title">
-              Rubric Score
+              Criteria Parsing Description by AI
               <span className="skill-map-rubric-session-title-name">
                 {' '}
-                - {evaluation.rubricScore.title}
+                - {evaluation.title}
               </span>
             </h2>
           </div>
@@ -550,24 +601,24 @@ const SkillMap: React.FC = () => {
                   <th scope="col" className="skill-map-rubric-th-skill">
                     Skill area
                   </th>
-                  {evaluation.rubricScore.headers.map((header, i) => (
-                    <th key={i} scope="col" className="skill-map-rubric-th-level">
-                      {header}
-                    </th>
-                  ))}
+                  <th scope="col" className="skill-map-rubric-th-level">AI level</th>
+                  <th scope="col">Criteria parsing description</th>
                 </tr>
               </thead>
               <tbody>
-                {evaluation.rubricScore.rows.map((row, rowIndex) => (
+                {evaluation.aiCriteriaParsingRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={3} className="skill-map-rubric-cell">
+                      No AI criteria parsing descriptions for this evaluation.
+                    </td>
+                  </tr>
+                ) : evaluation.aiCriteriaParsingRows.map((row, rowIndex) => (
                   <tr key={rowIndex}>
                     <th scope="row" className="skill-map-rubric-row-skill">
-                      {row.skillArea}
+                      {row.skillName || '—'}
                     </th>
-                    {evaluation.rubricScore.headers.map((_, colIndex) => (
-                      <td key={colIndex} className="skill-map-rubric-cell">
-                        {row.values[colIndex] ?? '—'}
-                      </td>
-                    ))}
+                    <td className="skill-map-rubric-cell">{row.levelRank > 0 ? row.levelRank : '—'}</td>
+                    <td className="skill-map-rubric-cell">{row.criteriaPassingDescription || '—'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -631,7 +682,7 @@ const SkillMap: React.FC = () => {
                       onClick={() => setPendingEvalId(String(ev.id))}
                     >
                       <span className="skill-map-modal-item-title">
-                        {rubricTitleByHistoryId[ev.rubric_score_history_id] || `Evaluation #${ev.id}`} ({ev.status === 'pending' ? 'Pending' : 'Completed'})
+                        {rubricTitleByHistoryId[ev.rubric_score_history_id] || `Evaluation #${ev.id}`} ({toStatusLabel(ev.status)})
                       </span>
                     </button>
                   </li>

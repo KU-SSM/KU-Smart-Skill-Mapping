@@ -6,10 +6,7 @@ export const testPortfolioImport = async () => {
   ];
 
   try {
-    console.log('Testing portfolio import...');
-    console.log('Note: Backend only accepts PDF files');
     const result = await importPortfolio('1', 'Portfolio 1', mockFiles);
-    console.log('✅ Portfolio import successful:', result);
     return result;
   } catch (error) {
     console.error('❌ Portfolio import failed:', error);

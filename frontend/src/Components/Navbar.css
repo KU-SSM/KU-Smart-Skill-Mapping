@@ -1,8 +1,8 @@
 .Navbar {
   width: 100%;
   max-width: 100%;
-  height: 75px;
-  background-color: rgba(178, 187, 30);
+  height: 82px;
+  background-color: rgb(148, 156, 28);
   display: flex;
   align-items: center;
   padding: 0 20px;
@@ -20,13 +20,30 @@
 }
 
 .Navbar-logo {
-  width: 400px;
+  width: auto;
+  min-width: 460px;
   height: 100%;
   display: flex;
+  align-items: center;
+  gap: 14px;
   font-family: 'Montserrat', sans-serif;
-  font-size: 30px;
+  font-size: 40px;
   font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
+}
+
+.Navbar-logo span {
+  white-space: nowrap;
+  line-height: 1;
+  transform: translateY(1px);
+}
+
+.Navbar-logo-image {
+  height: 58px;
+  width: auto;
+  max-width: 72px;
+  object-fit: contain;
+  flex-shrink: 0;
 }
 
 .Navbar-right {
@@ -46,7 +63,7 @@
 
 .Navbar-role-label {
   font-family: 'Montserrat', sans-serif;
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 600;
   opacity: 0.95;
   text-transform: uppercase;
@@ -54,13 +71,13 @@
 }
 
 .Navbar-role-pill {
-  padding: 8px 14px;
+  padding: 9px 16px;
   border: 2px solid rgba(255, 255, 255, 0.85);
   border-radius: 999px;
   background: transparent;
   color: #fff;
   font-family: 'Montserrat', sans-serif;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease;
@@ -83,11 +100,11 @@
 }
 
 .Navbar-button {
-  padding: 10px 20px;
+  padding: 11px 22px;
   border: none;
   border-radius: 5px;
   font-family: 'Montserrat', sans-serif;
-  font-size: 14px;
+  font-size: 17px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -112,5 +129,22 @@
   background-color: rgba(255, 255, 255, 0.9);
   transform: translateY(-1px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+@media (max-width: 1200px) {
+  .Navbar {
+    height: 78px;
+  }
+
+  .Navbar-logo {
+    min-width: 390px;
+    font-size: 25px;
+    gap: 10px;
+  }
+
+  .Navbar-logo-image {
+    height: 48px;
+    max-width: 60px;
+  }
 }
 

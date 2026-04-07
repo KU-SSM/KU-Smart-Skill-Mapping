@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { AiOutlineClose } from 'react-icons/ai';
 import './RubricScore.css';
 import { getRubricScores } from '../services/rubricScoreApi';
+import InstructionHelpBubble from './InstructionHelpBubble';
+import { instructionStudentRubricList } from './instructionHelpContent';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 
@@ -49,7 +51,13 @@ const RubricScoreListStudent: React.FC = () => {
     return (
       <div className="rubric-score-wrapper">
         <div className="rubric-score-container">
-          <h1 className="rubric-score-title">Rubric Score</h1>
+          <div className="rubric-score-title-row">
+            <h1 className="rubric-score-title">Rubric Score</h1>
+            <InstructionHelpBubble
+              content={instructionStudentRubricList}
+              ariaLabel="Rubric score page help"
+            />
+          </div>
           <div style={{ textAlign: 'center', padding: '40px' }}>
             <p>Loading rubric scores...</p>
           </div>
@@ -61,7 +69,13 @@ const RubricScoreListStudent: React.FC = () => {
   return (
     <div className="rubric-score-wrapper">
       <div className="rubric-score-container">
-        <h1 className="rubric-score-title">Rubric Score</h1>
+        <div className="rubric-score-title-row">
+          <h1 className="rubric-score-title">Rubric Score</h1>
+          <InstructionHelpBubble
+            content={instructionStudentRubricList}
+            ariaLabel="Rubric score page help"
+          />
+        </div>
         <div className="rubric-score-search-container">
           <input
             type="text"
@@ -79,7 +93,7 @@ const RubricScoreListStudent: React.FC = () => {
             </button>
           )}
         </div>
-        <div className="rubric-score-bars-container">
+        <div className="rubric-score-bars-container rubric-score-bars-container--scrollable">
           {filteredRubricScores.map((rubric) => (
             <div
               key={rubric.id}
