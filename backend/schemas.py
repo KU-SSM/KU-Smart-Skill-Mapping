@@ -201,12 +201,17 @@ class SkillEvaluationFullModel(SkillEvaluationModel):
     teacher_evaluated_skills: list[TeacherEvaluatedSkillModel] = []
 
 
-# --- Rubric snapshot history (immutable: no PUT endpoints) ---
+# --- Rubric snapshot history ---
 
 
 class RubricScoreHistoryCreate(BaseModel):
     rubric_score_id: int
     status: Optional[str] = "valid"
+    expired_at: Optional[datetime] = None
+
+
+class RubricScoreHistoryUpdate(BaseModel): 
+    status: Optional[str] = None
     expired_at: Optional[datetime] = None
 
 
