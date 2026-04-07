@@ -13,6 +13,11 @@ import {
 } from '../services/rubricScoreApi';
 import { localDateAndTimeToUtcIso } from '../utils/dateTime';
 import { getApiErrorDetail } from '../utils/apiErrors';
+import InstructionHelpBubble from './InstructionHelpBubble';
+import {
+  instructionTeacherRubricSaveExpiration,
+  instructionTeacherRubricTable,
+} from './instructionHelpContent';
 import './RubricScore.css';
 
 const DeleteIcon = AiOutlineDelete as React.ComponentType;
@@ -316,15 +321,22 @@ const RubricScoreDetail: React.FC = () => {
   const handleSaveChanges = () => {
     void (async () => {
       if (!id) return;
-    const effectiveTitle = isEditingTitle ? editingTitle.trim() : title.trim();
-    if (isEditingTitle) {
-      setTitle(effectiveTitle || title);
-      setIsEditingTitle(false);
-    }
-    const defaultExpirationDate = getDefaultExpirationDate();
-    const defaultExpirationTime = '23:59:59';
-    setExpirationDate(defaultExpirationDate);
-    setExpirationTime(defaultExpirationTime);
+      const liveInputValue = (titleInputRef.current?.value || '').trim();
+      const draftEditingTitle = (editingTitle || '').trim();
+      const currentTitle = (title || '').trim();
+      const effectiveTitle =
+        liveInputValue ||
+        (draftEditingTitle && draftEditingTitle !== currentTitle ? draftEditingTitle : currentTitle);
+      const resolvedTitle = effectiveTitle || title;
+      if (isEditingTitle) {
+        setEditingTitle(resolvedTitle);
+        setTitle(resolvedTitle);
+        setIsEditingTitle(false);
+      }
+      const defaultExpirationDate = getDefaultExpirationDate();
+      const defaultExpirationTime = '23:59:59';
+      setExpirationDate(defaultExpirationDate);
+      setExpirationTime(defaultExpirationTime);
       let isFirstSave = false;
       try {
         const histories = await getRubricScoreHistoryByRubric(id);
@@ -334,11 +346,11 @@ const RubricScoreDetail: React.FC = () => {
       }
 
       if (isFirstSave) {
-        performSave(defaultExpirationDate, defaultExpirationTime, effectiveTitle || title);
+        performSave(defaultExpirationDate, defaultExpirationTime, resolvedTitle);
         return;
       }
 
-      setPendingSaveTitle(effectiveTitle || title);
+      setPendingSaveTitle(resolvedTitle);
       setShowSaveExpirationModal(true);
     })();
   };
@@ -544,6 +556,11 @@ const RubricScoreDetail: React.FC = () => {
           >
             {React.createElement(HistoryIcon)}
           </button>
+          <InstructionHelpBubble
+            content={instructionTeacherRubricTable}
+            ariaLabel="Teacher rubric table help"
+            triggerClassName="ihb-trigger--section"
+          />
           <button 
             className="delete-rubric-button" 
             onClick={handleDelete}
@@ -788,6 +805,11 @@ const RubricScoreDetail: React.FC = () => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2 className="modal-title rubric-save-expiration-modal-title">
               Set expiration date before saving
+              <InstructionHelpBubble
+                content={instructionTeacherRubricSaveExpiration}
+                ariaLabel="Teacher rubric expiration popup help"
+                triggerClassName="ihb-trigger--section"
+              />
             </h2>
             <div className="modal-form">
               <div className="modal-field">

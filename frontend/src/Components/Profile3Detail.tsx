@@ -12,6 +12,7 @@ import { updateSkillEvaluation } from '../services/skillEvaluationApi';
 import { getApiErrorDetail } from '../utils/apiErrors';
 import InstructionHelpBubble from './InstructionHelpBubble';
 import { instructionTeacherEvaluation } from './instructionHelpContent';
+import { getEvaluationOwner } from '../utils/evaluationOwnership';
 
 const PdfIcon = FaFilePdf as React.ComponentType;
 const ArrowLeftIcon = FaArrowLeft as React.ComponentType;
@@ -175,7 +176,8 @@ const Profile3Detail: React.FC = () => {
         const portfolioRes = await api.get<PortfolioResponse>(`portfolio/${ev.portfolio_id}`);
 
         const rubricId = String(rh.data.rubric_score_id);
-        const studentName = userRes.data.name || `Student #${ev.user_id}`;
+        const ownerUsername = getEvaluationOwner(ev.id);
+        const studentName = ownerUsername || userRes.data.name || `Student #${ev.user_id}`;
         const rubricTitle = rubricRes.data.name || `Rubric #${rubricId}`;
         const portfolioFileName =
           (portfolioRes.data.filename || '').trim() || `Portfolio #${ev.portfolio_id}`;
@@ -198,10 +200,17 @@ const Profile3Detail: React.FC = () => {
         setSelectedPortfolioId(ev.portfolio_id);
         setSelectedRubricId(rubricId);
         setConfirmedRubricId(rubricId);
-        setAiEvaluations(toScoreMap(ev.ai_evaluated_skills || []));
 
         const studentMap = toScoreMap(ev.student_evaluated_skills || []);
         const rubricDetail = await getRubricScore(rubricId);
+        const aiMap = toScoreMap(ev.ai_evaluated_skills || []);
+        rubricDetail.rows.forEach((row) => {
+          const skillArea = (row.skillArea || '').trim();
+          if (!skillArea) return;
+          const current = (aiMap[skillArea] || '').trim();
+          aiMap[skillArea] = /^\d+$/.test(current) ? current : '0';
+        });
+        setAiEvaluations(aiMap);
         const rubricSetHydrate = new Set(
           rubricDetail.rows.map((r) => (r.skillArea || '').trim()).filter((n) => n !== '')
         );
@@ -743,13 +752,18 @@ const Profile3Detail: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/.test(dateString);
+    const normalizedIso = hasTimezone ? dateString : `${dateString}Z`;
+    const date = new Date(normalizedIso);
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'short', 
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: 'Asia/Bangkok',
+      hour12: false,
     });
   };
 
@@ -793,19 +807,16 @@ const Profile3Detail: React.FC = () => {
       
       <div className="portfolio-container">
         <div className="portfolio-section" style={{ textAlign: 'left' }}>
-          <div className="student-request-header-info" style={{ textAlign: 'left', width: '100%' }}>
-            <h2
-              className="portfolio-section-title profile3-detail-title-with-help"
-              style={{ margin: 0, textAlign: 'left', width: '100%' }}
-            >
-              <span>{selectedRequest.studentName}</span>
+          <div className="student-request-header-info profile3-detail-header-info">
+            <h2 className="portfolio-section-title profile3-detail-title-with-help">
+              <span className="profile3-detail-student-name">{selectedRequest.studentName}</span>
               <InstructionHelpBubble
                 content={instructionTeacherEvaluation}
                 ariaLabel="Teacher evaluation steps help"
                 triggerClassName="ihb-trigger--section"
               />
             </h2>
-            <p style={{ margin: '4px 0 0 0', color: '#666', fontSize: '14px', paddingLeft: 0, textAlign: 'left', width: '100%' }}>
+            <p className="profile3-detail-requested-at">
               Requested: {formatDate(selectedRequest.requestedAt)}
             </p>
           </div>

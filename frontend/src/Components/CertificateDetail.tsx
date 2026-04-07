@@ -13,6 +13,11 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
+import { useAppRole } from '../context/AppRoleContext';
+import {
+  getEvaluationOwner,
+  isEvaluationOwnedByCurrentSession,
+} from '../utils/evaluationOwnership';
 
 const PolarGridChart = PolarGrid as unknown as React.ComponentType<any>;
 const PolarAngleAxisChart = PolarAngleAxis as unknown as React.ComponentType<any>;
@@ -134,6 +139,7 @@ interface BackendCriteria {
 const CertificateDetail: React.FC = () => {
   const { evaluationId } = useParams<{ evaluationId: string }>();
   const navigate = useNavigate();
+  const { isTeacher } = useAppRole();
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [evaluationFull, setEvaluationFull] = useState<SkillEvaluationFullResponse | null>(null);
   const [rubricDetail, setRubricDetail] = useState<RubricDetailResponse | null>(null);
@@ -157,12 +163,22 @@ const CertificateDetail: React.FC = () => {
         if (!Number.isInteger(evalId) || evalId <= 0) {
           throw new Error('Invalid evaluation id');
         }
+        if (!isTeacher && !isEvaluationOwnedByCurrentSession(evalId)) {
+          alert('This certificate belongs to another student account.');
+          navigate('/certificate', { replace: true });
+          return;
+        }
         const fullRes = await api.get<SkillEvaluationFullResponse>(`skill_evaluation/${evalId}/full`);
         const full = fullRes.data;
         setEvaluationFull(full);
 
-        const userRes = await api.get<UserResponse>(`user/${full.user_id}`);
-        setStudentName(userRes.data.name || `Student #${full.user_id}`);
+        const ownerUsername = getEvaluationOwner(evalId);
+        if (ownerUsername) {
+          setStudentName(ownerUsername);
+        } else {
+          const userRes = await api.get<UserResponse>(`user/${full.user_id}`);
+          setStudentName(userRes.data.name || `Student #${full.user_id}`);
+        }
 
         const [historyRes, skillHistoryRes, levelHistoryRes] = await Promise.all([
           api.get<RubricHistoryResponse>(`rubric_score_history/${full.rubric_score_history_id}`),
@@ -278,7 +294,7 @@ const CertificateDetail: React.FC = () => {
       }
     };
     void loadCertificateData();
-  }, [evaluationId]);
+  }, [evaluationId, isTeacher, navigate]);
 
   const mappedSkillSummary = useMemo(() => {
     if (!evaluationFull || !rubricDetail) return [];

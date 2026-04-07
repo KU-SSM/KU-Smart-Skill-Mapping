@@ -4,10 +4,18 @@ import './Profile.css';
 import './RubricScore.css';
 import { getCurrentUserId } from '../utils/currentUser';
 import api from '../api/index';
-import { getSkillEvaluationsByUser, type SkillEvaluationRecord } from '../services/skillEvaluationApi';
+import {
+  getSkillEvaluations,
+  getSkillEvaluationsByUser,
+  type SkillEvaluationRecord,
+} from '../services/skillEvaluationApi';
 import { useAppRole } from '../context/AppRoleContext';
 import InstructionHelpBubble from './InstructionHelpBubble';
 import { instructionStudentCertificate, instructionTeacherCertificate } from './instructionHelpContent';
+import {
+  getEvaluationOwner,
+  isEvaluationOwnedByCurrentSession,
+} from '../utils/evaluationOwnership';
 
 interface CertificateEvaluationItem {
   id: string;
@@ -53,7 +61,10 @@ const CertificateList: React.FC = () => {
   const [evaluations, setEvaluations] = useState<CertificateEvaluationItem[]>([]);
   const rubricTitleByHistoryIdRef = useRef<Map<number, string>>(new Map());
 
-  const mapBackendEvaluation = async (ev: SkillEvaluationRecord): Promise<CertificateEvaluationItem> => {
+  const mapBackendEvaluation = async (
+    ev: SkillEvaluationRecord,
+    showStudentName: boolean
+  ): Promise<CertificateEvaluationItem> => {
     const id = String(ev.id);
     const meta = readEvaluationMeta(id);
     let rubricTitle = meta?.rubricTitle || `History #${ev.rubric_score_history_id}`;
@@ -71,10 +82,14 @@ const CertificateList: React.FC = () => {
     }
 
     rubricTitle = rubricTitleByHistoryIdRef.current.get(ev.rubric_score_history_id) || rubricTitle;
+    const ownerUsername = getEvaluationOwner(ev.id);
+    const displayTitle = showStudentName && ownerUsername
+      ? `${ownerUsername} - ${rubricTitle}`
+      : rubricTitle;
 
     return {
       id,
-      title: rubricTitle || `Evaluation #${ev.id}`,
+      title: displayTitle || `Evaluation #${ev.id}`,
       rubricTitle,
       requestedAt: ev.created_at || '',
       status: ev.status === 'approved' ? 'approved' : 'completed',
@@ -84,9 +99,13 @@ const CertificateList: React.FC = () => {
   const loadEvaluations = useCallback(async () => {
     try {
       setIsLoading(true);
-      const userId = getCurrentUserId();
-      const rows = await getSkillEvaluationsByUser(userId);
-      const completedRows = rows.filter((row) => row.status === 'completed' || row.status === 'approved');
+      const rows = isTeacher
+        ? await getSkillEvaluations()
+        : await getSkillEvaluationsByUser(getCurrentUserId());
+      const scopedRows = isTeacher
+        ? rows
+        : rows.filter((row) => isEvaluationOwnedByCurrentSession(row.id));
+      const completedRows = scopedRows.filter((row) => row.status === 'completed');
 
       const idsNeedingRubric = Array.from(
         new Set(
@@ -107,7 +126,9 @@ const CertificateList: React.FC = () => {
         })
       );
 
-      const enriched = await Promise.all(completedRows.map((row) => mapBackendEvaluation(row)));
+      const enriched = await Promise.all(
+        completedRows.map((row) => mapBackendEvaluation(row, isTeacher))
+      );
       setEvaluations(enriched);
     } catch (error) {
       console.error('Error loading certificate evaluations:', error);
@@ -115,7 +136,7 @@ const CertificateList: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isTeacher]);
 
   useEffect(() => {
     void loadEvaluations();

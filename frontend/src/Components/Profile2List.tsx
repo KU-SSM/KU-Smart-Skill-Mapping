@@ -11,6 +11,10 @@ import {
   getSkillEvaluationsByUser,
   type SkillEvaluationRecord,
 } from '../services/skillEvaluationApi';
+import {
+  isEvaluationOwnedByCurrentSession,
+  removeEvaluationOwner,
+} from '../utils/evaluationOwnership';
 import InstructionHelpBubble from './InstructionHelpBubble';
 import { instructionStudentEvaluationOverview } from './instructionHelpContent';
 
@@ -121,10 +125,11 @@ const Profile2List: React.FC = () => {
       setIsLoading(true);
       const userId = getCurrentUserId();
       const rows = await getSkillEvaluationsByUser(userId);
+      const scopedRows = rows.filter((row) => isEvaluationOwnedByCurrentSession(row.id));
 
       const idsNeedingRubric = Array.from(
         new Set(
-          rows
+          scopedRows
             .filter(
               (row) =>
                 !rubricTitleByHistoryIdRef.current.has(row.rubric_score_history_id) ||
@@ -151,13 +156,13 @@ const Profile2List: React.FC = () => {
         })
       );
 
-      const enriched = await Promise.all(rows.map((row) => mapBackendEvaluation(row)));
-      const rowsToExpire = rows.filter((row) => {
+      const enriched = await Promise.all(scopedRows.map((row) => mapBackendEvaluation(row)));
+      const rowsToExpire = scopedRows.filter((row) => {
         const shouldExpire =
           rubricExpiredByHistoryIdRef.current.get(row.rubric_score_history_id) || false;
         return shouldExpire && row.status !== 'expired';
       });
-      const rowsToOutdate = rows.filter((row) => {
+      const rowsToOutdate = scopedRows.filter((row) => {
         const shouldOutdate =
           rubricOutdatedByHistoryIdRef.current.get(row.rubric_score_history_id) || false;
         if (row.status === 'expired' || row.status === 'completed' || row.status === 'approved') {
@@ -233,6 +238,7 @@ const Profile2List: React.FC = () => {
       }
       try {
         localStorage.removeItem(evaluationMetaKey(id));
+        removeEvaluationOwner(id);
       } catch {
       }
       setEvaluations((prev) => prev.filter((item) => item.id !== id));

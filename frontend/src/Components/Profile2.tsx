@@ -22,6 +22,12 @@ import api from '../api/index';
 import { useAppRole } from '../context/AppRoleContext';
 import { getCurrentUserId, setCurrentUserId } from '../utils/currentUser';
 import { getApiErrorDetail } from '../utils/apiErrors';
+import { getMockSession } from '../utils/mockAuth';
+import {
+  isEvaluationOwnedByCurrentSession,
+  removeEvaluationOwner,
+  setEvaluationOwner,
+} from '../utils/evaluationOwnership';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 const BriefcaseIcon = FaBriefcase as React.ComponentType;
@@ -344,7 +350,7 @@ const Profile2: React.FC = () => {
       setHasAppliedHydratedScores(false);
       hasEphemeralEvaluationRef.current = false;
     }
-  }, [evaluationId]);
+  }, [evaluationId, navigate]);
 
   useEffect(() => {
     isAiPreviewDirtyRef.current = isAiPreviewDirty;
@@ -372,6 +378,11 @@ const Profile2: React.FC = () => {
 
     const loadSavedEvaluation = async () => {
       try {
+        if (!isEvaluationOwnedByCurrentSession(parsedId)) {
+          alert('This evaluation belongs to another student account.');
+          navigate('/profile2', { replace: true });
+          return;
+        }
         const se = await api.get<SkillEvaluationFullResponse>(`skill_evaluation/${parsedId}/full`);
         const rh = await api.get<RubricScoreHistoryResponse>(
           `rubric_score_history/${se.data.rubric_score_history_id}`
@@ -434,7 +445,7 @@ const Profile2: React.FC = () => {
     };
 
     void loadSavedEvaluation();
-  }, [evaluationId]);
+  }, [evaluationId, navigate]);
 
   useEffect(() => {
     const navState = (location.state || {}) as any;
@@ -455,12 +466,15 @@ const Profile2: React.FC = () => {
       }
     };
 
-    const createGuestUser = async (): Promise<number> => {
+    const createSessionUser = async (): Promise<number> => {
       const nowIso = new Date().toISOString();
       const stamp = Date.now();
+      const session = getMockSession();
+      const username = (session?.username || '').trim().toLowerCase() || `student${stamp}`;
+      const displayName = session?.username || `Student ${stamp}`;
       const res = await api.post('user/', {
-        name: `Guest Student ${stamp}`,
-        email: `guest.student.${stamp}@local.dev`,
+        name: displayName,
+        email: `${username}.${stamp}@local.dev`,
         password: 'guest',
         role: 'student',
         created_at: nowIso,
@@ -468,25 +482,16 @@ const Profile2: React.FC = () => {
       });
       const createdId = Number(res.data?.id);
       if (!Number.isInteger(createdId) || createdId <= 0) {
-        throw new Error('Failed to create a guest user for evaluation.');
+        throw new Error('Failed to create a user for evaluation.');
       }
       return createdId;
     };
 
     const preferred = getCurrentUserId();
     if (await checkUserExists(preferred)) return preferred;
-
-    for (let candidate = 1; candidate <= 50; candidate += 1) {
-      if (candidate === preferred) continue;
-      if (await checkUserExists(candidate)) {
-        setCurrentUserId(candidate);
-        return candidate;
-      }
-    }
-
-    const guestId = await createGuestUser();
-    setCurrentUserId(guestId);
-    return guestId;
+    const createdUserId = await createSessionUser();
+    setCurrentUserId(createdUserId);
+    return createdUserId;
   }, []);
 
   useEffect(() => {
@@ -546,8 +551,16 @@ const Profile2: React.FC = () => {
             .map((skillArea) => ({ skillArea }));
 
           setStudentExtraSkills(extraStudentSkills);
+          const normalizedHydratedAiScores: { [skillArea: string]: string } = Object.fromEntries(
+            Object.keys(newAiValues).map((skillArea) => [skillArea, '0'])
+          );
+          Object.entries(pendingHydratedScores.ai).forEach(([skillArea, raw]) => {
+            const trimmed = (raw || '').trim();
+            normalizedHydratedAiScores[skillArea] = /^\d+$/.test(trimmed) ? trimmed : '0';
+          });
+
           setTeacherEvaluations({ ...newTeacherValues, ...pendingHydratedScores.teacher });
-          setAiEvaluations({ ...newAiValues, ...pendingHydratedScores.ai });
+          setAiEvaluations(normalizedHydratedAiScores);
           setStudentEvaluations({ ...newStudentValues, ...pendingHydratedScores.student });
           setOriginalStudentSkills(skillsFromRubric.map((s) => ({ ...s })));
           setOriginalStudentExtraSkills(extraStudentSkills.map((s) => ({ ...s })));
@@ -555,7 +568,7 @@ const Profile2: React.FC = () => {
             ...newStudentValues,
             ...pendingHydratedScores.student,
           });
-          setOriginalAiEvaluations({ ...newAiValues, ...pendingHydratedScores.ai });
+          setOriginalAiEvaluations(normalizedHydratedAiScores);
           setHasAppliedHydratedScores(true);
           setPendingHydratedScores(null);
         } else {
@@ -750,6 +763,7 @@ const Profile2: React.FC = () => {
           hasEphemeralEvaluationRef.current = true;
         }
         setSavedSkillEvaluationId(evalRes.skill_evaluation_id);
+        setEvaluationOwner(evalRes.skill_evaluation_id);
       }
       setDraftAiEvaluations(nextAiEvaluations);
     } catch (error: any) {
@@ -934,6 +948,7 @@ const Profile2: React.FC = () => {
         removeEvaluationExtractedText(String(evalIdToDelete));
         removeStudentCustomSkills(String(evalIdToDelete));
         removeTeacherCustomSkills(String(evalIdToDelete));
+        removeEvaluationOwner(String(evalIdToDelete));
         navigate('/profile2', {
           state: { removeEvaluationId: String(evalIdToDelete), refreshAt: Date.now() },
         });
@@ -1100,6 +1115,7 @@ const Profile2: React.FC = () => {
       removeEvaluationExtractedText(String(savedSkillEvaluationId));
       removeStudentCustomSkills(String(savedSkillEvaluationId));
       removeTeacherCustomSkills(String(savedSkillEvaluationId));
+      removeEvaluationOwner(String(savedSkillEvaluationId));
       hasEphemeralEvaluationRef.current = false;
     } catch (error) {
       console.error('Failed to delete unsaved initial evaluation:', error);
@@ -1138,6 +1154,7 @@ const Profile2: React.FC = () => {
         ) {
           skillEvaluationIdToSave = evalRes.skill_evaluation_id;
           setSavedSkillEvaluationId(evalRes.skill_evaluation_id);
+          setEvaluationOwner(evalRes.skill_evaluation_id);
         }
       }
 
@@ -1194,6 +1211,7 @@ const Profile2: React.FC = () => {
           rubricTitle: selectedRubricData?.title || '',
           portfolioFileName: uploadedFiles[0]?.name || portfolioDisplayName || 'portfolio.pdf',
         });
+        setEvaluationOwner(skillEvaluationIdToSave);
         writeEvaluationExtractedText(String(skillEvaluationIdToSave), extractedPortfolioText);
         writeStudentCustomSkills(
           String(skillEvaluationIdToSave),
@@ -1679,6 +1697,7 @@ const Profile2: React.FC = () => {
             removeEvaluationExtractedText(String(evalId));
             removeStudentCustomSkills(String(evalId));
             removeTeacherCustomSkills(String(evalId));
+            removeEvaluationOwner(String(evalId));
           } catch (error) {
             console.error('Failed to delete unsaved initial evaluation on unmount:', error);
           }

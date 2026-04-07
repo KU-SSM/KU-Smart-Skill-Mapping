@@ -117,10 +117,38 @@
 }
 
 .profile3-detail-title-with-help {
-  display: flex;
-  align-items: baseline;
-  flex-wrap: wrap;
-  gap: 6px 10px;
+  margin: 0 !important;
+  padding-left: 0 !important;
+  padding-inline-start: 0 !important;
+  text-indent: 0 !important;
+  text-align: left;
+  width: 100%;
+}
+
+.profile3-detail-student-name {
+  display: inline-block;
+  margin: 0;
+  padding: 0;
+  text-indent: 0;
+}
+
+.profile3-detail-title-with-help .ihb-trigger {
+  margin-left: 8px;
+  vertical-align: middle;
+}
+
+.profile3-detail-header-info {
+  text-align: left;
+  width: 100%;
+}
+
+.profile3-detail-requested-at {
+  margin: 4px 0 0 0;
+  color: #666;
+  font-size: 14px;
+  padding-left: 0;
+  text-align: left;
+  width: 100%;
 }
 
 .add-new-skill-container {
@@ -1291,7 +1319,7 @@
   }
 
   .profile2-view-details-text {
-    display: none; /* Hide text on mobile, show only icon */
+    display: none;
   }
 
   .profile2-view-details-icon {

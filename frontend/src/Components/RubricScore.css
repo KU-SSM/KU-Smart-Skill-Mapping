@@ -45,6 +45,17 @@
   margin: 0;
 }
 
+.rubric-score-title-row .ihb-cloud {
+  width: min(520px, calc(100vw - 24px));
+  max-width: min(520px, calc(100vw - 24px));
+}
+
+.rubric-score-title-row .ihb-cloud-inner {
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
 .rubric-score-title-container {
   display: flex;
   align-items: center;
