@@ -1,12 +1,28 @@
 import React, { useState } from 'react';
 import './Login.css';
+import { useNavigate } from 'react-router-dom';
+import { useAppRole } from '../context/AppRoleContext';
+import { setCurrentUserId } from '../utils/currentUser';
+import { authenticateMockUser, setMockSession } from '../utils/mockAuth';
 
 const Login: React.FC = () => {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
+  const navigate = useNavigate();
+  const { setRole } = useAppRole();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const session = authenticateMockUser(username, password);
+    if (!session) {
+      alert('Invalid username or password');
+      return;
+    }
+
+    setMockSession(session);
+    setRole(session.role);
+    setCurrentUserId(session.userId);
+    navigate('/');
   };
 
   return (
@@ -23,14 +39,14 @@ const Login: React.FC = () => {
         <h1 className="auth-title">Log In</h1>
         <form onSubmit={handleSubmit} className="auth-form">
           <div className="form-group">
-            <label htmlFor="email" className="form-label">Email</label>
+            <label htmlFor="username" className="form-label">Username</label>
             <input
-              type="email"
-              id="email"
+              type="text"
+              id="username"
               className="form-input"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Enter your email"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="Enter your username"
               required
             />
           </div>

@@ -5,6 +5,7 @@ import './RubricScore.css';
 import { AiOutlineClose } from 'react-icons/ai';
 import api from '../api/index';
 import { getSkillEvaluations, type SkillEvaluationRecord } from '../services/skillEvaluationApi';
+import { getEvaluationOwner } from '../utils/evaluationOwnership';
 
 const CloseIcon = AiOutlineClose as React.ComponentType;
 
@@ -27,6 +28,11 @@ interface RubricResponse {
   name: string;
 }
 
+interface PortfolioResponse {
+  id: number;
+  filename?: string;
+}
+
 type TeacherRequestFilter = 'all' | 'pending' | 'approved' | 'completed';
 
 const Profile3: React.FC = () => {
@@ -37,6 +43,7 @@ const Profile3: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<TeacherRequestFilter>('all');
   const studentNameByUserIdRef = useRef<Map<number, string>>(new Map());
   const rubricTitleByHistoryIdRef = useRef<Map<number, string>>(new Map());
+  const portfolioNameByIdRef = useRef<Map<number, string>>(new Map());
 
   const mapBackendRequest = useCallback(async (ev: SkillEvaluationRecord): Promise<StudentRequest | null> => {
     const mappedStatus: StudentRequest['status'] | null =
@@ -54,10 +61,15 @@ const Profile3: React.FC = () => {
 
     let studentName =
       studentNameByUserIdRef.current.get(ev.user_id) || `Student #${ev.user_id}`;
+    const ownerUsername = getEvaluationOwner(ev.id);
+    if (ownerUsername) {
+      studentName = ownerUsername;
+    }
     let rubricTitle =
       rubricTitleByHistoryIdRef.current.get(ev.rubric_score_history_id) ||
       `History #${ev.rubric_score_history_id}`;
-    const portfolioFileName = `Portfolio #${ev.portfolio_id}`;
+    const portfolioFileName =
+      portfolioNameByIdRef.current.get(ev.portfolio_id) || `Portfolio #${ev.portfolio_id}`;
 
     if (!studentNameByUserIdRef.current.has(ev.user_id)) {
       try {
@@ -112,6 +124,13 @@ const Profile3: React.FC = () => {
             .filter((id) => !rubricTitleByHistoryIdRef.current.has(id))
         )
       );
+      const portfolioIdsToFetch = Array.from(
+        new Set(
+          relevantRows
+            .map((row) => row.portfolio_id)
+            .filter((id) => !portfolioNameByIdRef.current.has(id))
+        )
+      );
 
       await Promise.all([
         Promise.all(
@@ -135,6 +154,16 @@ const Profile3: React.FC = () => {
                 historyId,
                 rubricRes.data.name || `History #${historyId}`
               );
+            } catch {
+            }
+          })
+        ),
+        Promise.all(
+          portfolioIdsToFetch.map(async (portfolioId) => {
+            try {
+              const portfolioRes = await api.get<PortfolioResponse>(`portfolio/${portfolioId}`);
+              const filename = (portfolioRes.data.filename || '').trim() || `Portfolio #${portfolioId}`;
+              portfolioNameByIdRef.current.set(portfolioId, filename);
             } catch {
             }
           })
@@ -169,13 +198,18 @@ const Profile3: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/.test(dateString);
+    const normalizedIso = hasTimezone ? dateString : `${dateString}Z`;
+    const date = new Date(normalizedIso);
     return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
+      second: '2-digit',
+      timeZone: 'Asia/Bangkok',
+      hour12: false,
     });
   };
 

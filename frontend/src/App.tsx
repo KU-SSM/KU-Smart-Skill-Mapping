@@ -18,15 +18,18 @@ import Profile2List from './Components/Profile2List';
 import Profile3 from './Components/Profile3';
 import Profile3Detail from './Components/Profile3Detail';
 import RubricVersionEvaluationDetail from './Components/RubricVersionEvaluationDetail';
+import { getMockSession } from './utils/mockAuth';
 
 const App: React.FC = () => {
   const location = useLocation();
+  const session = getMockSession();
+  const isAuthenticated = session != null;
   const isAuthPage = location.pathname === '/login' || location.pathname === '/signup';
 
   return (
     <div className="App">
-      {!isAuthPage && <Navbar />}
-      {!isAuthPage ? (
+      {!isAuthPage && isAuthenticated && <Navbar />}
+      {!isAuthPage && isAuthenticated ? (
         <div className="App-body">
           <SideBar/>
           <main className="App-content">
@@ -52,6 +55,8 @@ const App: React.FC = () => {
             </Routes>
           </main>
         </div>
+      ) : !isAuthPage ? (
+        <Navigate to="/login" replace />
       ) : (
         <Routes>
           <Route path="/login" element={<Login />} />

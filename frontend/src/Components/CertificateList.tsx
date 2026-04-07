@@ -8,6 +8,7 @@ import { getSkillEvaluationsByUser, type SkillEvaluationRecord } from '../servic
 import { useAppRole } from '../context/AppRoleContext';
 import InstructionHelpBubble from './InstructionHelpBubble';
 import { instructionStudentCertificate, instructionTeacherCertificate } from './instructionHelpContent';
+import { isEvaluationOwnedByCurrentSession } from '../utils/evaluationOwnership';
 
 interface CertificateEvaluationItem {
   id: string;
@@ -86,7 +87,10 @@ const CertificateList: React.FC = () => {
       setIsLoading(true);
       const userId = getCurrentUserId();
       const rows = await getSkillEvaluationsByUser(userId);
-      const completedRows = rows.filter((row) => row.status === 'completed' || row.status === 'approved');
+      const scopedRows = rows.filter((row) => isEvaluationOwnedByCurrentSession(row.id));
+      const completedRows = scopedRows.filter(
+        (row) => row.status === 'completed' || row.status === 'approved'
+      );
 
       const idsNeedingRubric = Array.from(
         new Set(

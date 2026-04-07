@@ -19,6 +19,7 @@ import { getCurrentUserId } from '../utils/currentUser';
 import { useAppRole } from '../context/AppRoleContext';
 import InstructionHelpBubble from './InstructionHelpBubble';
 import { instructionStudentSkillMap, instructionTeacherSkillMap } from './instructionHelpContent';
+import { isEvaluationOwnedByCurrentSession } from '../utils/evaluationOwnership';
 
 const PolarAngleAxisComponent = PolarAngleAxis as React.ComponentType<any>;
 const PolarRadiusAxisComponent = PolarRadiusAxis as React.ComponentType<any>;
@@ -229,10 +230,15 @@ const SkillMap: React.FC = () => {
         const rows = isTeacher
           ? await getSkillEvaluations()
           : await getSkillEvaluationsByUser(getCurrentUserId());
-        const eligible = rows;
+        const scopedRows = isTeacher
+          ? rows
+          : rows.filter((row) => isEvaluationOwnedByCurrentSession(row.id));
+        const eligible = scopedRows.filter(
+          (row) => row.status === 'approved' || row.status === 'completed'
+        );
         setAvailableEvaluations(eligible);
         const uniqueHistoryIds = Array.from(
-          new Set(rows.map((row) => row.rubric_score_history_id))
+          new Set(eligible.map((row) => row.rubric_score_history_id))
         );
         const resolvedPairs = await Promise.all(
           uniqueHistoryIds.map(async (historyId) => {

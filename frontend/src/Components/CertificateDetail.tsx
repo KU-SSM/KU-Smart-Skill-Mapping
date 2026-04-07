@@ -13,6 +13,8 @@ import {
   ResponsiveContainer,
   Tooltip,
 } from 'recharts';
+import { useAppRole } from '../context/AppRoleContext';
+import { isEvaluationOwnedByCurrentSession } from '../utils/evaluationOwnership';
 
 const PolarGridChart = PolarGrid as unknown as React.ComponentType<any>;
 const PolarAngleAxisChart = PolarAngleAxis as unknown as React.ComponentType<any>;
@@ -134,6 +136,7 @@ interface BackendCriteria {
 const CertificateDetail: React.FC = () => {
   const { evaluationId } = useParams<{ evaluationId: string }>();
   const navigate = useNavigate();
+  const { isTeacher } = useAppRole();
   const previewRef = useRef<HTMLDivElement | null>(null);
   const [evaluationFull, setEvaluationFull] = useState<SkillEvaluationFullResponse | null>(null);
   const [rubricDetail, setRubricDetail] = useState<RubricDetailResponse | null>(null);
@@ -156,6 +159,11 @@ const CertificateDetail: React.FC = () => {
         const evalId = Number(evaluationId);
         if (!Number.isInteger(evalId) || evalId <= 0) {
           throw new Error('Invalid evaluation id');
+        }
+        if (!isTeacher && !isEvaluationOwnedByCurrentSession(evalId)) {
+          alert('This certificate belongs to another student account.');
+          navigate('/certificate', { replace: true });
+          return;
         }
         const fullRes = await api.get<SkillEvaluationFullResponse>(`skill_evaluation/${evalId}/full`);
         const full = fullRes.data;
@@ -278,7 +286,7 @@ const CertificateDetail: React.FC = () => {
       }
     };
     void loadCertificateData();
-  }, [evaluationId]);
+  }, [evaluationId, isTeacher, navigate]);
 
   const mappedSkillSummary = useMemo(() => {
     if (!evaluationFull || !rubricDetail) return [];
