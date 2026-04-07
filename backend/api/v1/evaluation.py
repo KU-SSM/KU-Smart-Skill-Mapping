@@ -2,6 +2,7 @@ import logging
 import base64
 from datetime import datetime
 from typing import List, Optional
+from urllib.parse import quote
 
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import JSONResponse, Response
@@ -133,10 +134,18 @@ async def read_portfolio_file(portfolio_id: int, db: db_dependency):
     download_name = row.filename or "portfolio.pdf"
     if not download_name.lower().endswith(".pdf"):
         download_name = f"{download_name}.pdf"
+    # Starlette encodes header values as latin-1; use RFC 5987 filename* for unicode names.
+    latin1_fallback_name = download_name.encode("latin-1", errors="replace").decode("latin-1")
+    encoded_utf8_name = quote(download_name, safe="")
     return Response(
         content=file_bytes,
         media_type="application/pdf",
-        headers={"Content-Disposition": f'inline; filename="{download_name}"'},
+        headers={
+            "Content-Disposition": (
+                f'inline; filename="{latin1_fallback_name}"; '
+                f"filename*=UTF-8''{encoded_utf8_name}"
+            )
+        },
     )
 
 

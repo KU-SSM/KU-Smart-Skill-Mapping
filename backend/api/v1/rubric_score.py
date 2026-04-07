@@ -81,7 +81,6 @@ async def update_rubric(rubric_id: int, rubric: RubricScoreBase, db: db_dependen
         setattr(db_rubric, key, value)
 
     update_active_histories_for_rubric(db, rubric_id)
-    db.refresh(db_rubric)
     snapshot_live_rubric_to_history(db, rubric_id)
     db.commit()
     db.refresh(db_rubric)

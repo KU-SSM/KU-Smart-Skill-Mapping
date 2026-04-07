@@ -14,7 +14,10 @@ import {
   Tooltip,
 } from 'recharts';
 import { useAppRole } from '../context/AppRoleContext';
-import { isEvaluationOwnedByCurrentSession } from '../utils/evaluationOwnership';
+import {
+  getEvaluationOwner,
+  isEvaluationOwnedByCurrentSession,
+} from '../utils/evaluationOwnership';
 
 const PolarGridChart = PolarGrid as unknown as React.ComponentType<any>;
 const PolarAngleAxisChart = PolarAngleAxis as unknown as React.ComponentType<any>;
@@ -169,8 +172,13 @@ const CertificateDetail: React.FC = () => {
         const full = fullRes.data;
         setEvaluationFull(full);
 
-        const userRes = await api.get<UserResponse>(`user/${full.user_id}`);
-        setStudentName(userRes.data.name || `Student #${full.user_id}`);
+        const ownerUsername = getEvaluationOwner(evalId);
+        if (ownerUsername) {
+          setStudentName(ownerUsername);
+        } else {
+          const userRes = await api.get<UserResponse>(`user/${full.user_id}`);
+          setStudentName(userRes.data.name || `Student #${full.user_id}`);
+        }
 
         const [historyRes, skillHistoryRes, levelHistoryRes] = await Promise.all([
           api.get<RubricHistoryResponse>(`rubric_score_history/${full.rubric_score_history_id}`),

@@ -62,7 +62,7 @@ const Home: React.FC = () => {
         </svg>
       ),
       title: 'Export Certificate',
-      text: 'Choose the approved evaluation results to make a certificate to export.',
+      text: 'Choose the completed evaluation results to make a certificate to export.',
       path: '/certificate',
     },
   ];
@@ -116,7 +116,7 @@ const Home: React.FC = () => {
         </svg>
       ),
       title: 'Export Certificate',
-      text: 'Choose the approved evaluation results to make a certificate to export.',
+      text: 'Choose the completed evaluation results to make a certificate to export.',
       path: '/certificate',
     },
   ];

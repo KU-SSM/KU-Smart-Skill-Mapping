@@ -58,7 +58,7 @@ export const instructionStudentCertificate: React.ReactNode = (
   <div className="ihb-body">
     <p className={B.pageTitle}>Certificate Page:</p>
     <ul className={`${B.list} ihb-list--flat`}>
-      <li>You can choose your approved evaluation results to make a certificate to export.</li>
+      <li>You can choose your completed evaluation results to make a certificate to export.</li>
     </ul>
   </div>
 );
@@ -67,7 +67,7 @@ export const instructionTeacherCertificate: React.ReactNode = (
   <div className="ihb-body">
     <p className={B.pageTitle}>Certificate Page:</p>
     <ul className={`${B.list} ihb-list--flat`}>
-      <li>You can choose the approved evaluation results to make a certificate to export.</li>
+      <li>You can choose the completed evaluation results to make a certificate to export.</li>
     </ul>
   </div>
 );

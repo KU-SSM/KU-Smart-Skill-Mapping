@@ -19,7 +19,10 @@ import { getCurrentUserId } from '../utils/currentUser';
 import { useAppRole } from '../context/AppRoleContext';
 import InstructionHelpBubble from './InstructionHelpBubble';
 import { instructionStudentSkillMap, instructionTeacherSkillMap } from './instructionHelpContent';
-import { isEvaluationOwnedByCurrentSession } from '../utils/evaluationOwnership';
+import {
+  getEvaluationOwner,
+  isEvaluationOwnedByCurrentSession,
+} from '../utils/evaluationOwnership';
 
 const PolarAngleAxisComponent = PolarAngleAxis as React.ComponentType<any>;
 const PolarRadiusAxisComponent = PolarRadiusAxis as React.ComponentType<any>;
@@ -89,6 +92,11 @@ interface RubricHistoryResponse {
 interface RubricResponse {
   id: number;
   name: string;
+}
+
+interface UserResponse {
+  id: number;
+  name?: string;
 }
 
 interface RubricSkillHistoryResponse {
@@ -181,6 +189,7 @@ const SkillMap: React.FC = () => {
   const [availableEvaluations, setAvailableEvaluations] = useState<SkillEvaluationRecord[]>([]);
   const [evaluationCache, setEvaluationCache] = useState<Record<string, SkillMapEvaluation>>({});
   const [rubricTitleByHistoryId, setRubricTitleByHistoryId] = useState<Record<number, string>>({});
+  const [studentNameByUserId, setStudentNameByUserId] = useState<Record<number, string>>({});
   const [selectedEvalId, setSelectedEvalId] = useState<string>('');
   const [isLoadingEvaluations, setIsLoadingEvaluations] = useState<boolean>(true);
   const [isLoadingSelected, setIsLoadingSelected] = useState<boolean>(false);
@@ -240,6 +249,7 @@ const SkillMap: React.FC = () => {
         const uniqueHistoryIds = Array.from(
           new Set(eligible.map((row) => row.rubric_score_history_id))
         );
+        const uniqueUserIds = Array.from(new Set(eligible.map((row) => row.user_id)));
         const resolvedPairs = await Promise.all(
           uniqueHistoryIds.map(async (historyId) => {
             try {
@@ -251,9 +261,25 @@ const SkillMap: React.FC = () => {
             }
           })
         );
+        const resolvedUsers = await Promise.all(
+          uniqueUserIds.map(async (userId) => {
+            try {
+              const userRes = await api.get<UserResponse>(`user/${userId}`);
+              return [userId, userRes.data.name || `Student #${userId}`] as const;
+            } catch {
+              return [userId, `Student #${userId}`] as const;
+            }
+          })
+        );
         setRubricTitleByHistoryId(
           resolvedPairs.reduce<Record<number, string>>((acc, [historyId, title]) => {
             acc[historyId] = title;
+            return acc;
+          }, {})
+        );
+        setStudentNameByUserId(
+          resolvedUsers.reduce<Record<number, string>>((acc, [userId, name]) => {
+            acc[userId] = name;
             return acc;
           }, {})
         );
@@ -374,9 +400,13 @@ const SkillMap: React.FC = () => {
           return { skillArea: s.name, values };
         });
 
+        const ownerUsername = getEvaluationOwner(evalIdNum);
+        const displayTitle =
+          isTeacher && ownerUsername ? `${ownerUsername} - ${rubricTitle}` : rubricTitle;
+
         const mapped: SkillMapEvaluation = {
           id: selectedEvalId,
-          title: rubricTitle || `Evaluation #${full.id}`,
+          title: displayTitle || `Evaluation #${full.id}`,
           rubricHint: rubricTitle,
           status: full.status === 'pending' ? 'pending' : full.status === 'approved' ? 'approved' : 'completed',
           rubricMaxRank: rubricAxisMaxFromLevels(levels),
@@ -398,7 +428,7 @@ const SkillMap: React.FC = () => {
     };
 
     void loadSelectedEvaluation();
-  }, [selectedEvalId, evaluationCache]);
+  }, [selectedEvalId, evaluationCache, isTeacher]);
 
   const openEvalModal = () => {
     setPendingEvalId(selectedEvalId);
@@ -688,7 +718,13 @@ const SkillMap: React.FC = () => {
                       onClick={() => setPendingEvalId(String(ev.id))}
                     >
                       <span className="skill-map-modal-item-title">
-                        {rubricTitleByHistoryId[ev.rubric_score_history_id] || `Evaluation #${ev.id}`} ({toStatusLabel(ev.status)})
+                        {isTeacher
+                          ? `${rubricTitleByHistoryId[ev.rubric_score_history_id] || `Evaluation #${ev.id}`} (${
+                              getEvaluationOwner(ev.id) ||
+                              studentNameByUserId[ev.user_id] ||
+                              `Student #${ev.user_id}`
+                            }) (${toStatusLabel(ev.status)})`
+                          : `${rubricTitleByHistoryId[ev.rubric_score_history_id] || `Evaluation #${ev.id}`} (${toStatusLabel(ev.status)})`}
                       </span>
                     </button>
                   </li>

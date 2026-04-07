@@ -200,10 +200,17 @@ const Profile3Detail: React.FC = () => {
         setSelectedPortfolioId(ev.portfolio_id);
         setSelectedRubricId(rubricId);
         setConfirmedRubricId(rubricId);
-        setAiEvaluations(toScoreMap(ev.ai_evaluated_skills || []));
 
         const studentMap = toScoreMap(ev.student_evaluated_skills || []);
         const rubricDetail = await getRubricScore(rubricId);
+        const aiMap = toScoreMap(ev.ai_evaluated_skills || []);
+        rubricDetail.rows.forEach((row) => {
+          const skillArea = (row.skillArea || '').trim();
+          if (!skillArea) return;
+          const current = (aiMap[skillArea] || '').trim();
+          aiMap[skillArea] = /^\d+$/.test(current) ? current : '0';
+        });
+        setAiEvaluations(aiMap);
         const rubricSetHydrate = new Set(
           rubricDetail.rows.map((r) => (r.skillArea || '').trim()).filter((n) => n !== '')
         );
@@ -745,13 +752,18 @@ const Profile3Detail: React.FC = () => {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
+    const hasTimezone = /(?:Z|[+-]\d{2}:\d{2})$/.test(dateString);
+    const normalizedIso = hasTimezone ? dateString : `${dateString}Z`;
+    const date = new Date(normalizedIso);
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'short', 
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
+      second: '2-digit',
+      timeZone: 'Asia/Bangkok',
+      hour12: false,
     });
   };
 

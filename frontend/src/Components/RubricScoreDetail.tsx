@@ -321,15 +321,22 @@ const RubricScoreDetail: React.FC = () => {
   const handleSaveChanges = () => {
     void (async () => {
       if (!id) return;
-    const effectiveTitle = isEditingTitle ? editingTitle.trim() : title.trim();
-    if (isEditingTitle) {
-      setTitle(effectiveTitle || title);
-      setIsEditingTitle(false);
-    }
-    const defaultExpirationDate = getDefaultExpirationDate();
-    const defaultExpirationTime = '23:59:59';
-    setExpirationDate(defaultExpirationDate);
-    setExpirationTime(defaultExpirationTime);
+      const liveInputValue = (titleInputRef.current?.value || '').trim();
+      const draftEditingTitle = (editingTitle || '').trim();
+      const currentTitle = (title || '').trim();
+      const effectiveTitle =
+        liveInputValue ||
+        (draftEditingTitle && draftEditingTitle !== currentTitle ? draftEditingTitle : currentTitle);
+      const resolvedTitle = effectiveTitle || title;
+      if (isEditingTitle) {
+        setEditingTitle(resolvedTitle);
+        setTitle(resolvedTitle);
+        setIsEditingTitle(false);
+      }
+      const defaultExpirationDate = getDefaultExpirationDate();
+      const defaultExpirationTime = '23:59:59';
+      setExpirationDate(defaultExpirationDate);
+      setExpirationTime(defaultExpirationTime);
       let isFirstSave = false;
       try {
         const histories = await getRubricScoreHistoryByRubric(id);
@@ -339,11 +346,11 @@ const RubricScoreDetail: React.FC = () => {
       }
 
       if (isFirstSave) {
-        performSave(defaultExpirationDate, defaultExpirationTime, effectiveTitle || title);
+        performSave(defaultExpirationDate, defaultExpirationTime, resolvedTitle);
         return;
       }
 
-      setPendingSaveTitle(effectiveTitle || title);
+      setPendingSaveTitle(resolvedTitle);
       setShowSaveExpirationModal(true);
     })();
   };

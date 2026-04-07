@@ -551,8 +551,16 @@ const Profile2: React.FC = () => {
             .map((skillArea) => ({ skillArea }));
 
           setStudentExtraSkills(extraStudentSkills);
+          const normalizedHydratedAiScores: { [skillArea: string]: string } = Object.fromEntries(
+            Object.keys(newAiValues).map((skillArea) => [skillArea, '0'])
+          );
+          Object.entries(pendingHydratedScores.ai).forEach(([skillArea, raw]) => {
+            const trimmed = (raw || '').trim();
+            normalizedHydratedAiScores[skillArea] = /^\d+$/.test(trimmed) ? trimmed : '0';
+          });
+
           setTeacherEvaluations({ ...newTeacherValues, ...pendingHydratedScores.teacher });
-          setAiEvaluations({ ...newAiValues, ...pendingHydratedScores.ai });
+          setAiEvaluations(normalizedHydratedAiScores);
           setStudentEvaluations({ ...newStudentValues, ...pendingHydratedScores.student });
           setOriginalStudentSkills(skillsFromRubric.map((s) => ({ ...s })));
           setOriginalStudentExtraSkills(extraStudentSkills.map((s) => ({ ...s })));
@@ -560,7 +568,7 @@ const Profile2: React.FC = () => {
             ...newStudentValues,
             ...pendingHydratedScores.student,
           });
-          setOriginalAiEvaluations({ ...newAiValues, ...pendingHydratedScores.ai });
+          setOriginalAiEvaluations(normalizedHydratedAiScores);
           setHasAppliedHydratedScores(true);
           setPendingHydratedScores(null);
         } else {

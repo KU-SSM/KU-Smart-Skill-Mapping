@@ -1319,7 +1319,7 @@
   }
 
   .profile2-view-details-text {
-    display: none; /* Hide text on mobile, show only icon */
+    display: none;
   }
 
   .profile2-view-details-icon {

@@ -45,7 +45,6 @@
   margin: 0;
 }
 
-/* Wider help bubble on rubric score list pages (teacher + student) */
 .rubric-score-title-row .ihb-cloud {
   width: min(520px, calc(100vw - 24px));
   max-width: min(520px, calc(100vw - 24px));

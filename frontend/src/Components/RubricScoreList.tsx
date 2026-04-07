@@ -1,8 +1,8 @@
-import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AiOutlineClose, AiOutlinePlus } from 'react-icons/ai';
 import './RubricScore.css';
-import { getRubricScores, createRubricScore, deleteRubricScore, updateRubricName } from '../services/rubricScoreApi';
+import { getRubricScores, createRubricScore, deleteRubricScore } from '../services/rubricScoreApi';
 import { getApiErrorDetail } from '../utils/apiErrors';
 import InstructionHelpBubble from './InstructionHelpBubble';
 import { instructionTeacherRubricManage } from './instructionHelpContent';
@@ -21,11 +21,9 @@ const RubricScoreList: React.FC = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isAddingRubric, setIsAddingRubric] = useState<boolean>(false);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(() => new Set());
-  const [renamingIds, setRenamingIds] = useState<Set<string>>(() => new Set());
   const [rubricScores, setRubricScores] = useState<RubricScore[]>([]);
 
   const lastPersistedTitleRef = useRef<Record<string, string>>({});
-  const pendingTitlePersistRef = useRef<Map<string, Promise<boolean>>>(new Map());
 
   useEffect(() => {
     const loadRubricScores = async () => {
@@ -50,40 +48,6 @@ const RubricScoreList: React.FC = () => {
     loadRubricScores();
   }, []);
 
-  const persistTitleIfChanged = useCallback(async (id: string, title: string): Promise<boolean> => {
-    const trimmed = title.trim() || 'Untitled Rubric';
-    const prev = lastPersistedTitleRef.current[id] ?? '';
-
-    if (trimmed === prev) return true;
-
-    const existing = pendingTitlePersistRef.current.get(id);
-    if (existing) return existing;
-
-    const p = (async (): Promise<boolean> => {
-      setRenamingIds(s => new Set(s).add(id));
-      try {
-        await updateRubricName(id, trimmed);
-        lastPersistedTitleRef.current[id] = trimmed;
-        setRubricScores(prevList => prevList.map(r => (r.id === id ? { ...r, title: trimmed } : r)));
-        return true;
-      } catch (error: unknown) {
-        alert(`Error: ${getApiErrorDetail(error) || 'Failed to rename rubric'}`);
-        setRubricScores(prevList => prevList.map(r => (r.id === id ? { ...r, title: prev } : r)));
-        return false;
-      } finally {
-        pendingTitlePersistRef.current.delete(id);
-        setRenamingIds(s => {
-          const n = new Set(s);
-          n.delete(id);
-          return n;
-        });
-      }
-    })();
-
-    pendingTitlePersistRef.current.set(id, p);
-    return p;
-  }, []);
-
   const filteredRubricScores = useMemo(() => {
     if (!searchQuery.trim()) {
       return rubricScores;
@@ -92,13 +56,8 @@ const RubricScoreList: React.FC = () => {
     return rubricScores.filter(rubric => rubric.title.toLowerCase().includes(query));
   }, [rubricScores, searchQuery]);
 
-  const handleTitleChange = (id: string, title: string) => {
-    setRubricScores(prev => prev.map(r => (r.id === id ? { ...r, title } : r)));
-  };
-
-  const openRubricDetail = async (rubric: RubricScore) => {
-    const ok = await persistTitleIfChanged(rubric.id, rubric.title);
-    if (ok) navigate(`/rubric_score/${rubric.id}`);
+  const openRubricDetail = (rubric: RubricScore) => {
+    navigate(`/rubric_score/${rubric.id}`);
   };
 
   const handleDeleteRubric = async (e: React.MouseEvent, id: string) => {
@@ -161,7 +120,7 @@ const RubricScoreList: React.FC = () => {
     );
   }
 
-  const rowBusy = (id: string) => deletingIds.has(id) || renamingIds.has(id);
+  const rowBusy = (id: string) => deletingIds.has(id);
 
   return (
     <div className="rubric-score-wrapper">
@@ -206,20 +165,9 @@ const RubricScoreList: React.FC = () => {
                 type="text"
                 className="rubric-score-bar-title-input rubric-score-bar-title-input--manage"
                 value={rubric.title}
-                onChange={(e) => handleTitleChange(rubric.id, e.target.value)}
-                onBlur={(e) => void persistTitleIfChanged(rubric.id, e.currentTarget.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    void (async () => {
-                      const ok = await persistTitleIfChanged(rubric.id, e.currentTarget.value);
-                      if (ok) navigate(`/rubric_score/${rubric.id}`);
-                    })();
-                  }
-                }}
                 placeholder="Rubric name"
                 aria-label="Rubric name"
-                disabled={rowBusy(rubric.id)}
+                readOnly
               />
               <button
                 type="button"
