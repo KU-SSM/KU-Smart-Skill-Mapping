@@ -76,7 +76,7 @@ const Home: React.FC = () => {
         </svg>
       ),
       title: 'Create Rubric Score',
-      text: 'Create, update or rename your rubric scores criteria.',
+      text: 'Create, update and manage your rubric scores to be used as a criteria for evaluation.',
       path: '/rubric_score',
     },
     {

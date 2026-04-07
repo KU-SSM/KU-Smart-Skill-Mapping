@@ -75,7 +75,7 @@ export const instructionTeacherCertificate: React.ReactNode = (
 export const instructionTeacherRubricManage: React.ReactNode = (
   <div className="ihb-body">
     <p className={B.pageTitle}>Rubric Score Page:</p>
-    <p className={B.para}>Create, update or rename your rubric scores criteria.</p>
+    <p className={B.para}>Create, update and delete your rubric scores criteria.</p>
   </div>
 );
 
